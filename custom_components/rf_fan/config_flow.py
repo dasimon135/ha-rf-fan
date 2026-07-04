@@ -11,12 +11,8 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
+from .actions import split_actions, validate_codes
 from .const import (
-    ACTION_FAN_OFF,
-    ACTION_FAN_ON,
-    ACTION_LIGHT_OFF,
-    ACTION_LIGHT_ON,
-    ACTION_LIGHT_TOGGLE,
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
@@ -28,7 +24,6 @@ from .const import (
     DEFAULT_SPEED_COUNT,
     DOMAIN,
     EVENT_RF_FAN_RECEIVED,
-    speed_action,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -138,18 +133,17 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Étape manuelle: mapping action -> code RF."""
         errors: dict[str, str] = {}
-        required_actions, optional_actions = self._split_actions()
+        required_actions, optional_actions = split_actions(
+            self._speed_count, self._has_light
+        )
 
         if user_input is not None:
-            codes: dict[str, str] = {}
-            for action in required_actions + optional_actions:
-                value = str(user_input.get(action, "")).strip()
-                if action in required_actions and not value:
-                    errors[action] = "required"
-                    continue
-                if value:
-                    codes[action] = value
-
+            codes = {
+                action: str(user_input.get(action, "")).strip()
+                for action in required_actions + optional_actions
+                if str(user_input.get(action, "")).strip()
+            }
+            errors = validate_codes(codes, required_actions, self._has_light)
             if not errors:
                 return self._create_entry(codes)
 
@@ -167,18 +161,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def _learn_actions(self) -> list[str]:
         """Lister les actions à apprendre dans l'ordre."""
-        required_actions, optional_actions = self._split_actions()
+        required_actions, optional_actions = split_actions(
+            self._speed_count, self._has_light
+        )
         return required_actions + optional_actions
-
-    def _split_actions(self) -> tuple[list[str], list[str]]:
-        """Retourner les actions obligatoires et optionnelles."""
-        required_actions = [ACTION_FAN_OFF, ACTION_FAN_ON]
-        required_actions.extend(speed_action(idx) for idx in range(1, self._speed_count + 1))
-        optional_actions: list[str] = []
-        if self._has_light:
-            required_actions.extend([ACTION_LIGHT_ON, ACTION_LIGHT_OFF])
-            optional_actions.append(ACTION_LIGHT_TOGGLE)
-        return required_actions, optional_actions
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
