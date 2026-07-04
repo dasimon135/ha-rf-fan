@@ -55,6 +55,7 @@
     },
     "error": {
       "required": "Ce champ est obligatoire.",
+      "light_code_required": "Renseignez au moins un code lumière (ON/OFF ou bascule).",
       "required_esphome_device": "Plusieurs devices ESPHome compatibles ont été trouvés. Choisissez-en un.",
       "unknown_esphome_device": "Aucun device ESPHome compatible n'a été trouvé avec ce nom.",
       "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action."

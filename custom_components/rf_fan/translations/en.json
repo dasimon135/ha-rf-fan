@@ -55,6 +55,7 @@
     },
     "error": {
       "required": "This field is required.",
+      "light_code_required": "Provide at least one light code (on/off or toggle).",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose one.",
       "unknown_esphome_device": "No compatible ESPHome device was found with this name.",
       "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action."
