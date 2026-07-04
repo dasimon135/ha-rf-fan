@@ -38,3 +38,16 @@ def split_actions(speed_count: int, has_light: bool) -> tuple[list[str], list[st
     if has_light:
         optional.extend(LIGHT_ACTIONS)
     return required, optional
+
+
+def validate_codes(
+    codes: dict[str, str], required: list[str], has_light: bool
+) -> dict[str, str]:
+    """Retourner {champ: clé_erreur} ; dict vide si tout est valide."""
+    errors: dict[str, str] = {}
+    for action in required:
+        if not codes.get(action):
+            errors[action] = "required"
+    if has_light and not any(codes.get(action) for action in LIGHT_ACTIONS):
+        errors[ACTION_LIGHT_TOGGLE] = "light_code_required"
+    return errors
