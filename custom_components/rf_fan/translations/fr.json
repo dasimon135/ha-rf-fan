@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ventilateur RF - Configuration",
+        "description": "Choisissez la passerelle RF ESPHome et les capacités du ventilateur. Appareil(s) ESPHome compatible(s) détecté(s): {detected}.",
+        "data": {
+          "esphome_device": "Nom du device ESPHome",
+          "fan_name": "Nom d'affichage du ventilateur",
+          "speed_count": "Nombre de vitesses distinctes",
+          "has_light": "Le ventilateur a une lumière intégrée"
+        }
+      },
+      "method": {
+        "title": "Ventilateur RF - Méthode de configuration",
+        "description": "Choisissez la saisie manuelle ou l'apprentissage guidé à partir des appuis sur la télécommande.",
+        "data": {
+          "method": "Méthode de configuration"
+        },
+        "data_description": {
+          "method": {
+            "manual": "Saisie manuelle : collez vous-même les codes RF.",
+            "learn": "Apprentissage guidé : appuyez sur chaque bouton quand il est demandé."
+          }
+        }
+      },
+      "learn": {
+        "title": "Ventilateur RF - Apprentissage guidé",
+        "description": "En attente de l'action {action}. Appuyez sur le bouton correspondant dans les {timeout} secondes, ou collez le code manuellement si nécessaire.",
+        "data": {
+          "code": "Code RF capturé",
+          "skip": "Ignorer cette action"
+        }
+      },
+      "codes": {
+        "title": "Ventilateur RF - Codes d'action",
+        "description": "Collez le code RF pour chaque action. Les codes sont des chaînes opaques, exactement comme produites par votre pipeline de sniff.",
+        "data": {
+          "fan_on": "Code pour ventilateur ON",
+          "fan_off": "Code pour ventilateur OFF",
+          "fan_speed_1": "Code vitesse 1",
+          "fan_speed_2": "Code vitesse 2",
+          "fan_speed_3": "Code vitesse 3",
+          "fan_speed_4": "Code vitesse 4",
+          "fan_speed_5": "Code vitesse 5",
+          "fan_speed_6": "Code vitesse 6",
+          "light_on": "Code lumière ON",
+          "light_off": "Code lumière OFF",
+          "light_toggle": "Code bascule lumière (optionnel)"
+        }
+      }
+    },
+    "progress": {
+      "listen_rf_signal": "En attente d'un signal RF de la télécommande physique"
+    },
+    "error": {
+      "required": "Ce champ est obligatoire.",
+      "required_esphome_device": "Plusieurs devices ESPHome compatibles ont été trouvés. Choisissez-en un.",
+      "unknown_esphome_device": "Aucun device ESPHome compatible n'a été trouvé avec ce nom.",
+      "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options d'émission RF",
+        "description": "Ajustez les réglages de fiabilité RF.",
+        "data": {
+          "repeat_count": "Nombre de répétitions RF"
+        }
+      }
+    }
+  }
+}

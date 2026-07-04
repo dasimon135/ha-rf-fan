@@ -1,0 +1,135 @@
+"""Plateforme fan pour RF Fan."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from homeassistant.components.fan import FanEntity, FanEntityFeature
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import ACTION_FAN_OFF, ACTION_FAN_ON, CONF_SPEED_COUNT, EVENT_RF_FAN_RECEIVED, speed_action
+from .entity import RfFanBaseEntity
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Configurer l'entité fan."""
+    async_add_entities([RfFanEntity(hass, config_entry)])
+
+
+class RfFanEntity(RfFanBaseEntity, FanEntity):
+    """Ventilateur RF générique à état supposé."""
+
+    _attr_supported_features = (
+        FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF | FanEntityFeature.SET_SPEED
+    )
+
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+        """Initialiser l'entité fan."""
+        super().__init__(hass, config_entry)
+        self._attr_unique_id = f"{config_entry.entry_id}_fan"
+        self._attr_name = "Fan"
+        self._speed_count: int = int(config_entry.data[CONF_SPEED_COUNT])
+        self._is_on: bool | None = None
+        self._percentage: int | None = None
+        self._event_unsub = None
+
+    @property
+    def is_on(self) -> bool | None:
+        """Retourner l'état on/off supposé."""
+        return self._is_on
+
+    @property
+    def percentage(self) -> int | None:
+        """Retourner la vitesse en pourcentage."""
+        return self._percentage
+
+    @property
+    def percentage_step(self) -> float:
+        """Retourner le pas de vitesse supporté."""
+        return 100 / self._speed_count
+
+    async def async_added_to_hass(self) -> None:
+        """S'abonner aux événements RF reçus par ESPHome."""
+        self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Désabonner les callbacks."""
+        if self._event_unsub is not None:
+            self._event_unsub()
+            self._event_unsub = None
+
+    async def async_turn_on(
+        self,
+        percentage: int | None = None,
+        preset_mode: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Allumer le ventilateur."""
+        if percentage is not None:
+            await self.async_set_percentage(percentage)
+            return
+
+        sent = await self._async_transmit_action(ACTION_FAN_ON)
+        if not sent:
+            sent = await self._async_transmit_action(speed_action(1))
+
+        if sent:
+            self._is_on = True
+            if self._percentage is None or self._percentage <= 0:
+                self._percentage = round(100 / self._speed_count)
+            self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Éteindre le ventilateur."""
+        sent = await self._async_transmit_action(ACTION_FAN_OFF)
+        if sent:
+            self._is_on = False
+            self._percentage = 0
+            self.async_write_ha_state()
+
+    async def async_set_percentage(self, percentage: int) -> None:
+        """Définir la vitesse via une action fan_speed_X."""
+        if percentage <= 0:
+            await self.async_turn_off()
+            return
+
+        step = 100 / self._speed_count
+        speed_index = max(1, min(self._speed_count, int(round(percentage / step))))
+        sent = await self._async_transmit_action(speed_action(speed_index))
+        if sent:
+            self._is_on = True
+            self._percentage = int(round(speed_index * step))
+            self.async_write_ha_state()
+
+    @callback
+    def _handle_rf_event(self, event: Any) -> None:
+        """Mettre à jour l'état local quand la télécommande physique est utilisée."""
+        action = self._event_action(event.data)
+        if action is None:
+            return
+
+        if action == ACTION_FAN_OFF:
+            self._is_on = False
+            self._percentage = 0
+            self.async_write_ha_state()
+            return
+
+        if action == ACTION_FAN_ON:
+            self._is_on = True
+            if self._percentage is None or self._percentage <= 0:
+                self._percentage = int(round(100 / self._speed_count))
+            self.async_write_ha_state()
+            return
+
+        for idx in range(1, self._speed_count + 1):
+            if action == speed_action(idx):
+                self._is_on = True
+                self._percentage = int(round(idx * (100 / self._speed_count)))
+                self.async_write_ha_state()
+                return

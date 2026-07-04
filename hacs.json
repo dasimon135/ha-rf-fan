@@ -1,0 +1,7 @@
+{
+  "name": "RF Fan",
+  "content_in_root": false,
+  "render_readme": true,
+  "domains": ["rf_fan"],
+  "homeassistant": "2026.5.0"
+}

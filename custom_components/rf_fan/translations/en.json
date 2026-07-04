@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RF Fan - Device Setup",
+        "description": "Choose the ESPHome RF gateway and basic fan capabilities. Compatible ESPHome devices found: {detected}.",
+        "data": {
+          "esphome_device": "ESPHome device name",
+          "fan_name": "Fan display name",
+          "speed_count": "Number of discrete speeds",
+          "has_light": "Fan has integrated light"
+        }
+      },
+      "method": {
+        "title": "RF Fan - Setup Method",
+        "description": "Choose manual entry or guided learning from remote button presses.",
+        "data": {
+          "method": "Configuration method"
+        },
+        "data_description": {
+          "method": {
+            "manual": "Manual entry: paste the RF codes yourself.",
+            "learn": "Guided learning: press each remote button when prompted."
+          }
+        }
+      },
+      "learn": {
+        "title": "RF Fan - Guided Learning",
+        "description": "Listening for action {action}. Press the corresponding remote button within {timeout} seconds, or paste the code manually if needed.",
+        "data": {
+          "code": "Captured RF code",
+          "skip": "Skip this action"
+        }
+      },
+      "codes": {
+        "title": "RF Fan - Action Codes",
+        "description": "Paste the RF code for each action. Codes are opaque strings, exactly as produced by your sniffing pipeline.",
+        "data": {
+          "fan_on": "Code for fan on",
+          "fan_off": "Code for fan off",
+          "fan_speed_1": "Code for speed 1",
+          "fan_speed_2": "Code for speed 2",
+          "fan_speed_3": "Code for speed 3",
+          "fan_speed_4": "Code for speed 4",
+          "fan_speed_5": "Code for speed 5",
+          "fan_speed_6": "Code for speed 6",
+          "light_on": "Code for light on",
+          "light_off": "Code for light off",
+          "light_toggle": "Code for light toggle (optional)"
+        }
+      }
+    },
+    "progress": {
+      "listen_rf_signal": "Waiting for an RF signal from the physical remote"
+    },
+    "error": {
+      "required": "This field is required.",
+      "required_esphome_device": "Several compatible ESPHome devices were found. Choose one.",
+      "unknown_esphome_device": "No compatible ESPHome device was found with this name.",
+      "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "RF Transmission Options",
+        "description": "Adjust RF reliability settings.",
+        "data": {
+          "repeat_count": "RF repeat count"
+        }
+      }
+    }
+  }
+}
