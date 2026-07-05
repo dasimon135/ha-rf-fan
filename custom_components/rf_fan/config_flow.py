@@ -49,6 +49,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._learn_codes: dict[str, str] = {}
         self._learn_action_index: int = 0
         self._learn_task: asyncio.Task[str | None] | None = None
+        self._learn_timeout: bool = False
 
     def _available_esphome_devices(self) -> list[str]:
         """Lister les devices ESPHome exposant un service transmit_rf_fan."""
@@ -171,40 +172,49 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Apprendre les codes d'une action après l'autre."""
         actions = self._learn_actions()
+
+        # Une écoute est en cours ou vient de se terminer : la résoudre d'abord.
+        # HA relance automatiquement cette étape quand la tâche se termine ; on ne
+        # doit donc jamais piloter le flow à la main (cf. async_show_progress).
+        if self._learn_task is not None:
+            if not self._learn_task.done():
+                return self.async_show_progress(
+                    step_id="learn",
+                    progress_action="listen_rf_signal",
+                    progress_task=self._learn_task,
+                    description_placeholders={
+                        "action": actions[self._learn_action_index],
+                        "timeout": str(LEARN_TIMEOUT_SEC),
+                    },
+                )
+
+            learned_code = self._learn_task.result()
+            self._learn_task = None
+            if learned_code is not None:
+                self._learn_codes[actions[self._learn_action_index]] = learned_code
+                self._learn_action_index += 1
+            else:
+                self._learn_timeout = True
+            # Toujours sortir de l'écran de progression via show_progress_done.
+            return self.async_show_progress_done(next_step_id="learn")
+
+        # Soumission d'un formulaire (saisie manuelle, ignorer, ou réessayer).
+        if user_input is not None:
+            self._learn_timeout = False
+            if bool(user_input.get("skip")):
+                self._learn_action_index += 1
+            else:
+                learned_code = str(user_input.get("code", "")).strip()
+                if learned_code:
+                    self._learn_codes[actions[self._learn_action_index]] = learned_code
+                    self._learn_action_index += 1
+
+        # Toutes les actions traitées : créer l'entrée.
         if self._learn_action_index >= len(actions):
             return self._create_entry(self._learn_codes)
 
-        current_action = actions[self._learn_action_index]
-        if user_input is not None:
-            if bool(user_input.get("skip")):
-                self._learn_action_index += 1
-                self._learn_task = None
-                return await self.async_step_learn()
-
-            learned_code = str(user_input.get("code", "")).strip()
-            if learned_code:
-                self._learn_codes[current_action] = learned_code
-                self._learn_action_index += 1
-                self._learn_task = None
-                return await self.async_step_learn()
-
-        if self._learn_task is None:
-            self._learn_task = self.hass.async_create_task(self._async_wait_for_rf_signal())
-
-        if not self._learn_task.done():
-            return self.async_show_progress(
-                step_id="learn",
-                progress_action="listen_rf_signal",
-                progress_task=self._learn_task,
-                description_placeholders={
-                    "action": current_action,
-                    "timeout": str(LEARN_TIMEOUT_SEC),
-                },
-            )
-
-        learned_code = self._learn_task.result()
-        self._learn_task = None
-        if learned_code is None:
+        # Timeout sur l'écoute précédente : proposer saisie manuelle / ignorer.
+        if self._learn_timeout:
             return self.async_show_form(
                 step_id="learn",
                 data_schema=vol.Schema(
@@ -214,15 +224,25 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 description_placeholders={
-                    "action": current_action,
+                    "action": actions[self._learn_action_index],
                     "timeout": str(LEARN_TIMEOUT_SEC),
                 },
                 errors={"base": "learn_timeout"},
             )
 
-        self._learn_codes[current_action] = learned_code
-        self._learn_action_index += 1
-        return await self.async_step_learn()
+        # Démarrer l'écoute de l'action courante.
+        self._learn_task = self.hass.async_create_task(
+            self._async_wait_for_rf_signal()
+        )
+        return self.async_show_progress(
+            step_id="learn",
+            progress_action="listen_rf_signal",
+            progress_task=self._learn_task,
+            description_placeholders={
+                "action": actions[self._learn_action_index],
+                "timeout": str(LEARN_TIMEOUT_SEC),
+            },
+        )
 
     async def _async_wait_for_rf_signal(self) -> str | None:
         """Attendre un événement RF de la passerelle sélectionnée."""
@@ -243,7 +263,6 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
             result = code.strip()
             event_received.set()
-            self.hass.async_create_task(self.hass.config_entries.flow.async_configure(self.flow_id))
 
         unsubscribe = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, _handle_event)
 
