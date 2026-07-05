@@ -51,7 +51,7 @@
       }
     },
     "progress": {
-      "listen_rf_signal": "En attente d'un signal RF de la télécommande physique"
+      "listen_rf_signal": "Action « {action} » : appuyez sur le bouton correspondant de la télécommande (≤ {timeout}s)."
     },
     "error": {
       "required": "Ce champ est obligatoire.",

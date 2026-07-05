@@ -51,7 +51,7 @@
       }
     },
     "progress": {
-      "listen_rf_signal": "Waiting for an RF signal from the physical remote"
+      "listen_rf_signal": "Action \"{action}\": press the matching button on the remote (≤ {timeout}s)."
     },
     "error": {
       "required": "This field is required.",
