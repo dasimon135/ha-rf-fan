@@ -170,24 +170,65 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Apprendre les codes d'une action après l'autre."""
+        """Écran de progression : écouter l'action courante.
+
+        Cette étape ne renvoie QUE ``SHOW_PROGRESS`` ou ``SHOW_PROGRESS_DONE`` :
+        depuis un écran de progression, HA n'autorise aucune autre transition. Le
+        stockage du code et le passage à l'action suivante se font dans
+        ``async_step_learn_resolve``, qui porte un ``step_id`` différent. Ce
+        changement de ``step_id`` est indispensable : c'est lui qui déclenche
+        l'événement ``data_entry_flow_progressed`` rafraîchissant le frontend
+        (cf. ``FlowManager._async_configure``). Boucler sur le même ``step_id``
+        (``show_progress`` → ``show_progress_done(next_step_id="learn")``) ne
+        change pas le ``step_id`` → aucun rafraîchissement → le spinner reste figé
+        alors même que le backend a avancé.
+        """
         actions = self._learn_actions()
 
-        # Une écoute est en cours ou vient de se terminer : la résoudre d'abord.
-        # HA relance automatiquement cette étape quand la tâche se termine ; on ne
-        # doit donc jamais piloter le flow à la main (cf. async_show_progress).
-        if self._learn_task is not None:
-            if not self._learn_task.done():
-                return self.async_show_progress(
-                    step_id="learn",
-                    progress_action="listen_rf_signal",
-                    progress_task=self._learn_task,
-                    description_placeholders={
-                        "action": actions[self._learn_action_index],
-                        "timeout": str(LEARN_TIMEOUT_SEC),
-                    },
-                )
+        # L'écoute est terminée : passer à la résolution (change de step_id).
+        if self._learn_task is not None and self._learn_task.done():
+            return self.async_show_progress_done(next_step_id="learn_resolve")
 
+        # Démarrer l'écoute si nécessaire, puis afficher la progression.
+        if self._learn_task is None:
+            self._learn_task = self.hass.async_create_task(
+                self._async_wait_for_rf_signal()
+            )
+        return self.async_show_progress(
+            step_id="learn",
+            progress_action="listen_rf_signal",
+            progress_task=self._learn_task,
+            description_placeholders={
+                "action": actions[self._learn_action_index],
+                "timeout": str(LEARN_TIMEOUT_SEC),
+            },
+        )
+
+    async def async_step_learn_resolve(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Résoudre une écoute terminée (ou le formulaire de reprise), puis continuer.
+
+        ``step_id`` distinct de ``learn`` : la transition ``learn`` →
+        ``learn_resolve`` fait changer le ``step_id``, ce qui déclenche le
+        rafraîchissement du frontend. On y traite aussi les cas qui ne peuvent
+        pas être renvoyés directement depuis l'écran de progression (formulaire de
+        reprise après timeout, création de l'entrée).
+        """
+        actions = self._learn_actions()
+
+        if user_input is not None:
+            # Soumission du formulaire de reprise : ignorer ou coller un code.
+            self._learn_timeout = False
+            if bool(user_input.get("skip")):
+                self._learn_action_index += 1
+            else:
+                manual_code = str(user_input.get("code", "")).strip()
+                if manual_code:
+                    self._learn_codes[actions[self._learn_action_index]] = manual_code
+                    self._learn_action_index += 1
+        elif self._learn_task is not None:
+            # Une écoute vient de se terminer : stocker le code ou marquer le timeout.
             learned_code = self._learn_task.result()
             self._learn_task = None
             if learned_code is not None:
@@ -195,19 +236,6 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._learn_action_index += 1
             else:
                 self._learn_timeout = True
-            # Toujours sortir de l'écran de progression via show_progress_done.
-            return self.async_show_progress_done(next_step_id="learn")
-
-        # Soumission d'un formulaire (saisie manuelle, ignorer, ou réessayer).
-        if user_input is not None:
-            self._learn_timeout = False
-            if bool(user_input.get("skip")):
-                self._learn_action_index += 1
-            else:
-                learned_code = str(user_input.get("code", "")).strip()
-                if learned_code:
-                    self._learn_codes[actions[self._learn_action_index]] = learned_code
-                    self._learn_action_index += 1
 
         # Toutes les actions traitées : créer l'entrée.
         if self._learn_action_index >= len(actions):
@@ -216,7 +244,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         # Timeout sur l'écoute précédente : proposer saisie manuelle / ignorer.
         if self._learn_timeout:
             return self.async_show_form(
-                step_id="learn",
+                step_id="learn_resolve",
                 data_schema=vol.Schema(
                     {
                         vol.Optional("code", default=""): str,
@@ -230,19 +258,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors={"base": "learn_timeout"},
             )
 
-        # Démarrer l'écoute de l'action courante.
-        self._learn_task = self.hass.async_create_task(
-            self._async_wait_for_rf_signal()
-        )
-        return self.async_show_progress(
-            step_id="learn",
-            progress_action="listen_rf_signal",
-            progress_task=self._learn_task,
-            description_placeholders={
-                "action": actions[self._learn_action_index],
-                "timeout": str(LEARN_TIMEOUT_SEC),
-            },
-        )
+        # Sinon : écouter l'action suivante.
+        return await self.async_step_learn()
 
     async def _async_wait_for_rf_signal(self) -> str | None:
         """Attendre un événement RF de la passerelle sélectionnée."""

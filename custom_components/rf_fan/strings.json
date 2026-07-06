@@ -32,6 +32,14 @@
           "skip": "Skip this action"
         }
       },
+      "learn_resolve": {
+        "title": "RF Fan - Guided Learning",
+        "description": "No RF signal was captured for action {action}. Paste the code manually, tick skip, or submit to listen again ({timeout}s).",
+        "data": {
+          "code": "Captured RF code",
+          "skip": "Skip this action"
+        }
+      },
       "codes": {
         "title": "RF Fan - Action Codes",
         "description": "Paste the RF code for each action. Codes are opaque strings, exactly as produced by your sniffing pipeline.",

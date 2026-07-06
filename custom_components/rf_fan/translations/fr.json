@@ -32,6 +32,14 @@
           "skip": "Ignorer cette action"
         }
       },
+      "learn_resolve": {
+        "title": "Ventilateur RF - Apprentissage guidé",
+        "description": "Aucun signal RF capté pour l'action {action}. Collez le code manuellement, cochez ignorer, ou validez pour réécouter ({timeout}s).",
+        "data": {
+          "code": "Code RF capturé",
+          "skip": "Ignorer cette action"
+        }
+      },
       "codes": {
         "title": "Ventilateur RF - Codes d'action",
         "description": "Collez le code RF pour chaque action. Les codes sont des chaînes opaques, exactement comme produites par votre pipeline de sniff.",
