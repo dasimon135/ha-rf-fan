@@ -13,9 +13,6 @@ try:  # runtime Home Assistant : import relatif dans le package
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
-        CONF_HAS_FAN_ON,
-        CONF_LIGHT_CONTROL,
-        LIGHT_CONTROL_NONE,
         LIGHT_CONTROL_ON_OFF,
         LIGHT_CONTROL_TOGGLE,
         TIMER_HOURS,
@@ -33,9 +30,6 @@ except ImportError:  # pragma: no cover - tests : import top-level via conftest
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
-        CONF_HAS_FAN_ON,
-        CONF_LIGHT_CONTROL,
-        LIGHT_CONTROL_NONE,
         LIGHT_CONTROL_ON_OFF,
         LIGHT_CONTROL_TOGGLE,
         TIMER_HOURS,
@@ -106,12 +100,3 @@ CAPABILITY_FLAGS = (
 def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
     """Extraire les capacités d'un dict de config entry (défaut False)."""
     return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
-
-
-def split_kwargs_from_data(data: dict[str, object]) -> dict[str, object]:
-    """Construire les kwargs de split_actions depuis un dict de config entry."""
-    return {
-        "light_control": data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_NONE),
-        "has_fan_on": bool(data.get(CONF_HAS_FAN_ON, False)),
-        **caps_from_data(data),
-    }

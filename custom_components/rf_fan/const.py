@@ -22,7 +22,6 @@ CONF_REPEAT_COUNT: Final = "repeat_count"
 CONF_CODES: Final = "codes"
 
 DEFAULT_SPEED_COUNT: Final = 3
-DEFAULT_HAS_LIGHT: Final = True
 DEFAULT_REPEAT_COUNT: Final = 2
 
 ACTION_FAN_ON: Final = "fan_on"
