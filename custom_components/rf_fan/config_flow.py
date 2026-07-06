@@ -10,13 +10,19 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 
-from .actions import split_actions, validate_codes
+from .actions import CAPABILITY_FLAGS, split_actions, validate_codes
 from .const import (
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
+    CONF_HAS_COLOR_TEMP,
+    CONF_HAS_DIRECTION,
     CONF_HAS_LIGHT,
+    CONF_HAS_NATURAL_PRESET,
+    CONF_HAS_SOUND,
+    CONF_HAS_TIMERS,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
     DEFAULT_HAS_LIGHT,
@@ -46,6 +52,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._fan_name: str = ""
         self._speed_count: int = DEFAULT_SPEED_COUNT
         self._has_light: bool = DEFAULT_HAS_LIGHT
+        self._caps: dict[str, bool] = {}
         self._learn_codes: dict[str, str] = {}
         self._learn_action_index: int = 0
         self._learn_task: asyncio.Task[str | None] | None = None
@@ -86,18 +93,39 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
                 self._speed_count = int(user_input[CONF_SPEED_COUNT])
                 self._has_light = bool(user_input[CONF_HAS_LIGHT])
+                self._caps = {
+                    flag: bool(user_input.get(flag, False)) for flag in CAPABILITY_FLAGS
+                }
                 return await self.async_step_method()
+
+        if available_devices:
+            device_key = vol.Required(
+                CONF_ESPHOME_DEVICE, default=default_device or available_devices[0]
+            )
+            device_field: Any = SelectSelector(
+                SelectSelectorConfig(options=available_devices)
+            )
+        else:
+            device_key = vol.Optional(CONF_ESPHOME_DEVICE, default=default_device)
+            device_field = str
+
+        data_schema = vol.Schema(
+            {
+                device_key: device_field,
+                vol.Required(CONF_FAN_NAME): str,
+                vol.Required(CONF_SPEED_COUNT, default=DEFAULT_SPEED_COUNT): vol.In([3, 4, 5, 6]),
+                vol.Required(CONF_HAS_LIGHT, default=DEFAULT_HAS_LIGHT): bool,
+                vol.Required(CONF_HAS_DIRECTION, default=False): bool,
+                vol.Required(CONF_HAS_NATURAL_PRESET, default=False): bool,
+                vol.Required(CONF_HAS_COLOR_TEMP, default=False): bool,
+                vol.Required(CONF_HAS_TIMERS, default=False): bool,
+                vol.Required(CONF_HAS_SOUND, default=False): bool,
+            }
+        )
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_ESPHOME_DEVICE, default=default_device): str,
-                    vol.Required(CONF_FAN_NAME): str,
-                    vol.Required(CONF_SPEED_COUNT, default=DEFAULT_SPEED_COUNT): vol.In([3, 4, 5, 6]),
-                    vol.Required(CONF_HAS_LIGHT, default=DEFAULT_HAS_LIGHT): bool,
-                }
-            ),
+            data_schema=data_schema,
             description_placeholders={
                 "detected": ", ".join(available_devices) if available_devices else "aucun",
             },
@@ -135,7 +163,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         """Étape manuelle: mapping action -> code RF."""
         errors: dict[str, str] = {}
         required_actions, optional_actions = split_actions(
-            self._speed_count, self._has_light
+            self._speed_count, self._has_light, **self._caps
         )
 
         if user_input is not None:
@@ -163,7 +191,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     def _learn_actions(self) -> list[str]:
         """Lister les actions à apprendre dans l'ordre."""
         required_actions, optional_actions = split_actions(
-            self._speed_count, self._has_light
+            self._speed_count, self._has_light, **self._caps
         )
         return required_actions + optional_actions
 
@@ -301,6 +329,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_FAN_NAME: self._fan_name,
                 CONF_SPEED_COUNT: self._speed_count,
                 CONF_HAS_LIGHT: self._has_light,
+                **self._caps,
                 CONF_REPEAT_COUNT: DEFAULT_REPEAT_COUNT,
                 CONF_CODES: codes,
             },
