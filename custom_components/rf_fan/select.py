@@ -14,7 +14,6 @@ from .const import (
     ACTION_LIGHT_KELVIN,
     COLOR_TEMP_OPTIONS,
     CONF_HAS_COLOR_TEMP,
-    DOMAIN,
     EVENT_RF_FAN_RECEIVED,
 )
 from .entity import RfFanBaseEntity
@@ -45,11 +44,6 @@ class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
         self._signal_unsub = None
 
     @property
-    def _kelvin_signal(self) -> str:
-        """Nom du signal dispatcher couplant la lumière à ce sélecteur."""
-        return f"{DOMAIN}_{self._config_entry.entry_id}_kelvin"
-
-    @property
     def current_option(self) -> str:
         """Retourner la position couleur supposée."""
         return COLOR_TEMP_OPTIONS[self._entry_runtime().get("kelvin_position", 0)]
@@ -58,7 +52,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
         """Cycler jusqu'à la position couleur demandée."""
         target = COLOR_TEMP_OPTIONS.index(option)
         runtime = self._entry_runtime()
-        steps = (target - runtime["kelvin_position"]) % len(COLOR_TEMP_OPTIONS)
+        steps = (target - runtime.get("kelvin_position", 0)) % len(COLOR_TEMP_OPTIONS)
         await self._async_transmit_times(ACTION_LIGHT_KELVIN, steps)
         runtime["kelvin_position"] = target
         self.async_write_ha_state()
@@ -67,7 +61,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
         """S'abonner aux événements RF et au signal de couplage kelvin."""
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
         self._signal_unsub = async_dispatcher_connect(
-            self.hass, self._kelvin_signal, self._on_kelvin_changed
+            self.hass, self._kelvin_signal(), self._on_kelvin_changed
         )
 
     async def async_will_remove_from_hass(self) -> None:

@@ -96,6 +96,10 @@ class RfFanBaseEntity(Entity):
         """Dict d'état partagé de l'entrée (créé dans __init__.py async_setup_entry)."""
         return self.hass.data[DOMAIN][self._config_entry.entry_id]
 
+    def _kelvin_signal(self) -> str:
+        """Nom du signal dispatcher de la position couleur, propre à l'entrée."""
+        return f"{DOMAIN}_{self._config_entry.entry_id}_kelvin"
+
     def _advance_kelvin_position(self) -> int:
         """Avancer la position couleur d'un cran (mod N) et la retourner."""
         runtime = self._entry_runtime()

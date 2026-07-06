@@ -46,7 +46,9 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
         """Initialiser l'entité fan."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_fan"
-        self._attr_name = "Fan"
+        # Entité principale de l'appareil : name=None fait porter le nom de
+        # l'appareil (évite un suffixe « …Ventilateur » redondant).
+        self._attr_name = None
         self._speed_count: int = int(config_entry.data[CONF_SPEED_COUNT])
         self._is_on: bool | None = None
         self._percentage: int | None = None

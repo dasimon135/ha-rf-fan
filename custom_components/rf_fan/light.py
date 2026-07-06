@@ -16,7 +16,6 @@ from .const import (
     ACTION_LIGHT_TOGGLE,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_LIGHT,
-    DOMAIN,
     EVENT_RF_FAN_RECEIVED,
 )
 from .entity import RfFanBaseEntity
@@ -44,7 +43,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
         """Initialiser l'entité light."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_light"
-        self._attr_name = "Light"
+        self._attr_name = "Lampe"
         self._is_on: bool | None = None
         self._event_unsub = None
         self._has_color_temp: bool = config_entry.data.get(CONF_HAS_COLOR_TEMP, False)
@@ -69,7 +68,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
         if not self._has_color_temp:
             return
         self._advance_kelvin_position()
-        async_dispatcher_send(self.hass, f"{DOMAIN}_{self._config_entry.entry_id}_kelvin")
+        async_dispatcher_send(self.hass, self._kelvin_signal())
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Allumer la lumière."""

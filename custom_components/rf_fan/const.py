@@ -46,7 +46,10 @@ PRESET_NATURAL: Final = "natural"
 # Positions couleur (select kelvin) : ordre du cycle matériel
 COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
 
-# Fenêtre anti-écho : ignorer les événements RF reçus juste après notre propre émission
+# Fenêtre anti-écho globale à l'entrée : après toute émission, toute réception RF de
+# l'entrée est ignorée pendant ce nombre de secondes pour écarter l'écho de notre propre
+# émission renvoyé par la passerelle (effet de bord : un appui télécommande physique dans
+# cette fenêtre, juste après une commande HA, est ignoré).
 ECHO_SUPPRESS_SEC: Final = 1.0
 
 
