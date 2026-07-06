@@ -12,7 +12,7 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 
-from .actions import CAPABILITY_FLAGS, split_actions, validate_codes
+from .actions import caps_from_data, split_actions, validate_codes
 from .const import (
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
@@ -86,16 +86,14 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[CONF_ESPHOME_DEVICE] = "required_esphome_device"
                 else:
                     errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
-            elif selected_device not in available_devices:
+            elif available_devices and selected_device not in available_devices:
                 errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
             else:
                 self._esphome_device = selected_device
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
                 self._speed_count = int(user_input[CONF_SPEED_COUNT])
                 self._has_light = bool(user_input[CONF_HAS_LIGHT])
-                self._caps = {
-                    flag: bool(user_input.get(flag, False)) for flag in CAPABILITY_FLAGS
-                }
+                self._caps = caps_from_data(user_input)
                 return await self.async_step_method()
 
         if available_devices:

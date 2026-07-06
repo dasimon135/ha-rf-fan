@@ -77,7 +77,7 @@ class RfFanBaseEntity(Entity):
                 sent_any = True
         return sent_any
 
-    def _entry_runtime(self) -> dict:
+    def _entry_runtime(self) -> dict[str, Any]:
         """Dict d'état partagé de l'entrée (créé dans __init__.py async_setup_entry)."""
         return self.hass.data[DOMAIN][self._config_entry.entry_id]
 
