@@ -25,7 +25,33 @@ ACTION_LIGHT_ON: Final = "light_on"
 ACTION_LIGHT_OFF: Final = "light_off"
 ACTION_LIGHT_TOGGLE: Final = "light_toggle"
 
+# Capacités (config flow)
+CONF_HAS_DIRECTION: Final = "has_direction"
+CONF_HAS_NATURAL_PRESET: Final = "has_natural_preset"
+CONF_HAS_COLOR_TEMP: Final = "has_color_temp"
+CONF_HAS_TIMERS: Final = "has_timers"
+CONF_HAS_SOUND: Final = "has_sound"
+
+# Nouvelles actions
+ACTION_FAN_REVERSE: Final = "fan_reverse"
+ACTION_FAN_NATURAL: Final = "fan_natural"
+ACTION_LIGHT_KELVIN: Final = "light_kelvin"
+ACTION_SOUND_TOGGLE: Final = "sound_toggle"
+TIMER_HOURS: Final = (1, 2, 4, 8)
+
+# Preset flux naturel
+PRESET_NORMAL: Final = "normal"
+PRESET_NATURAL: Final = "natural"
+
+# Positions couleur (select kelvin) : ordre du cycle matériel
+COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
+
 
 def speed_action(index: int) -> str:
     """Retourner la clé d'action de vitesse pour un index donné."""
     return f"fan_speed_{index}"
+
+
+def timer_action(hours: int) -> str:
+    """Clé d'action pour la minuterie de N heures."""
+    return f"timer_{hours}h"
