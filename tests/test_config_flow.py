@@ -104,3 +104,51 @@ async def test_learn_flow_advances_and_creates_entry(hass: HomeAssistant) -> Non
     assert codes["fan_off"] == "C_fan_off"
     assert codes["fan_speed_1"] == "C_fan_speed_1"
     assert codes["fan_speed_3"] == "C_fan_speed_3"
+
+
+async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
+    """Manuel avec toutes les capacités : la liste d'actions et l'entrée sont complètes."""
+    hass.services.async_register(
+        "esphome", "esp32_test_transmit_rf_fan", lambda call: None
+    )
+    await hass.async_block_till_done()
+    flow = hass.config_entries.flow
+    result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "esphome_device": DEVICE,
+            "fan_name": "Full",
+            "speed_count": 3,
+            "has_light": True,
+            "has_direction": True,
+            "has_natural_preset": True,
+            "has_color_temp": True,
+            "has_timers": True,
+            "has_sound": True,
+        },
+    )
+    result = await flow.async_configure(result["flow_id"], {"method": "manual"})
+    assert result["step_id"] == "codes"
+
+    # Fournir un code par action requise. required = fan_off + speed_1..3 +
+    # light_toggle (via at-least-one) + fan_reverse + fan_natural + light_kelvin
+    # + timer_1h/2h/4h/8h + sound_toggle. Fournir aussi light_toggle pour la
+    # règle "au moins un code lumière".
+    codes_input = {
+        "fan_off": "C_off",
+        "fan_speed_1": "C_s1", "fan_speed_2": "C_s2", "fan_speed_3": "C_s3",
+        "light_toggle": "C_lt",
+        "fan_reverse": "C_rev", "fan_natural": "C_nat", "light_kelvin": "C_kel",
+        "timer_1h": "C_t1", "timer_2h": "C_t2", "timer_4h": "C_t4", "timer_8h": "C_t8",
+        "sound_toggle": "C_snd",
+    }
+    result = await flow.async_configure(result["flow_id"], codes_input)
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    data = result["data"]
+    assert data["has_direction"] and data["has_color_temp"] and data["has_sound"]
+    codes = data["codes"]
+    assert codes["fan_reverse"] == "C_rev"
+    assert codes["light_kelvin"] == "C_kel"
+    assert codes["timer_8h"] == "C_t8"
+    assert codes["sound_toggle"] == "C_snd"
