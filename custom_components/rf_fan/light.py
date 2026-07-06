@@ -7,9 +7,19 @@ from typing import Any
 from homeassistant.components.light import ColorMode, LightEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ACTION_LIGHT_OFF, ACTION_LIGHT_ON, ACTION_LIGHT_TOGGLE, CONF_HAS_LIGHT, EVENT_RF_FAN_RECEIVED
+from .const import (
+    ACTION_LIGHT_OFF,
+    ACTION_LIGHT_ON,
+    ACTION_LIGHT_TOGGLE,
+    COLOR_TEMP_OPTIONS,
+    CONF_HAS_COLOR_TEMP,
+    CONF_HAS_LIGHT,
+    DOMAIN,
+    EVENT_RF_FAN_RECEIVED,
+)
 from .entity import RfFanBaseEntity
 
 
@@ -38,6 +48,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
         self._attr_name = "Light"
         self._is_on: bool | None = None
         self._event_unsub = None
+        self._has_color_temp: bool = config_entry.data.get(CONF_HAS_COLOR_TEMP, False)
 
     @property
     def is_on(self) -> bool | None:
@@ -54,6 +65,16 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
             self._event_unsub()
             self._event_unsub = None
 
+    def _bump_kelvin(self) -> None:
+        """Avancer la position couleur d'un cran (le matériel avance à chaque allumage)."""
+        if not self._has_color_temp:
+            return
+        runtime = self._entry_runtime()
+        runtime["kelvin_position"] = (
+            runtime["kelvin_position"] + 1
+        ) % len(COLOR_TEMP_OPTIONS)
+        async_dispatcher_send(self.hass, f"{DOMAIN}_{self._config_entry.entry_id}_kelvin")
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Allumer la lumière."""
         sent = await self._async_transmit_action(ACTION_LIGHT_ON)
@@ -61,6 +82,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
             sent = await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
         if sent:
             self._is_on = True
+            self._bump_kelvin()
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -81,6 +103,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
 
         if action == ACTION_LIGHT_ON:
             self._is_on = True
+            self._bump_kelvin()
             self.async_write_ha_state()
             return
 
@@ -91,4 +114,6 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
 
         if action == ACTION_LIGHT_TOGGLE and self._is_on is not None:
             self._is_on = not self._is_on
+            if self._is_on:
+                self._bump_kelvin()
             self.async_write_ha_state()
