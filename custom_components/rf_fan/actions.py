@@ -13,6 +13,11 @@ try:  # runtime Home Assistant : import relatif dans le package
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
+        CONF_HAS_FAN_ON,
+        CONF_LIGHT_CONTROL,
+        LIGHT_CONTROL_NONE,
+        LIGHT_CONTROL_ON_OFF,
+        LIGHT_CONTROL_TOGGLE,
         TIMER_HOURS,
         speed_action,
         timer_action,
@@ -28,39 +33,45 @@ except ImportError:  # pragma: no cover - tests : import top-level via conftest
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
+        CONF_HAS_FAN_ON,
+        CONF_LIGHT_CONTROL,
+        LIGHT_CONTROL_NONE,
+        LIGHT_CONTROL_ON_OFF,
+        LIGHT_CONTROL_TOGGLE,
         TIMER_HOURS,
         speed_action,
         timer_action,
     )
 
-LIGHT_ACTIONS = (ACTION_LIGHT_ON, ACTION_LIGHT_OFF, ACTION_LIGHT_TOGGLE)
-
 
 def split_actions(
     speed_count: int,
-    has_light: bool,
+    light_control: str = "none",
     *,
+    has_fan_on: bool = False,
     has_direction: bool = False,
     has_natural_preset: bool = False,
     has_color_temp: bool = False,
     has_timers: bool = False,
     has_sound: bool = False,
 ) -> tuple[list[str], list[str]]:
-    """Retourner (actions_obligatoires, actions_optionnelles).
+    """Actions requises selon le style de commande et les capacités déclarées.
 
     Obligatoire : `fan_off` + une action par vitesse, plus les actions des
-    capacités activées (inversion, flux naturel, couleur kelvin, minuteries,
-    son). Chacune est facultative au niveau de la configuration mais devient
-    obligatoire dès que la capacité correspondante est activée.
-    Optionnel : `fan_on` (l'allumage retombe sur speed_1) et, si `has_light`,
-    `light_on` / `light_off` / `light_toggle`. Au moins un code lumière est
-    exigé — validé séparément par `validate_codes`.
+    capacités déclarées : `fan_on` si `has_fan_on`, la ou les actions lumière
+    selon `light_control` (`toggle` -> `light_toggle` ; `on_off` -> `light_on`
+    et `light_off` ; `none` -> aucune), puis les actions des capacités activées
+    (inversion, flux naturel, couleur kelvin, minuteries, son).
+    Aucune action optionnelle : la liste retournée est toujours vide.
     """
     required = [ACTION_FAN_OFF]
     required.extend(speed_action(index) for index in range(1, speed_count + 1))
-    optional = [ACTION_FAN_ON]
-    if has_light:
-        optional.extend(LIGHT_ACTIONS)
+    if has_fan_on:
+        required.append(ACTION_FAN_ON)
+    if light_control == LIGHT_CONTROL_TOGGLE:
+        required.append(ACTION_LIGHT_TOGGLE)
+    elif light_control == LIGHT_CONTROL_ON_OFF:
+        required.extend([ACTION_LIGHT_ON, ACTION_LIGHT_OFF])
     if has_direction:
         required.append(ACTION_FAN_REVERSE)
     if has_natural_preset:
@@ -71,19 +82,15 @@ def split_actions(
         required.extend(timer_action(hours) for hours in TIMER_HOURS)
     if has_sound:
         required.append(ACTION_SOUND_TOGGLE)
-    return required, optional
+    return required, []
 
 
-def validate_codes(
-    codes: dict[str, str], required: list[str], has_light: bool
-) -> dict[str, str]:
+def validate_codes(codes: dict[str, str], required: list[str]) -> dict[str, str]:
     """Retourner {champ: clé_erreur} ; dict vide si tout est valide."""
     errors: dict[str, str] = {}
     for action in required:
         if not codes.get(action):
             errors[action] = "required"
-    if has_light and not any(codes.get(action) for action in LIGHT_ACTIONS):
-        errors[ACTION_LIGHT_TOGGLE] = "light_code_required"
     return errors
 
 
@@ -99,3 +106,12 @@ CAPABILITY_FLAGS = (
 def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
     """Extraire les capacités d'un dict de config entry (défaut False)."""
     return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
+
+
+def split_kwargs_from_data(data: dict[str, object]) -> dict[str, object]:
+    """Construire les kwargs de split_actions depuis un dict de config entry."""
+    return {
+        "light_control": data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_NONE),
+        "has_fan_on": bool(data.get(CONF_HAS_FAN_ON, False)),
+        **caps_from_data(data),
+    }

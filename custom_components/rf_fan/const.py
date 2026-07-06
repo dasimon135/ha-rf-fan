@@ -12,6 +12,12 @@ CONF_ESPHOME_DEVICE: Final = "esphome_device"
 CONF_FAN_NAME: Final = "fan_name"
 CONF_SPEED_COUNT: Final = "speed_count"
 CONF_HAS_LIGHT: Final = "has_light"
+CONF_LIGHT_CONTROL: Final = "light_control"
+CONF_HAS_FAN_ON: Final = "has_fan_on"
+LIGHT_CONTROL_NONE: Final = "none"
+LIGHT_CONTROL_TOGGLE: Final = "toggle"
+LIGHT_CONTROL_ON_OFF: Final = "on_off"
+LIGHT_CONTROL_OPTIONS: Final = [LIGHT_CONTROL_NONE, LIGHT_CONTROL_TOGGLE, LIGHT_CONTROL_ON_OFF]
 CONF_REPEAT_COUNT: Final = "repeat_count"
 CONF_CODES: Final = "codes"
 
