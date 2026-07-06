@@ -27,6 +27,7 @@ class RfFanBaseEntity(Entity):
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_assumed_state = True
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialiser l'entité de base."""
