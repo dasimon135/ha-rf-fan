@@ -58,7 +58,6 @@ async def _start_learn(hass: HomeAssistant):
             "esphome_device": DEVICE,
             "fan_name": "Test",
             "speed_count": 3,
-            "has_light": False,
         },
     )
     result = await flow.async_configure(result["flow_id"], {"method": "learn"})
