@@ -8,7 +8,12 @@
           "esphome_device": "Nom du device ESPHome",
           "fan_name": "Nom d'affichage du ventilateur",
           "speed_count": "Nombre de vitesses distinctes",
-          "has_light": "Le ventilateur a une lumière intégrée"
+          "has_light": "Le ventilateur a une lumière intégrée",
+          "has_direction": "Sens inverse (bouton reverse)",
+          "has_natural_preset": "Flux d'air naturel",
+          "has_color_temp": "Température de couleur (Kelvin)",
+          "has_timers": "Minuteries (1h/2h/4h/8h)",
+          "has_sound": "Son (bip)"
         }
       },
       "method": {
@@ -54,7 +59,15 @@
           "fan_speed_6": "Code vitesse 6",
           "light_on": "Code lumière ON",
           "light_off": "Code lumière OFF",
-          "light_toggle": "Code bascule lumière (optionnel)"
+          "light_toggle": "Code bascule lumière (optionnel)",
+          "fan_reverse": "Code sens inverse",
+          "fan_natural": "Code flux naturel",
+          "light_kelvin": "Code température de couleur (cycle kelvin)",
+          "timer_1h": "Code minuterie 1h",
+          "timer_2h": "Code minuterie 2h",
+          "timer_4h": "Code minuterie 4h",
+          "timer_8h": "Code minuterie 8h",
+          "sound_toggle": "Code son"
         }
       }
     },

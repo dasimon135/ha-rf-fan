@@ -8,7 +8,12 @@
           "esphome_device": "ESPHome device name",
           "fan_name": "Fan display name",
           "speed_count": "Number of discrete speeds",
-          "has_light": "Fan has integrated light"
+          "has_light": "Fan has integrated light",
+          "has_direction": "Reverse direction (reverse button)",
+          "has_natural_preset": "Natural airflow",
+          "has_color_temp": "Color temperature (Kelvin)",
+          "has_timers": "Sleep timers (1h/2h/4h/8h)",
+          "has_sound": "Sound (beep)"
         }
       },
       "method": {
@@ -54,7 +59,15 @@
           "fan_speed_6": "Code for speed 6",
           "light_on": "Code for light on",
           "light_off": "Code for light off",
-          "light_toggle": "Code for light toggle (optional)"
+          "light_toggle": "Code for light toggle (optional)",
+          "fan_reverse": "Code for reverse direction",
+          "fan_natural": "Code for natural airflow",
+          "light_kelvin": "Code for color temperature (kelvin cycle)",
+          "timer_1h": "Code for 1h timer",
+          "timer_2h": "Code for 2h timer",
+          "timer_4h": "Code for 4h timer",
+          "timer_8h": "Code for 8h timer",
+          "sound_toggle": "Code for sound toggle"
         }
       }
     },
