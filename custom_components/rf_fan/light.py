@@ -14,7 +14,6 @@ from .const import (
     ACTION_LIGHT_OFF,
     ACTION_LIGHT_ON,
     ACTION_LIGHT_TOGGLE,
-    COLOR_TEMP_OPTIONS,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_LIGHT,
     DOMAIN,
@@ -69,20 +68,20 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
         """Avancer la position couleur d'un cran (le matériel avance à chaque allumage)."""
         if not self._has_color_temp:
             return
-        runtime = self._entry_runtime()
-        runtime["kelvin_position"] = (
-            runtime["kelvin_position"] + 1
-        ) % len(COLOR_TEMP_OPTIONS)
+        self._advance_kelvin_position()
         async_dispatcher_send(self.hass, f"{DOMAIN}_{self._config_entry.entry_id}_kelvin")
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Allumer la lumière."""
+        was_on = self._is_on
         sent = await self._async_transmit_action(ACTION_LIGHT_ON)
         if not sent:
             sent = await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
         if sent:
             self._is_on = True
-            self._bump_kelvin()
+            # Le matériel n'avance la couleur que lors d'une réelle transition OFF->ON.
+            if not was_on:
+                self._bump_kelvin()
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -97,13 +96,18 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Mettre à jour l'état light depuis les actions RF reçues."""
+        if self._recently_transmitted():
+            return
+
         action = self._event_action(event.data)
         if action is None:
             return
 
         if action == ACTION_LIGHT_ON:
+            was_on = self._is_on
             self._is_on = True
-            self._bump_kelvin()
+            if not was_on:
+                self._bump_kelvin()
             self.async_write_ha_state()
             return
 

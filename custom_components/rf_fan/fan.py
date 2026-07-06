@@ -157,6 +157,8 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
         """Basculer le sens de rotation (télécommande à bascule unique)."""
         if self._direction == direction:
             return
+        # État supposé : depuis un sens inconnu (None), une seule bascule ne peut
+        # garantir la cible absolue (limitation inhérente à l'assumed_state).
         sent = await self._async_transmit_action(ACTION_FAN_REVERSE)
         if sent:
             self._direction = direction
@@ -174,6 +176,9 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Mettre à jour l'état local quand la télécommande physique est utilisée."""
+        if self._recently_transmitted():
+            return
+
         action = self._event_action(event.data)
         if action is None:
             return

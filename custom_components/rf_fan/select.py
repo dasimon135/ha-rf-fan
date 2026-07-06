@@ -52,7 +52,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         """Retourner la position couleur supposée."""
-        return COLOR_TEMP_OPTIONS[self._entry_runtime()["kelvin_position"]]
+        return COLOR_TEMP_OPTIONS[self._entry_runtime().get("kelvin_position", 0)]
 
     async def async_select_option(self, option: str) -> None:
         """Cycler jusqu'à la position couleur demandée."""
@@ -87,10 +87,10 @@ class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Avancer la position couleur quand la télécommande émet l'action kelvin."""
+        if self._recently_transmitted():
+            return
+
         action = self._event_action(event.data)
         if action == ACTION_LIGHT_KELVIN:
-            runtime = self._entry_runtime()
-            runtime["kelvin_position"] = (
-                runtime["kelvin_position"] + 1
-            ) % len(COLOR_TEMP_OPTIONS)
+            self._advance_kelvin_position()
             self.async_write_ha_state()

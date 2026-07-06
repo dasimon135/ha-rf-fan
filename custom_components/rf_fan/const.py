@@ -46,6 +46,9 @@ PRESET_NATURAL: Final = "natural"
 # Positions couleur (select kelvin) : ordre du cycle matériel
 COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
 
+# Fenêtre anti-écho : ignorer les événements RF reçus juste après notre propre émission
+ECHO_SUPPRESS_SEC: Final = 1.0
+
 
 def speed_action(index: int) -> str:
     """Retourner la clé d'action de vitesse pour un index donné."""

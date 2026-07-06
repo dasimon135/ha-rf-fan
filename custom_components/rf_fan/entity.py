@@ -9,7 +9,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 
-from .const import CONF_CODES, CONF_ESPHOME_DEVICE, CONF_FAN_NAME, CONF_REPEAT_COUNT, DOMAIN
+from .const import (
+    COLOR_TEMP_OPTIONS,
+    CONF_CODES,
+    CONF_ESPHOME_DEVICE,
+    CONF_FAN_NAME,
+    CONF_REPEAT_COUNT,
+    DOMAIN,
+    ECHO_SUPPRESS_SEC,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,7 +75,13 @@ class RfFanBaseEntity(Entity):
             _LOGGER.warning("Erreur envoi RF (%s): %s", action, err)
             return False
 
+        self._entry_runtime()["last_tx"] = self.hass.loop.time()
         return True
+
+    def _recently_transmitted(self) -> bool:
+        """True si une émission a eu lieu très récemment (fenêtre anti-écho)."""
+        last_tx = self._entry_runtime().get("last_tx", 0.0)
+        return (self.hass.loop.time() - last_tx) < ECHO_SUPPRESS_SEC
 
     async def _async_transmit_times(self, action: str, times: int) -> bool:
         """Émettre `times` fois le code d'une action (cycle). True si au moins une émission."""
@@ -80,6 +94,12 @@ class RfFanBaseEntity(Entity):
     def _entry_runtime(self) -> dict[str, Any]:
         """Dict d'état partagé de l'entrée (créé dans __init__.py async_setup_entry)."""
         return self.hass.data[DOMAIN][self._config_entry.entry_id]
+
+    def _advance_kelvin_position(self) -> int:
+        """Avancer la position couleur d'un cran (mod N) et la retourner."""
+        runtime = self._entry_runtime()
+        runtime["kelvin_position"] = (runtime.get("kelvin_position", 0) + 1) % len(COLOR_TEMP_OPTIONS)
+        return runtime["kelvin_position"]
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:
         """Vérifier que l'événement RF vient de la passerelle configurée."""
