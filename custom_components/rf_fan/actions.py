@@ -96,6 +96,6 @@ CAPABILITY_FLAGS = (
 )
 
 
-def caps_from_data(data: dict) -> dict[str, bool]:
+def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
     """Extraire les capacités d'un dict de config entry (défaut False)."""
     return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
