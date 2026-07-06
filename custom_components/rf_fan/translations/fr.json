@@ -8,7 +8,8 @@
           "esphome_device": "Nom du device ESPHome",
           "fan_name": "Nom d'affichage du ventilateur",
           "speed_count": "Nombre de vitesses distinctes",
-          "has_light": "Le ventilateur a une lumière intégrée",
+          "light_control": "Commande de la lumière",
+          "has_fan_on": "Le ventilateur a un bouton marche dédié",
           "has_direction": "Sens inverse (bouton reverse)",
           "has_natural_preset": "Flux d'air naturel",
           "has_color_temp": "Température de couleur (Kelvin)",
@@ -73,6 +74,15 @@
     },
     "progress": {
       "listen_rf_signal": "Action « {action} » : appuyez sur le bouton correspondant de la télécommande (≤ {timeout}s)."
+    },
+    "selector": {
+      "light_control": {
+        "options": {
+          "none": "Aucune",
+          "toggle": "Bouton toggle unique",
+          "on_off": "Deux boutons (on/off)"
+        }
+      }
     },
     "error": {
       "required": "Ce champ est obligatoire.",

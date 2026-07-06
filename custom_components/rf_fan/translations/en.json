@@ -8,7 +8,8 @@
           "esphome_device": "ESPHome device name",
           "fan_name": "Fan display name",
           "speed_count": "Number of discrete speeds",
-          "has_light": "Fan has integrated light",
+          "light_control": "Light control",
+          "has_fan_on": "Fan has a dedicated on button",
           "has_direction": "Reverse direction (reverse button)",
           "has_natural_preset": "Natural airflow",
           "has_color_temp": "Color temperature (Kelvin)",
@@ -73,6 +74,15 @@
     },
     "progress": {
       "listen_rf_signal": "Action \"{action}\": press the matching button on the remote (≤ {timeout}s)."
+    },
+    "selector": {
+      "light_control": {
+        "options": {
+          "none": "None",
+          "toggle": "Single toggle button",
+          "on_off": "Two buttons (on/off)"
+        }
+      }
     },
     "error": {
       "required": "This field is required.",
