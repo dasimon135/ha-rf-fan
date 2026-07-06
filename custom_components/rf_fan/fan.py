@@ -4,12 +4,29 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.fan import FanEntity, FanEntityFeature
+from homeassistant.components.fan import (
+    DIRECTION_FORWARD,
+    DIRECTION_REVERSE,
+    FanEntity,
+    FanEntityFeature,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ACTION_FAN_OFF, ACTION_FAN_ON, CONF_SPEED_COUNT, EVENT_RF_FAN_RECEIVED, speed_action
+from .const import (
+    ACTION_FAN_NATURAL,
+    ACTION_FAN_OFF,
+    ACTION_FAN_ON,
+    ACTION_FAN_REVERSE,
+    CONF_HAS_DIRECTION,
+    CONF_HAS_NATURAL_PRESET,
+    CONF_SPEED_COUNT,
+    EVENT_RF_FAN_RECEIVED,
+    PRESET_NATURAL,
+    PRESET_NORMAL,
+    speed_action,
+)
 from .entity import RfFanBaseEntity
 
 
@@ -25,10 +42,6 @@ async def async_setup_entry(
 class RfFanEntity(RfFanBaseEntity, FanEntity):
     """Ventilateur RF générique à état supposé."""
 
-    _attr_supported_features = (
-        FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF | FanEntityFeature.SET_SPEED
-    )
-
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialiser l'entité fan."""
         super().__init__(hass, config_entry)
@@ -39,6 +52,29 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
         self._percentage: int | None = None
         self._event_unsub = None
 
+        # Capacités optionnelles (config flow)
+        self._has_direction: bool = config_entry.data.get(CONF_HAS_DIRECTION, False)
+        self._has_preset: bool = config_entry.data.get(CONF_HAS_NATURAL_PRESET, False)
+
+        # Fonctions supportées calculées par instance selon les capacités
+        features = (
+            FanEntityFeature.TURN_ON
+            | FanEntityFeature.TURN_OFF
+            | FanEntityFeature.SET_SPEED
+        )
+        if self._has_direction:
+            features |= FanEntityFeature.DIRECTION
+        if self._has_preset:
+            features |= FanEntityFeature.PRESET_MODE
+        self._attr_supported_features = features
+
+        if self._has_preset:
+            self._attr_preset_modes = [PRESET_NORMAL, PRESET_NATURAL]
+
+        # État supposé des capacités optionnelles
+        self._direction: str | None = None
+        self._preset: str | None = None
+
     @property
     def is_on(self) -> bool | None:
         """Retourner l'état on/off supposé."""
@@ -48,6 +84,16 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
     def percentage(self) -> int | None:
         """Retourner la vitesse en pourcentage."""
         return self._percentage
+
+    @property
+    def current_direction(self) -> str | None:
+        """Retourner le sens de rotation supposé."""
+        return self._direction
+
+    @property
+    def preset_mode(self) -> str | None:
+        """Retourner le preset supposé."""
+        return self._preset
 
     @property
     def percentage_step(self) -> float:
@@ -107,6 +153,24 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
             self._percentage = int(round(speed_index * step))
             self.async_write_ha_state()
 
+    async def async_set_direction(self, direction: str) -> None:
+        """Basculer le sens de rotation (télécommande à bascule unique)."""
+        if self._direction == direction:
+            return
+        sent = await self._async_transmit_action(ACTION_FAN_REVERSE)
+        if sent:
+            self._direction = direction
+            self.async_write_ha_state()
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        """Basculer le preset flux naturel (télécommande à bascule unique)."""
+        if self._preset == preset_mode:
+            return
+        sent = await self._async_transmit_action(ACTION_FAN_NATURAL)
+        if sent:
+            self._preset = preset_mode
+            self.async_write_ha_state()
+
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Mettre à jour l'état local quand la télécommande physique est utilisée."""
@@ -124,6 +188,22 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
             self._is_on = True
             if self._percentage is None or self._percentage <= 0:
                 self._percentage = int(round(100 / self._speed_count))
+            self.async_write_ha_state()
+            return
+
+        if action == ACTION_FAN_REVERSE:
+            self._direction = (
+                DIRECTION_FORWARD
+                if self._direction == DIRECTION_REVERSE
+                else DIRECTION_REVERSE
+            )
+            self.async_write_ha_state()
+            return
+
+        if action == ACTION_FAN_NATURAL:
+            self._preset = (
+                PRESET_NORMAL if self._preset == PRESET_NATURAL else PRESET_NATURAL
+            )
             self.async_write_ha_state()
             return
 
