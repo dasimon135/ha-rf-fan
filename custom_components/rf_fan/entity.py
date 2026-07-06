@@ -69,6 +69,18 @@ class RfFanBaseEntity(Entity):
 
         return True
 
+    async def _async_transmit_times(self, action: str, times: int) -> bool:
+        """Émettre `times` fois le code d'une action (cycle). True si au moins une émission."""
+        sent_any = False
+        for _ in range(max(0, times)):
+            if await self._async_transmit_action(action):
+                sent_any = True
+        return sent_any
+
+    def _entry_runtime(self) -> dict:
+        """Dict d'état partagé de l'entrée (créé dans __init__.py async_setup_entry)."""
+        return self.hass.data[DOMAIN][self._config_entry.entry_id]
+
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:
         """Vérifier que l'événement RF vient de la passerelle configurée."""
         device = event_data.get("device")
