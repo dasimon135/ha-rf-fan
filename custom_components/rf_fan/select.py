@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     ACTION_LIGHT_KELVIN,
@@ -31,7 +32,7 @@ async def async_setup_entry(
     async_add_entities([RfFanColorTempSelect(hass, config_entry)])
 
 
-class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
+class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
     """Sélecteur de température de couleur à état supposé (dead-reckoning)."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -58,11 +59,16 @@ class RfFanColorTempSelect(RfFanBaseEntity, SelectEntity):
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """S'abonner aux événements RF et au signal de couplage kelvin."""
+        """Restaurer la position couleur puis s'abonner aux événements RF et au signal kelvin."""
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in COLOR_TEMP_OPTIONS:
+            self._entry_runtime()["kelvin_position"] = COLOR_TEMP_OPTIONS.index(last_state.state)
+
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
         self._signal_unsub = async_dispatcher_connect(
             self.hass, self._kelvin_signal(), self._on_kelvin_changed
         )
+        self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self) -> None:
         """Désabonner les callbacks."""
