@@ -19,17 +19,21 @@ from .const import (
     CONF_FAN_NAME,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_DIRECTION,
+    CONF_HAS_FAN_ON,
     CONF_HAS_LIGHT,
     CONF_HAS_NATURAL_PRESET,
     CONF_HAS_SOUND,
     CONF_HAS_TIMERS,
+    CONF_LIGHT_CONTROL,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
-    DEFAULT_HAS_LIGHT,
     DEFAULT_REPEAT_COUNT,
     DEFAULT_SPEED_COUNT,
     DOMAIN,
     EVENT_RF_FAN_RECEIVED,
+    LIGHT_CONTROL_NONE,
+    LIGHT_CONTROL_OPTIONS,
+    LIGHT_CONTROL_TOGGLE,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -51,7 +55,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._esphome_device: str = ""
         self._fan_name: str = ""
         self._speed_count: int = DEFAULT_SPEED_COUNT
-        self._has_light: bool = DEFAULT_HAS_LIGHT
+        self._light_control: str = LIGHT_CONTROL_TOGGLE
+        self._has_fan_on: bool = False
+        self._has_light: bool = True
         self._caps: dict[str, bool] = {}
         self._learn_codes: dict[str, str] = {}
         self._learn_action_index: int = 0
@@ -92,7 +98,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._esphome_device = selected_device
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
                 self._speed_count = int(user_input[CONF_SPEED_COUNT])
-                self._has_light = bool(user_input[CONF_HAS_LIGHT])
+                self._light_control = user_input[CONF_LIGHT_CONTROL]
+                self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
+                self._has_light = self._light_control != LIGHT_CONTROL_NONE
                 self._caps = caps_from_data(user_input)
                 return await self.async_step_method()
 
@@ -112,7 +120,12 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 device_key: device_field,
                 vol.Required(CONF_FAN_NAME): str,
                 vol.Required(CONF_SPEED_COUNT, default=DEFAULT_SPEED_COUNT): vol.In([3, 4, 5, 6]),
-                vol.Required(CONF_HAS_LIGHT, default=DEFAULT_HAS_LIGHT): bool,
+                vol.Required(CONF_LIGHT_CONTROL, default=LIGHT_CONTROL_TOGGLE): SelectSelector(
+                    SelectSelectorConfig(
+                        options=LIGHT_CONTROL_OPTIONS, translation_key="light_control"
+                    )
+                ),
+                vol.Required(CONF_HAS_FAN_ON, default=False): bool,
                 vol.Required(CONF_HAS_DIRECTION, default=False): bool,
                 vol.Required(CONF_HAS_NATURAL_PRESET, default=False): bool,
                 vol.Required(CONF_HAS_COLOR_TEMP, default=False): bool,
@@ -161,7 +174,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         """Étape manuelle: mapping action -> code RF."""
         errors: dict[str, str] = {}
         required_actions, optional_actions = split_actions(
-            self._speed_count, self._has_light, **self._caps
+            self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
         )
 
         if user_input is not None:
@@ -170,7 +183,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 for action in required_actions + optional_actions
                 if str(user_input.get(action, "")).strip()
             }
-            errors = validate_codes(codes, required_actions, self._has_light)
+            errors = validate_codes(codes, required_actions)
             if not errors:
                 return self._create_entry(codes)
 
@@ -189,7 +202,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     def _learn_actions(self) -> list[str]:
         """Lister les actions à apprendre dans l'ordre."""
         required_actions, optional_actions = split_actions(
-            self._speed_count, self._has_light, **self._caps
+            self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
         )
         return required_actions + optional_actions
 
@@ -326,6 +339,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_ESPHOME_DEVICE: self._esphome_device,
                 CONF_FAN_NAME: self._fan_name,
                 CONF_SPEED_COUNT: self._speed_count,
+                CONF_LIGHT_CONTROL: self._light_control,
+                CONF_HAS_FAN_ON: self._has_fan_on,
                 CONF_HAS_LIGHT: self._has_light,
                 **self._caps,
                 CONF_REPEAT_COUNT: DEFAULT_REPEAT_COUNT,
