@@ -100,3 +100,19 @@ CAPABILITY_FLAGS = (
 def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
     """Extraire les capacités d'un dict de config entry (défaut False)."""
     return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
+
+
+def classify_reconfigure_actions(
+    required: list[str], existing_codes: dict[str, str]
+) -> tuple[list[str], list[str], list[str]]:
+    """Répartir les actions pour une reconfiguration.
+
+    - to_learn : requises sans code existant (nouvellement requises).
+    - kept : requises disposant déjà d'un code (conservées).
+    - forgotten : codées mais plus requises (à retirer).
+    Ordre : to_learn/kept suivent `required` ; forgotten suit `existing_codes`.
+    """
+    to_learn = [a for a in required if not existing_codes.get(a)]
+    kept = [a for a in required if existing_codes.get(a)]
+    forgotten = [a for a in existing_codes if a not in required]
+    return to_learn, kept, forgotten
