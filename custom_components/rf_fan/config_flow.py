@@ -153,7 +153,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         """Choisir entre saisie manuelle et apprentissage."""
         if user_input is not None:
             if user_input["method"] == "learn":
-                self._learn_codes = {}
+                if not self._reconfigure:
+                    self._learn_codes = {}
+                self._learn_task = None
+                self._learn_timeout = False
                 self._learn_action_index = 0
                 return await self.async_step_learn()
             return await self.async_step_codes()
