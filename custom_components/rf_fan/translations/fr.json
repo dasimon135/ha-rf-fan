@@ -70,6 +70,26 @@
           "timer_8h": "Code minuterie 8h",
           "sound_toggle": "Code son"
         }
+      },
+      "reconfigure": {
+        "title": "Ventilateur RF - Reconfiguration",
+        "description": "Re-déclarez les capacités du ventilateur. Les codes existants sont conservés ; seuls les nouveaux boutons requis seront appris ensuite.",
+        "data": {
+          "fan_name": "Nom d'affichage du ventilateur",
+          "speed_count": "Nombre de vitesses distinctes",
+          "light_control": "Commande de la lumière",
+          "has_fan_on": "Le ventilateur a un bouton marche dédié",
+          "has_direction": "Sens inverse (bouton reverse)",
+          "has_natural_preset": "Flux d'air naturel",
+          "has_color_temp": "Température de couleur (Kelvin)",
+          "has_timers": "Minuteries (1h/2h/4h/8h)",
+          "has_sound": "Son (bip)"
+        }
+      },
+      "reconfigure_review": {
+        "title": "Ventilateur RF - Vérification",
+        "description": "À apprendre : {to_learn}\nGardées (cocher pour ré-apprendre) : {kept}\nRetirées : {forgotten}",
+        "data": {}
       }
     },
     "progress": {
@@ -90,6 +110,9 @@
       "required_esphome_device": "Plusieurs devices ESPHome compatibles ont été trouvés. Choisissez-en un.",
       "unknown_esphome_device": "Aucun device ESPHome compatible n'a été trouvé avec ce nom.",
       "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action."
+    },
+    "abort": {
+      "reconfigure_successful": "Reconfiguration enregistrée et rechargée."
     }
   },
   "options": {
