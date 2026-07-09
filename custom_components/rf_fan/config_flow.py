@@ -71,7 +71,6 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._reconfigure: bool = False
         self._existing_codes: dict[str, str] = {}
         self._pending_actions: list[str] | None = None
-        self._forgotten_actions: list[str] = []
         self._repeat_count: int = DEFAULT_REPEAT_COUNT
 
     def _available_esphome_devices(self) -> list[str]:
@@ -408,7 +407,6 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             self._pending_actions = [
                 a for a in required_actions if a in to_learn or a in relearn
             ]
-            self._forgotten_actions = forgotten
             if not self._pending_actions:
                 return self._finish(dict(self._learn_codes))
             self._learn_action_index = 0

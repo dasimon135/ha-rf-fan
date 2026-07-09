@@ -311,3 +311,83 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
     assert codes["fan_off"] == "c_off"  # bases conservées
     assert codes["fan_speed_3"] == "c3"
     assert entry.data["has_color_temp"] is True
+
+
+async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
+    """Régression : la reconfiguration en mode apprentissage préserve les codes conservés.
+
+    C'est le chemin où vivait le bug d'effacement du seed : la boucle
+    d'apprentissage ne doit ré-apprendre que le delta (`_pending_actions`) tout en
+    conservant les 5 codes existants (`_learn_codes` pré-rempli depuis l'entrée).
+    Calqué sur `test_learn_flow_advances_and_creates_entry` pour piloter les écrans
+    `SHOW_PROGRESS` (fire `EVENT_RF_FAN_RECEIVED` puis re-`async_configure`).
+    """
+    entry = _basic_entry(hass)
+    # La passerelle doit être découvrable comme dans `_start_learn`.
+    hass.services.async_register(
+        "esphome", "esp32_test_transmit_rf_fan", lambda call: None
+    )
+    await hass.async_block_till_done()
+    flow = hass.config_entries.flow
+
+    learned = {"timer_1h": "t1", "timer_2h": "t2", "timer_4h": "t4", "timer_8h": "t8"}
+
+    with patch(
+        "custom_components.rf_fan.async_setup_entry", return_value=True
+    ):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Recon",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "has_direction": False,
+                "has_natural_preset": False,
+                "has_color_temp": False,
+                "has_timers": True,
+                "has_sound": False,
+            },
+        )
+        assert result["step_id"] == "reconfigure_review"
+        result = await flow.async_configure(result["flow_id"], {})
+        result = await flow.async_configure(result["flow_id"], {"method": "learn"})
+        flow_id = result["flow_id"]
+
+        # La boucle d'apprentissage ne doit itérer QUE le delta (les 4 minuteries).
+        seen: list[str] = []
+        for _ in range(10):
+            if result["type"] != FlowResultType.SHOW_PROGRESS:
+                break
+            action = result["description_placeholders"]["action"]
+            seen.append(action)
+            hass.bus.async_fire(
+                EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": learned[action]}
+            )
+            await hass.async_block_till_done()
+            # Simule le re-fetch du frontend après l'événement de progression.
+            result = await flow.async_configure(flow_id)
+        await hass.async_block_till_done()
+
+    assert seen == ["timer_1h", "timer_2h", "timer_4h", "timer_8h"]
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    codes = entry.data["codes"]
+    # Les 5 codes conservés SURVIVENT + les 4 minuteries apprises = 9 au total.
+    assert codes == {
+        "fan_off": "c_off",
+        "fan_speed_1": "c1",
+        "fan_speed_2": "c2",
+        "fan_speed_3": "c3",
+        "light_toggle": "c_tog",
+        "timer_1h": "t1",
+        "timer_2h": "t2",
+        "timer_4h": "t4",
+        "timer_8h": "t8",
+    }
+    assert entry.data["has_timers"] is True
