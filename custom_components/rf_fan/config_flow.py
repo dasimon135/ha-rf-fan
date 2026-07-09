@@ -12,7 +12,12 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 
-from .actions import caps_from_data, split_actions, validate_codes
+from .actions import (
+    caps_from_data,
+    classify_reconfigure_actions,
+    split_actions,
+    validate_codes,
+)
 from .const import (
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
@@ -175,11 +180,14 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         actions = self._actions_to_process()
 
         if user_input is not None:
-            codes = {
-                action: str(user_input.get(action, "")).strip()
-                for action in actions
-                if str(user_input.get(action, "")).strip()
-            }
+            codes = dict(self._learn_codes) if self._reconfigure else {}
+            codes.update(
+                {
+                    action: str(user_input.get(action, "")).strip()
+                    for action in actions
+                    if str(user_input.get(action, "")).strip()
+                }
+            )
             errors = validate_codes(codes, actions)
             if not errors:
                 return self._finish(codes)
@@ -345,6 +353,76 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             entry = self._get_reconfigure_entry()
             return self.async_update_reload_and_abort(entry, data=data)
         return self.async_create_entry(title=self._fan_name, data=data)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Reconfigurer une entrée existante : re-déclarer + apprendre le delta."""
+        entry = self._get_reconfigure_entry()
+        data = entry.data
+
+        if user_input is None:
+            self._reconfigure = True
+            self._esphome_device = data[CONF_ESPHOME_DEVICE]
+            self._fan_name = data.get(CONF_FAN_NAME, entry.title)
+            self._speed_count = int(data.get(CONF_SPEED_COUNT, DEFAULT_SPEED_COUNT))
+            self._light_control = data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_TOGGLE)
+            self._has_fan_on = bool(data.get(CONF_HAS_FAN_ON, False))
+            self._caps = caps_from_data(data)
+            self._existing_codes = dict(data.get(CONF_CODES, {}))
+            self._repeat_count = int(
+                entry.options.get(
+                    CONF_REPEAT_COUNT, data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
+                )
+            )
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=self._base_schema(include_device=False),
+            )
+
+        self._fan_name = user_input[CONF_FAN_NAME].strip()
+        self._speed_count = int(user_input[CONF_SPEED_COUNT])
+        self._light_control = user_input[CONF_LIGHT_CONTROL]
+        self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
+        self._has_light = self._light_control != LIGHT_CONTROL_NONE
+        self._caps = caps_from_data(user_input)
+        return await self.async_step_reconfigure_review()
+
+    async def async_step_reconfigure_review(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Récap : à apprendre / gardées (re-apprendre ?) / oubliées, puis capture."""
+        required_actions, _ = split_actions(
+            self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
+        )
+        to_learn, kept, forgotten = classify_reconfigure_actions(
+            required_actions, self._existing_codes
+        )
+
+        if user_input is not None:
+            relearn = [a for a in kept if bool(user_input.get(f"relearn::{a}"))]
+            self._learn_codes = {a: self._existing_codes[a] for a in kept}
+            self._pending_actions = [
+                a for a in required_actions if a in to_learn or a in relearn
+            ]
+            self._forgotten_actions = forgotten
+            if not self._pending_actions:
+                return self._finish(dict(self._learn_codes))
+            self._learn_action_index = 0
+            return await self.async_step_method()
+
+        schema_fields: dict[Any, Any] = {
+            vol.Optional(f"relearn::{a}", default=False): bool for a in kept
+        }
+        return self.async_show_form(
+            step_id="reconfigure_review",
+            data_schema=vol.Schema(schema_fields),
+            description_placeholders={
+                "to_learn": ", ".join(to_learn) or "—",
+                "kept": ", ".join(kept) or "—",
+                "forgotten": ", ".join(forgotten) or "—",
+            },
+        )
 
 
 class RfFanOptionsFlow(OptionsFlow):
