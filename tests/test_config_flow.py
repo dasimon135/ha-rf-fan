@@ -22,13 +22,16 @@ compense l'absence de notification) : d'où l'assertion sur l'événement lui-m�
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from homeassistant.config_entries import SOURCE_USER  # noqa: E402
+from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER  # noqa: E402
 from homeassistant.core import HomeAssistant  # noqa: E402
 from homeassistant.data_entry_flow import FlowResultType  # noqa: E402
+from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: E402
 
 from custom_components.rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED  # noqa: E402
 
@@ -152,3 +155,159 @@ async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
     assert codes["light_kelvin"] == "C_kel"
     assert codes["timer_8h"] == "C_t8"
     assert codes["sound_toggle"] == "C_snd"
+
+
+def _basic_entry(hass: HomeAssistant) -> MockConfigEntry:
+    """Créer une entrée de base (3 vitesses + lumière toggle) enregistrée dans hass."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Recon",
+        data={
+            "esphome_device": DEVICE,
+            "fan_name": "Recon",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_fan_on": False,
+            "has_direction": False,
+            "has_natural_preset": False,
+            "has_color_temp": False,
+            "has_timers": False,
+            "has_sound": False,
+            "has_light": True,
+            "repeat_count": 2,
+            "codes": {
+                "fan_off": "c_off",
+                "fan_speed_1": "c1",
+                "fan_speed_2": "c2",
+                "fan_speed_3": "c3",
+                "light_toggle": "c_tog",
+            },
+        },
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
+    """Reconfigurer en activant les minuteries : seul le delta est demandé, codes fusionnés."""
+    entry = _basic_entry(hass)
+    flow = hass.config_entries.flow
+
+    # Le reload déclenché par async_update_reload_and_abort est neutralisé : on
+    # ne teste ici que la logique du flow, pas le (re)montage des plateformes.
+    with patch(
+        "custom_components.rf_fan.async_setup_entry", return_value=True
+    ):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        assert result["step_id"] == "reconfigure"
+
+        # Re-déclarer les mêmes bases, mais avec les minuteries activées.
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Recon",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "has_direction": False,
+                "has_natural_preset": False,
+                "has_color_temp": False,
+                "has_timers": True,
+                "has_sound": False,
+            },
+        )
+        assert result["step_id"] == "reconfigure_review"
+
+        # Ne re-apprendre aucune action conservée.
+        result = await flow.async_configure(result["flow_id"], {})
+        assert result["step_id"] == "method"
+
+        result = await flow.async_configure(result["flow_id"], {"method": "manual"})
+        assert result["step_id"] == "codes"
+
+        # Le formulaire ne doit demander QUE le delta : les 4 minuteries.
+        fields = {str(key) for key in result["data_schema"].schema}
+        assert fields == {"timer_1h", "timer_2h", "timer_4h", "timer_8h"}
+
+        result = await flow.async_configure(
+            result["flow_id"],
+            {"timer_1h": "t1", "timer_2h": "t2", "timer_4h": "t4", "timer_8h": "t8"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    codes = entry.data["codes"]
+    # Les 5 codes d'origine + les 4 minuteries = 9 au total.
+    assert codes == {
+        "fan_off": "c_off",
+        "fan_speed_1": "c1",
+        "fan_speed_2": "c2",
+        "fan_speed_3": "c3",
+        "light_toggle": "c_tog",
+        "timer_1h": "t1",
+        "timer_2h": "t2",
+        "timer_4h": "t4",
+        "timer_8h": "t8",
+    }
+    assert entry.data["has_timers"] is True
+
+
+async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant) -> None:
+    """Reconfigurer en activant la couleur + re-apprendre light_toggle."""
+    entry = _basic_entry(hass)
+    flow = hass.config_entries.flow
+
+    with patch(
+        "custom_components.rf_fan.async_setup_entry", return_value=True
+    ):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Recon",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "has_direction": False,
+                "has_natural_preset": False,
+                "has_color_temp": True,
+                "has_timers": False,
+                "has_sound": False,
+            },
+        )
+        assert result["step_id"] == "reconfigure_review"
+
+        # Cocher le re-apprentissage de light_toggle (action conservée).
+        result = await flow.async_configure(
+            result["flow_id"], {"relearn::light_toggle": True}
+        )
+        result = await flow.async_configure(result["flow_id"], {"method": "manual"})
+        assert result["step_id"] == "codes"
+
+        # Delta demandé : light_toggle (re-appris) + light_kelvin (nouveau).
+        fields = {str(key) for key in result["data_schema"].schema}
+        assert fields == {"light_toggle", "light_kelvin"}
+
+        result = await flow.async_configure(
+            result["flow_id"],
+            {"light_toggle": "c_tog_new", "light_kelvin": "c_kel"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    codes = entry.data["codes"]
+    assert codes["light_toggle"] == "c_tog_new"  # écrasé par le re-apprentissage
+    assert codes["light_kelvin"] == "c_kel"  # nouvelle capacité
+    assert codes["fan_off"] == "c_off"  # bases conservées
+    assert codes["fan_speed_3"] == "c3"
+    assert entry.data["has_color_temp"] is True
