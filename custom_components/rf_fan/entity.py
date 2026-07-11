@@ -17,6 +17,7 @@ from .const import (
     CONF_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
+    SINGLE_SHOT_ACTIONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,6 +62,9 @@ class RfFanBaseEntity(Entity):
             return False
 
         service_name = f"{self._esphome_device.replace('-', '_')}_transmit_rf_fan"
+        # Relative/toggle actions must fire exactly once (the captured code already
+        # holds the remote's repeat burst); only absolute actions use repeat_count.
+        repeat_count = 1 if action in SINGLE_SHOT_ACTIONS else self._repeat_count()
         try:
             await self.hass.services.async_call(
                 "esphome",
@@ -68,7 +72,7 @@ class RfFanBaseEntity(Entity):
                 {
                     "action": action,
                     "code": code,
-                    "repeat_count": self._repeat_count(),
+                    "repeat_count": repeat_count,
                 },
                 blocking=True,
             )

@@ -44,6 +44,22 @@ ACTION_LIGHT_KELVIN: Final = "light_kelvin"
 ACTION_SOUND_TOGGLE: Final = "sound_toggle"
 TIMER_HOURS: Final = (1, 2, 4, 8)
 
+# Relative/toggle actions that must fire EXACTLY once. Each press flips or steps a
+# state (toggle the light or sound, flip direction/natural preset, or advance the
+# color cycle). The captured RF code already contains the remote's own repeat burst
+# = one physical press, so replaying it repeat_count>1 times would double-actuate and
+# cancel out (toggles) or overshoot (kelvin). These always transmit once, regardless
+# of the configured repeat_count. Absolute actions (speeds, timers, on/off) keep it.
+SINGLE_SHOT_ACTIONS: Final = frozenset(
+    {
+        ACTION_LIGHT_TOGGLE,
+        ACTION_SOUND_TOGGLE,
+        ACTION_LIGHT_KELVIN,
+        ACTION_FAN_REVERSE,
+        ACTION_FAN_NATURAL,
+    }
+)
+
 # Natural airflow preset
 PRESET_NORMAL: Final = "normal"
 PRESET_NATURAL: Final = "natural"

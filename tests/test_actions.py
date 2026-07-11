@@ -148,3 +148,28 @@ def test_classify_preserves_required_order():
     to_learn, kept, forgotten = classify_reconfigure_actions(required, existing)
     assert to_learn == [ACTION_FAN_OFF, speed_action(2)]
     assert kept == [speed_action(1), ACTION_LIGHT_TOGGLE]
+
+
+def test_single_shot_actions_cover_relative_actions_only():
+    from const import (
+        ACTION_FAN_NATURAL,
+        ACTION_FAN_ON,
+        ACTION_FAN_REVERSE,
+        ACTION_LIGHT_KELVIN,
+        ACTION_SOUND_TOGGLE,
+        SINGLE_SHOT_ACTIONS,
+    )
+
+    # Relative / toggle / cycle actions must fire exactly once.
+    for relative in (
+        ACTION_LIGHT_TOGGLE,
+        ACTION_SOUND_TOGGLE,
+        ACTION_LIGHT_KELVIN,
+        ACTION_FAN_REVERSE,
+        ACTION_FAN_NATURAL,
+    ):
+        assert relative in SINGLE_SHOT_ACTIONS
+
+    # Absolute actions must NOT be single-shot (they keep repeat_count for reliability).
+    for absolute in (ACTION_FAN_OFF, ACTION_FAN_ON, speed_action(1), timer_action(4)):
+        assert absolute not in SINGLE_SHOT_ACTIONS
