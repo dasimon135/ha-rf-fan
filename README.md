@@ -1,76 +1,138 @@
-# RF Fan - Home Assistant Integration
+# RF Fan — Home Assistant integration
 
-Integration Home Assistant pour ventilateurs RF433 génériques, avec apprentissage manuel ou guidé via ESPHome.
+A **generic** Home Assistant integration for RF (typically 433 MHz) ceiling and wall
+fans that have no manufacturer-specific integration. You pair it with an ESPHome
+gateway that can transmit — and ideally receive — the raw RF frames, then teach Home
+Assistant your remote button by button.
 
-## Objectif
+It is deliberately protocol-agnostic: the integration stores your codes as **opaque
+strings** and replays them through the ESPHome gateway. It does not care whether the
+frames are `rc_switch`, raw timings, or anything else the gateway understands. A
+Cecotec fan is used as the reference example, but any RF fan works.
 
-Ce projet cible les ventilateurs de plafond ou muraux pilotés par télécommande RF, quand il n'existe pas d'intégration dédiée au constructeur.
+<p align="center">
+  <img src="assets/brand/icon@2x.png" width="128" alt="RF Fan icon">
+</p>
 
-L'approche retenue est volontairement générique :
+## Features
 
-1. une passerelle ESPHome sniffe les trames RF reçues ;
-2. Home Assistant apprend les codes bouton par bouton ;
-3. l'intégration expose une entité fan et, si besoin, une entité light.
+- **Config flow** — no YAML to write.
+- **Two setup methods**: paste already-sniffed codes manually, or **guided learning**
+  from remote button presses (via ESPHome events).
+- **Declarative capabilities** — you only get asked for the buttons your fan actually
+  has:
+  - Discrete fan speeds (3–6).
+  - Optional light: none / single toggle / separate on & off buttons.
+  - Optional dedicated fan "on" button.
+  - Optional **reverse direction**, **natural-airflow preset**, **color temperature
+    (Kelvin)**, **sleep timers** (1/2/4/8 h), and **sound** toggle.
+- **Reconfigure in place** — add or change capabilities on an existing entry and learn
+  only the new buttons, keeping the codes you already captured (see below).
+- **Assumed state** (`assumed_state`) with dead-reckoning, plus partial state sync when
+  the physical remote is used (if the gateway reports received frames).
+- **Configurable RF repeat count**.
 
-## Fonctionnalités
+## Entities
 
-- config flow Home Assistant
-- mode manuel pour coller les codes RF déjà sniffés
-- mode apprentissage guidé à partir des événements ESPHome
-- entité fan à vitesses discrètes
-- entité light optionnelle
-- état supposé (`assumed_state`)
-- répétition RF configurable
-- synchronisation partielle quand la télécommande physique est utilisée
+Depending on the declared capabilities, a device exposes:
 
-## Pré-requis
+| Entity | When | Notes |
+| --- | --- | --- |
+| `fan` | always | discrete speeds; gains `direction` and a `natural` preset when enabled |
+| `light` | light ≠ none | on/off; toggle- or on/off-driven |
+| `select` "color temperature" | color temp enabled | cycles Warm → Neutral → Cold |
+| `button` calibrate | color temp enabled | resyncs the assumed color position — **emits nothing** |
+| `button` timer ×4 | timers enabled | 1 h / 2 h / 4 h / 8 h |
+| `switch` sound | sound enabled | beep on/off |
 
-- Home Assistant 2026.5+
-- un nœud ESPHome exposant le service `transmit_rf_fan`
-- un émetteur RF433 supporté par ESPHome
-- idéalement un récepteur RF433 pour le sniff et la synchro d'état
+### Color temperature (Kelvin)
 
-## Installation HACS
+The remote's Kelvin button *cycles* the color, so the integration tracks an **assumed
+position** (dead-reckoning). To change the color, use the **"color temperature"
+dropdown** and pick a value *different* from the one shown — picking the current value
+sends nothing. The **calibrate button never emits RF**: it only tells Home Assistant
+"the lamp is now on Warm", to re-align the dropdown if it drifts (set the lamp to Warm
+physically, then press it). The color only changes visibly when the light is on.
 
-1. Ajouter ce dépôt comme dépôt personnalisé de type `Integration`
-2. Installer `RF Fan`
-3. Redémarrer Home Assistant
-4. Ajouter l'intégration `RF Fan`
+## Requirements
 
-## Structure du projet
+- Home Assistant **2026.5+**.
+- An ESPHome node exposing a `transmit_rf_fan` service (see the ESPHome contract below).
+- An RF transmitter supported by ESPHome (e.g. a CC1101 module).
+- Ideally an RF receiver too, for guided learning and physical-remote state sync.
+
+## Installation (HACS)
+
+1. Add this repository as a **custom repository** of type `Integration`.
+2. Install **RF Fan**.
+3. Restart Home Assistant.
+4. Add the **RF Fan** integration and follow the config flow.
+
+## Reconfiguring an existing fan
+
+To add a capability (or fix a captured code) later, open the integration entry and use
+**⋮ → Reconfigure** (on the *RF Fan* integration card, not the device page):
+
+1. Re-declare the capabilities (existing values are pre-filled) and enable the new ones.
+2. On the review screen you see what will be **learned** (newly required buttons),
+   **kept** (existing codes — tick a box to re-learn one), and **removed**.
+3. Choose learning or manual entry; only the delta is asked for.
+4. The entry reloads in place — your dashboards and automations keep working.
+
+> A full Home Assistant **restart** is required after updating the integration so the
+> new config-flow steps load.
+
+## ESPHome contract
+
+The ESPHome node must expose a Home Assistant service named `transmit_rf_fan` with:
+
+- `action` — logical action name (`fan_speed_1`, `light_toggle`, `timer_2h`, …).
+- `code` — the RF frame as an opaque string (raw CSV timings such as
+  `raw:150,-5839,1144,-370,…`, or a `<protocol>:<bits>` rc_switch code).
+- `repeat_count` — number of RF repeats.
+
+For guided learning and physical-remote sync, the node should also fire the
+`esphome.rf_fan_received` event with `device` and `code` fields. A complete, working
+example is in [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml).
+
+## Project structure
 
 ```text
-custom_components/
-  rf_fan/
-    __init__.py
-    config_flow.py
-    const.py
-    entity.py
-    fan.py
-    light.py
-    manifest.json
-    strings.json
-    translations/
-      en.json
-      fr.json
+custom_components/rf_fan/
+  __init__.py        actions.py       config_flow.py   const.py
+  entity.py          fan.py           light.py         select.py
+  button.py          switch.py        manifest.json
+  strings.json       translations/{en,fr}.json
 esphome/
   rf_fan_example.yaml
+assets/brand/        icon.png  icon@2x.png  logo.png  (for home-assistant/brands)
 ```
 
-## Contrat ESPHome
+## Brand icon
 
-Le nœud ESPHome doit exposer un service Home Assistant nommé `transmit_rf_fan`.
+The integration icon/logo live in [`assets/brand/`](assets/brand/). Home Assistant
+serves integration icons from the [home-assistant/brands](https://github.com/home-assistant/brands)
+repository, so until they are submitted there the UI shows "logo not available". See
+[`assets/brand/README.md`](assets/brand/README.md) for the submission path.
 
-Payload attendu :
+## Known limitations
 
-- `action` : nom logique de l'action (`fan_speed_1`, `light_on`, etc.)
-- `code` : trame RF brute sous forme de chaîne CSV (`5000,-1500,350,-750,...`)
-- `repeat_count` : nombre d'émissions RF
+- No generic rolling-code support.
+- No native RF acknowledgement — state is assumed, not confirmed.
+- The protocols that actually work depend on what your ESPHome gateway can sniff and
+  replay correctly.
 
-Le nœud peut aussi publier l'événement `esphome.rf_fan_received` pour le mode apprentissage et la mise à jour d'état. Exemple fourni dans [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml).
+## Development
 
-## Limites connues
+Pure logic tests run anywhere:
 
-- pas de support générique des rolling codes
-- pas d'accusé de réception RF natif
-- les protocoles réellement supportés dépendent de ce que la passerelle ESPHome sait sniffer et rejouer correctement
+```bash
+python -m pytest tests/test_actions.py -q
+```
+
+The config-flow tests require `pytest-homeassistant-custom-component` (a Home Assistant
+test environment) and skip cleanly when it is unavailable.
+
+## License
+
+See [LICENSE](LICENSE).
