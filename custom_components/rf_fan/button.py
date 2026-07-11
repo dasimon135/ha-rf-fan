@@ -54,7 +54,7 @@ class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):
         """Initialiser le bouton de calibration couleur."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_kelvin_calibrate"
-        self._attr_name = "Couleur → Chaud (calibrer)"
+        self._attr_name = "Couleur : recaler le suivi sur Chaud"
 
     async def async_press(self) -> None:
         """Remettre la position couleur à zéro sans émettre de code RF."""

@@ -287,7 +287,7 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
 
         # Cocher le re-apprentissage de light_toggle (action conservée).
         result = await flow.async_configure(
-            result["flow_id"], {"relearn::light_toggle": True}
+            result["flow_id"], {"relearn_light_toggle": True}
         )
         result = await flow.async_configure(result["flow_id"], {"method": "manual"})
         assert result["step_id"] == "codes"

@@ -402,7 +402,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         if user_input is not None:
-            relearn = [a for a in kept if bool(user_input.get(f"relearn::{a}"))]
+            relearn = [a for a in kept if bool(user_input.get(f"relearn_{a}"))]
             self._learn_codes = {a: self._existing_codes[a] for a in kept}
             self._pending_actions = [
                 a for a in required_actions if a in to_learn or a in relearn
@@ -413,7 +413,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_method()
 
         schema_fields: dict[Any, Any] = {
-            vol.Optional(f"relearn::{a}", default=False): bool for a in kept
+            vol.Optional(f"relearn_{a}", default=False): bool for a in kept
         }
         return self.async_show_form(
             step_id="reconfigure_review",

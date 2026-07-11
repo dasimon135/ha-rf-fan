@@ -89,7 +89,27 @@
       "reconfigure_review": {
         "title": "Ventilateur RF - Vérification",
         "description": "À apprendre : {to_learn}\nGardées (cocher pour ré-apprendre) : {kept}\nRetirées : {forgotten}",
-        "data": {}
+        "data": {
+          "relearn_fan_off": "Ré-apprendre : ventilateur OFF",
+          "relearn_fan_on": "Ré-apprendre : ventilateur ON",
+          "relearn_fan_speed_1": "Ré-apprendre : vitesse 1",
+          "relearn_fan_speed_2": "Ré-apprendre : vitesse 2",
+          "relearn_fan_speed_3": "Ré-apprendre : vitesse 3",
+          "relearn_fan_speed_4": "Ré-apprendre : vitesse 4",
+          "relearn_fan_speed_5": "Ré-apprendre : vitesse 5",
+          "relearn_fan_speed_6": "Ré-apprendre : vitesse 6",
+          "relearn_light_toggle": "Ré-apprendre : bascule lumière",
+          "relearn_light_on": "Ré-apprendre : lumière ON",
+          "relearn_light_off": "Ré-apprendre : lumière OFF",
+          "relearn_fan_reverse": "Ré-apprendre : sens inverse",
+          "relearn_fan_natural": "Ré-apprendre : flux naturel",
+          "relearn_light_kelvin": "Ré-apprendre : température couleur",
+          "relearn_timer_1h": "Ré-apprendre : minuterie 1h",
+          "relearn_timer_2h": "Ré-apprendre : minuterie 2h",
+          "relearn_timer_4h": "Ré-apprendre : minuterie 4h",
+          "relearn_timer_8h": "Ré-apprendre : minuterie 8h",
+          "relearn_sound_toggle": "Ré-apprendre : son"
+        }
       }
     },
     "progress": {

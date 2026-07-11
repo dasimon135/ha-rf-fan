@@ -89,7 +89,27 @@
       "reconfigure_review": {
         "title": "RF Fan - Review changes",
         "description": "To learn: {to_learn}\nKept (tick to re-learn): {kept}\nRemoved: {forgotten}",
-        "data": {}
+        "data": {
+          "relearn_fan_off": "Re-learn: fan off",
+          "relearn_fan_on": "Re-learn: fan on",
+          "relearn_fan_speed_1": "Re-learn: speed 1",
+          "relearn_fan_speed_2": "Re-learn: speed 2",
+          "relearn_fan_speed_3": "Re-learn: speed 3",
+          "relearn_fan_speed_4": "Re-learn: speed 4",
+          "relearn_fan_speed_5": "Re-learn: speed 5",
+          "relearn_fan_speed_6": "Re-learn: speed 6",
+          "relearn_light_toggle": "Re-learn: light toggle",
+          "relearn_light_on": "Re-learn: light on",
+          "relearn_light_off": "Re-learn: light off",
+          "relearn_fan_reverse": "Re-learn: reverse direction",
+          "relearn_fan_natural": "Re-learn: natural airflow",
+          "relearn_light_kelvin": "Re-learn: color temperature",
+          "relearn_timer_1h": "Re-learn: 1h timer",
+          "relearn_timer_2h": "Re-learn: 2h timer",
+          "relearn_timer_4h": "Re-learn: 4h timer",
+          "relearn_timer_8h": "Re-learn: 8h timer",
+          "relearn_sound_toggle": "Re-learn: sound"
+        }
       }
     },
     "progress": {
