@@ -8,5 +8,5 @@
   "integration_type": "device",
   "iot_class": "assumed_state",
   "codeowners": ["@dasimon135"],
-  "version": "0.1.0"
+  "version": "1.0.0"
 }

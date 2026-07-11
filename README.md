@@ -103,17 +103,19 @@ custom_components/rf_fan/
   entity.py          fan.py           light.py         select.py
   button.py          switch.py        manifest.json
   strings.json       translations/{en,fr}.json
+  brand/             icon.png  icon@2x.png  logo.png
 esphome/
   rf_fan_example.yaml
-assets/brand/        icon.png  icon@2x.png  logo.png  (for home-assistant/brands)
 ```
 
 ## Brand icon
 
-The integration icon/logo live in [`assets/brand/`](assets/brand/). Home Assistant
-serves integration icons from the [home-assistant/brands](https://github.com/home-assistant/brands)
-repository, so until they are submitted there the UI shows "logo not available". See
-[`assets/brand/README.md`](assets/brand/README.md) for the submission path.
+The integration ships its own icon/logo in
+[`custom_components/rf_fan/brand/`](custom_components/rf_fan/brand/). Since Home
+Assistant 2026.3, custom integrations serve local brand images directly (they take
+priority over the brands CDN), so no submission to `home-assistant/brands` is needed.
+Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
+`dark_icon.png` / `dark_logo.png`).
 
 ## Known limitations
 
