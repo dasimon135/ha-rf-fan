@@ -8,6 +8,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import ACTION_SOUND_TOGGLE, CONF_HAS_SOUND, EVENT_RF_FAN_RECEIVED
 from .entity import RfFanBaseEntity
@@ -25,7 +26,7 @@ async def async_setup_entry(
     async_add_entities([RfFanSoundSwitch(hass, config_entry)])
 
 
-class RfFanSoundSwitch(RfFanBaseEntity, SwitchEntity):
+class RfFanSoundSwitch(RfFanBaseEntity, RestoreEntity, SwitchEntity):
     """Sound switch with assumed state (single toggle)."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -42,7 +43,10 @@ class RfFanSoundSwitch(RfFanBaseEntity, SwitchEntity):
         return self._is_on
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to RF events received by ESPHome."""
+        """Restore the assumed sound state, then subscribe to RF events."""
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in ("on", "off"):
+            self._is_on = last_state.state == "on"
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
 
     async def async_will_remove_from_hass(self) -> None:

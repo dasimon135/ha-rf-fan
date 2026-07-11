@@ -13,6 +13,7 @@ from homeassistant.components.fan import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     ACTION_FAN_NATURAL,
@@ -39,7 +40,7 @@ async def async_setup_entry(
     async_add_entities([RfFanEntity(hass, config_entry)])
 
 
-class RfFanEntity(RfFanBaseEntity, FanEntity):
+class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
     """Generic RF fan with assumed state."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -103,7 +104,21 @@ class RfFanEntity(RfFanBaseEntity, FanEntity):
         return 100 / self._speed_count
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to RF events received by ESPHome."""
+        """Restore the assumed state (on/off, speed, direction, preset), then subscribe to RF events."""
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in ("on", "off"):
+            self._is_on = last_state.state == "on"
+            pct = last_state.attributes.get("percentage")
+            if isinstance(pct, (int, float)):
+                self._percentage = int(pct)
+            if self._has_direction:
+                direction = last_state.attributes.get("direction")
+                if direction in (DIRECTION_FORWARD, DIRECTION_REVERSE):
+                    self._direction = direction
+            if self._has_preset:
+                preset = last_state.attributes.get("preset_mode")
+                if preset in (PRESET_NORMAL, PRESET_NATURAL):
+                    self._preset = preset
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
 
     async def async_will_remove_from_hass(self) -> None:

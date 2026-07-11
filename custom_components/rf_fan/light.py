@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     ACTION_LIGHT_OFF,
@@ -33,7 +34,7 @@ async def async_setup_entry(
     async_add_entities([RfFanLightEntity(hass, config_entry)])
 
 
-class RfFanLightEntity(RfFanBaseEntity, LightEntity):
+class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
     """Generic RF light (on/off)."""
 
     _attr_color_mode = ColorMode.ONOFF
@@ -54,7 +55,13 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
         return self._is_on
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to RF events received by ESPHome."""
+        """Restore the assumed on/off state (without a color bump), then subscribe to RF events."""
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in ("on", "off"):
+            self._is_on = last_state.state == "on"
+            # Share the restored state so the color select gates correctly on startup.
+            self._entry_runtime()["light_on"] = self._is_on
+            async_dispatcher_send(self.hass, self._kelvin_signal())
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
 
     async def async_will_remove_from_hass(self) -> None:
