@@ -19,7 +19,10 @@ PLATFORMS: list[Platform] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Initialize an RF fan config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"kelvin_position": 0}
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "kelvin_position": 0,
+        "light_on": None,
+    }
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

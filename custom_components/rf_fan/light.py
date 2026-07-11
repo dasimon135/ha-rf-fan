@@ -70,6 +70,12 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
         self._advance_kelvin_position()
         async_dispatcher_send(self.hass, self._kelvin_signal())
 
+    def _publish_light_state(self) -> None:
+        """Share the assumed on/off state (so the color select can gate on it) and refresh."""
+        self._entry_runtime()["light_on"] = self._is_on
+        async_dispatcher_send(self.hass, self._kelvin_signal())
+        self.async_write_ha_state()
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light."""
         was_on = self._is_on
@@ -81,7 +87,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
             # The hardware only advances the color on a real OFF->ON transition.
             if not was_on:
                 self._bump_kelvin()
-            self.async_write_ha_state()
+            self._publish_light_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
@@ -90,7 +96,7 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
             sent = await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
         if sent:
             self._is_on = False
-            self.async_write_ha_state()
+            self._publish_light_state()
 
     @callback
     def _handle_rf_event(self, event: Any) -> None:
@@ -107,16 +113,16 @@ class RfFanLightEntity(RfFanBaseEntity, LightEntity):
             self._is_on = True
             if not was_on:
                 self._bump_kelvin()
-            self.async_write_ha_state()
+            self._publish_light_state()
             return
 
         if action == ACTION_LIGHT_OFF:
             self._is_on = False
-            self.async_write_ha_state()
+            self._publish_light_state()
             return
 
         if action == ACTION_LIGHT_TOGGLE and self._is_on is not None:
             self._is_on = not self._is_on
             if self._is_on:
                 self._bump_kelvin()
-            self.async_write_ha_state()
+            self._publish_light_state()

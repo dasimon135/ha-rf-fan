@@ -49,10 +49,18 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         """Return the assumed color position."""
         return COLOR_TEMP_OPTIONS[self._entry_runtime().get("kelvin_position", 0)]
 
+    @property
+    def available(self) -> bool:
+        """Unavailable while the light is known to be off (the color cycle needs it on)."""
+        return self._entry_runtime().get("light_on") is not False
+
     async def async_select_option(self, option: str) -> None:
-        """Cycle to the requested color position."""
-        target = COLOR_TEMP_OPTIONS.index(option)
+        """Cycle to the requested color position (ignored while the light is off)."""
         runtime = self._entry_runtime()
+        if runtime.get("light_on") is False:
+            # The lamp only cycles color while powered on; skip to avoid desync.
+            return
+        target = COLOR_TEMP_OPTIONS.index(option)
         steps = (target - runtime.get("kelvin_position", 0)) % len(COLOR_TEMP_OPTIONS)
         await self._async_transmit_times(ACTION_LIGHT_KELVIN, steps)
         runtime["kelvin_position"] = target
