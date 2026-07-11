@@ -1,8 +1,8 @@
 substitutions:
   device_name: rf-fan-gateway
-  friendly_name: Passerelle ventilateur RF
-  # Fréquence RF de la télécommande (MHz). Commencer à 433.92 et ajuster si
-  # le sniff ne capte rien (essayer 433.42, 434.42...).
+  friendly_name: RF fan gateway
+  # RF frequency of the remote (MHz). Start at 433.92 and adjust if
+  # the sniff captures nothing (try 433.42, 434.42...).
   cc1101_frequency: "433.92"
 
 esphome:
@@ -18,7 +18,7 @@ esp32:
   framework:
     type: esp-idf
 
-# Composant RadioLib CC1101 (requis pour les modules CC1101 8 broches)
+# RadioLib CC1101 component (required for 8-pin CC1101 modules)
 external_components:
   - source: github://juanboro/esphome-radiolib-cc1101@main
     components: [ radiolib_cc1101 ]
@@ -61,7 +61,7 @@ captive_portal:
 web_server:
   port: 80
 
-# SPI standard ESP32 (VSPI)
+# Standard ESP32 SPI (VSPI)
 spi:
   id: spi_bus
   type: single
@@ -69,9 +69,9 @@ spi:
   mosi_pin: GPIO23
   miso_pin: GPIO19
 
-# CC1101 câblage module bleu (standard 8 broches)
+# CC1101 blue module wiring (standard 8-pin)
 # Pin 1 VCC→3V3 | Pin 2 GND→GND | Pin 3 MOSI→D23 | Pin 4 SCLK→D18
-# Pin 5 MISO→D19 | Pin 6 GDO2→(non utilisé) | Pin 7 GDO0→D4 | Pin 8 CSN→D5
+# Pin 5 MISO→D19 | Pin 6 GDO2→(unused) | Pin 7 GDO0→D4 | Pin 8 CSN→D5
 radiolib_cc1101:
   id: mycc1101
   cs_pin: 5
@@ -82,7 +82,7 @@ radiolib_cc1101:
   filter: 464kHz
   bitrate: 5
 
-# Émetteur RF sur GDO0 (GPIO4) — bascule le CC1101 en TX puis revient en RX
+# RF transmitter on GDO0 (GPIO4) — switches the CC1101 to TX then back to RX
 remote_transmitter:
   - id: rf_transmitter
     pin:
@@ -97,7 +97,7 @@ remote_transmitter:
       then:
         - lambda: id(mycc1101).recv();
 
-# Récepteur RF sur GDO0 (GPIO4) — sniff et publie vers Home Assistant
+# RF receiver on GDO0 (GPIO4) — sniffs and publishes to Home Assistant
 remote_receiver:
   - id: rf_receiver
     pin:

@@ -1,8 +1,8 @@
-"""Logique pure de sélection/validation des actions RF (testable sans Home Assistant)."""
+"""Pure RF action selection/validation logic (testable without Home Assistant)."""
 
 from __future__ import annotations
 
-try:  # runtime Home Assistant : import relatif dans le package
+try:  # Home Assistant runtime: relative import within the package
     from .const import (
         ACTION_FAN_NATURAL,
         ACTION_FAN_OFF,
@@ -19,7 +19,7 @@ try:  # runtime Home Assistant : import relatif dans le package
         speed_action,
         timer_action,
     )
-except ImportError:  # pragma: no cover - tests : import top-level via conftest
+except ImportError:  # pragma: no cover - tests: top-level import via conftest
     from const import (
         ACTION_FAN_NATURAL,
         ACTION_FAN_OFF,
@@ -49,14 +49,14 @@ def split_actions(
     has_timers: bool = False,
     has_sound: bool = False,
 ) -> tuple[list[str], list[str]]:
-    """Actions requises selon le style de commande et les capacités déclarées.
+    """Required actions based on the control style and the declared capabilities.
 
-    Obligatoire : `fan_off` + une action par vitesse, plus les actions des
-    capacités déclarées : `fan_on` si `has_fan_on`, la ou les actions lumière
-    selon `light_control` (`toggle` -> `light_toggle` ; `on_off` -> `light_on`
-    et `light_off` ; `none` -> aucune), puis les actions des capacités activées
-    (inversion, flux naturel, couleur kelvin, minuteries, son).
-    Aucune action optionnelle : la liste retournée est toujours vide.
+    Mandatory: `fan_off` + one action per speed, plus the actions for the
+    declared capabilities: `fan_on` if `has_fan_on`, the light action(s)
+    depending on `light_control` (`toggle` -> `light_toggle`; `on_off` -> `light_on`
+    and `light_off`; `none` -> none), then the actions for the enabled capabilities
+    (reverse, natural airflow, kelvin color, timers, sound).
+    No optional action: the returned list is always empty.
     """
     required = [ACTION_FAN_OFF]
     required.extend(speed_action(index) for index in range(1, speed_count + 1))
@@ -80,7 +80,7 @@ def split_actions(
 
 
 def validate_codes(codes: dict[str, str], required: list[str]) -> dict[str, str]:
-    """Retourner {champ: clé_erreur} ; dict vide si tout est valide."""
+    """Return {field: error_key}; empty dict if everything is valid."""
     errors: dict[str, str] = {}
     for action in required:
         if not codes.get(action):
@@ -98,19 +98,19 @@ CAPABILITY_FLAGS = (
 
 
 def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
-    """Extraire les capacités d'un dict de config entry (défaut False)."""
+    """Extract the capabilities from a config entry dict (default False)."""
     return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
 
 
 def classify_reconfigure_actions(
     required: list[str], existing_codes: dict[str, str]
 ) -> tuple[list[str], list[str], list[str]]:
-    """Répartir les actions pour une reconfiguration.
+    """Split the actions for a reconfiguration.
 
-    - to_learn : requises sans code existant (nouvellement requises).
-    - kept : requises disposant déjà d'un code (conservées).
-    - forgotten : codées mais plus requises (à retirer).
-    Ordre : to_learn/kept suivent `required` ; forgotten suit `existing_codes`.
+    - to_learn: required with no existing code (newly required).
+    - kept: required that already have a code (kept).
+    - forgotten: coded but no longer required (to be removed).
+    Order: to_learn/kept follow `required`; forgotten follows `existing_codes`.
     """
     to_learn = [a for a in required if not existing_codes.get(a)]
     kept = [a for a in required if existing_codes.get(a)]

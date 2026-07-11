@@ -1,4 +1,4 @@
-"""Plateforme select pour RF Fan (température de couleur)."""
+"""Select platform for RF Fan (color temperature)."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Configurer l'entité select si le ventilateur gère la température de couleur."""
+    """Set up the select entity if the fan supports color temperature."""
     if not config_entry.data.get(CONF_HAS_COLOR_TEMP, False):
         return
 
@@ -33,10 +33,10 @@ async def async_setup_entry(
 
 
 class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
-    """Sélecteur de température de couleur à état supposé (dead-reckoning)."""
+    """Color temperature selector with assumed state (dead-reckoning)."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        """Initialiser l'entité select."""
+        """Initialize the select entity."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_color_temp"
         self._attr_name = "Température couleur"
@@ -46,11 +46,11 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
 
     @property
     def current_option(self) -> str:
-        """Retourner la position couleur supposée."""
+        """Return the assumed color position."""
         return COLOR_TEMP_OPTIONS[self._entry_runtime().get("kelvin_position", 0)]
 
     async def async_select_option(self, option: str) -> None:
-        """Cycler jusqu'à la position couleur demandée."""
+        """Cycle to the requested color position."""
         target = COLOR_TEMP_OPTIONS.index(option)
         runtime = self._entry_runtime()
         steps = (target - runtime.get("kelvin_position", 0)) % len(COLOR_TEMP_OPTIONS)
@@ -59,7 +59,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
-        """Restaurer la position couleur puis s'abonner aux événements RF et au signal kelvin."""
+        """Restore the color position, then subscribe to RF events and the kelvin signal."""
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in COLOR_TEMP_OPTIONS:
             self._entry_runtime()["kelvin_position"] = COLOR_TEMP_OPTIONS.index(last_state.state)
@@ -71,7 +71,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self) -> None:
-        """Désabonner les callbacks."""
+        """Unsubscribe the callbacks."""
         if self._event_unsub is not None:
             self._event_unsub()
             self._event_unsub = None
@@ -81,12 +81,12 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
 
     @callback
     def _on_kelvin_changed(self) -> None:
-        """Rafraîchir l'état quand la lumière avance la position couleur."""
+        """Refresh the state when the light advances the color position."""
         self.async_write_ha_state()
 
     @callback
     def _handle_rf_event(self, event: Any) -> None:
-        """Avancer la position couleur quand la télécommande émet l'action kelvin."""
+        """Advance the color position when the remote emits the kelvin action."""
         if self._recently_transmitted():
             return
 

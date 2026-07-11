@@ -1,31 +1,31 @@
 # ha-rf-fan — Copilot Instructions
 
-## Contexte
+## Context
 
-Intégration HACS pour ventilateurs RF433 génériques pilotés par télécommande.
+HACS integration for generic RF433 fans controlled by a remote.
 
 ## Stack
 
 - Python 3.12+
 - Home Assistant custom component (`custom_components/rf_fan/`)
-- ESPHome pour sniff et transmission RF
+- ESPHome for RF sniffing and transmission
 
 ## Conventions
 
-- Langue : français
-- Python : snake_case, annotations de type complètes
-- 1 config entry = 1 ventilateur
-- État supposé par défaut tant qu'il n'existe pas de retour matériel fiable
+- Language: English
+- Python: snake_case, full type annotations
+- 1 config entry = 1 fan
+- State assumed by default as long as there is no reliable hardware feedback
 
 ## Architecture
 
-- `config_flow.py` : mode manuel + apprentissage guidé
-- `fan.py` : entité fan à vitesses discrètes
-- `light.py` : lumière optionnelle si intégrée au ventilateur
-- `entity.py` : émission RF via service ESPHome et filtrage d'événements par passerelle
+- `config_flow.py`: manual mode + guided learning
+- `fan.py`: fan entity with discrete speeds
+- `light.py`: optional light if integrated into the fan
+- `entity.py`: RF transmission via the ESPHome service and per-gateway event filtering
 
-## Mode apprentissage
+## Learning mode
 
-- ESPHome publie l'événement `esphome.rf_fan_received`
-- L'événement doit contenir au minimum `code`
-- Ajouter `device` est recommandé pour filtrer si plusieurs passerelles RF coexistent
+- ESPHome publishes the `esphome.rf_fan_received` event
+- The event must contain at least `code`
+- Adding `device` is recommended for filtering when multiple RF gateways coexist

@@ -1,4 +1,4 @@
-"""Constantes pour l'intégration RF fan générique."""
+"""Constants for the generic RF fan integration."""
 
 from __future__ import annotations
 
@@ -30,39 +30,39 @@ ACTION_LIGHT_ON: Final = "light_on"
 ACTION_LIGHT_OFF: Final = "light_off"
 ACTION_LIGHT_TOGGLE: Final = "light_toggle"
 
-# Capacités (config flow)
+# Capabilities (config flow)
 CONF_HAS_DIRECTION: Final = "has_direction"
 CONF_HAS_NATURAL_PRESET: Final = "has_natural_preset"
 CONF_HAS_COLOR_TEMP: Final = "has_color_temp"
 CONF_HAS_TIMERS: Final = "has_timers"
 CONF_HAS_SOUND: Final = "has_sound"
 
-# Nouvelles actions
+# New actions
 ACTION_FAN_REVERSE: Final = "fan_reverse"
 ACTION_FAN_NATURAL: Final = "fan_natural"
 ACTION_LIGHT_KELVIN: Final = "light_kelvin"
 ACTION_SOUND_TOGGLE: Final = "sound_toggle"
 TIMER_HOURS: Final = (1, 2, 4, 8)
 
-# Preset flux naturel
+# Natural airflow preset
 PRESET_NORMAL: Final = "normal"
 PRESET_NATURAL: Final = "natural"
 
-# Positions couleur (select kelvin) : ordre du cycle matériel
+# Color positions (kelvin select): hardware cycle order
 COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
 
-# Fenêtre anti-écho globale à l'entrée : après toute émission, toute réception RF de
-# l'entrée est ignorée pendant ce nombre de secondes pour écarter l'écho de notre propre
-# émission renvoyé par la passerelle (effet de bord : un appui télécommande physique dans
-# cette fenêtre, juste après une commande HA, est ignoré).
+# Global per-entry anti-echo window: after any transmission, all RF reception for the
+# entry is ignored for this number of seconds to discard the echo of our own transmission
+# sent back by the gateway (side effect: a physical remote press within this window, just
+# after an HA command, is ignored).
 ECHO_SUPPRESS_SEC: Final = 1.0
 
 
 def speed_action(index: int) -> str:
-    """Retourner la clé d'action de vitesse pour un index donné."""
+    """Return the speed action key for a given index."""
     return f"fan_speed_{index}"
 
 
 def timer_action(hours: int) -> str:
-    """Clé d'action pour la minuterie de N heures."""
+    """Action key for the N-hour timer."""
     return f"timer_{hours}h"

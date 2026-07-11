@@ -1,9 +1,9 @@
-"""Config pytest : expose le module rf_fan sans déclencher l'import Home Assistant."""
+"""Pytest config: exposes the rf_fan module without triggering the Home Assistant import."""
 
 import sys
 from pathlib import Path
 
-# Le dossier du composant est ajouté au path pour importer `const` / `actions`
-# en modules top-level, sans passer par le package (dont __init__ importe HA).
+# The component directory is added to the path so `const` / `actions` can be imported
+# as top-level modules, without going through the package (whose __init__ imports HA).
 _COMPONENT_DIR = Path(__file__).resolve().parent.parent / "custom_components" / "rf_fan"
 sys.path.insert(0, str(_COMPONENT_DIR))

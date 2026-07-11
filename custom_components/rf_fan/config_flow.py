@@ -1,4 +1,4 @@
-"""Config flow pour l'intégration RF Fan."""
+"""Config flow for the RF Fan integration."""
 
 from __future__ import annotations
 
@@ -45,18 +45,18 @@ LEARN_TIMEOUT_SEC = 30
 
 
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Config flow pour ajouter un ventilateur RF générique."""
+    """Config flow to add a generic RF fan."""
 
     VERSION = 1
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> RfFanOptionsFlow:
-        """Retourner le flow d'options."""
+        """Return the options flow."""
         return RfFanOptionsFlow(config_entry)
 
     def __init__(self) -> None:
-        """Initialiser le flow."""
+        """Initialize the flow."""
         self._esphome_device: str = ""
         self._fan_name: str = ""
         self._speed_count: int = DEFAULT_SPEED_COUNT
@@ -74,7 +74,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._repeat_count: int = DEFAULT_REPEAT_COUNT
 
     def _available_esphome_devices(self) -> list[str]:
-        """Lister les devices ESPHome exposant un service transmit_rf_fan."""
+        """List ESPHome devices exposing a transmit_rf_fan service."""
         esphome_services = self.hass.services.async_services().get("esphome", {})
         devices = []
         suffix = "_transmit_rf_fan"
@@ -84,7 +84,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         return sorted(devices)
 
     def _base_schema(self, *, include_device: bool) -> vol.Schema:
-        """Construire le schéma de l'étape 1, réutilisable pour la reconfiguration."""
+        """Build the step 1 schema, reusable for reconfiguration."""
         fields: dict[Any, Any] = {}
         if include_device:
             available = self._available_esphome_devices()
@@ -111,7 +111,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Étape 1: infos générales du ventilateur."""
+        """Step 1: general fan information."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
 
@@ -141,7 +141,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=self._base_schema(include_device=True),
             description_placeholders={
-                "detected": ", ".join(available_devices) if available_devices else "aucun",
+                "detected": ", ".join(available_devices) if available_devices else "none",
             },
             errors=errors,
         )
@@ -149,7 +149,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_method(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Choisir entre saisie manuelle et apprentissage."""
+        """Choose between manual entry and learning."""
         if user_input is not None:
             if user_input["method"] == "learn":
                 if not self._reconfigure:
@@ -177,7 +177,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_codes(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Étape manuelle: mapping action -> code RF."""
+        """Manual step: mapping of action -> RF code."""
         errors: dict[str, str] = {}
         actions = self._actions_to_process()
 
@@ -205,7 +205,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     def _actions_to_process(self) -> list[str]:
-        """Lister les actions à traiter dans l'ordre."""
+        """List the actions to process, in order."""
         if self._pending_actions is not None:
             return self._pending_actions
         required_actions, optional_actions = split_actions(
@@ -216,26 +216,26 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Écran de progression : écouter l'action courante.
+        """Progress screen: listen for the current action.
 
-        Cette étape ne renvoie QUE ``SHOW_PROGRESS`` ou ``SHOW_PROGRESS_DONE`` :
-        depuis un écran de progression, HA n'autorise aucune autre transition. Le
-        stockage du code et le passage à l'action suivante se font dans
-        ``async_step_learn_resolve``, qui porte un ``step_id`` différent. Ce
-        changement de ``step_id`` est indispensable : c'est lui qui déclenche
-        l'événement ``data_entry_flow_progressed`` rafraîchissant le frontend
-        (cf. ``FlowManager._async_configure``). Boucler sur le même ``step_id``
-        (``show_progress`` → ``show_progress_done(next_step_id="learn")``) ne
-        change pas le ``step_id`` → aucun rafraîchissement → le spinner reste figé
-        alors même que le backend a avancé.
+        This step returns ONLY ``SHOW_PROGRESS`` or ``SHOW_PROGRESS_DONE``:
+        from a progress screen, HA does not allow any other transition. Storing
+        the code and moving on to the next action happen in
+        ``async_step_learn_resolve``, which carries a different ``step_id``. This
+        change of ``step_id`` is essential: it is what triggers the
+        ``data_entry_flow_progressed`` event that refreshes the frontend
+        (see ``FlowManager._async_configure``). Looping on the same ``step_id``
+        (``show_progress`` → ``show_progress_done(next_step_id="learn")``) does
+        not change the ``step_id`` → no refresh → the spinner stays frozen
+        even though the backend has already moved on.
         """
         actions = self._actions_to_process()
 
-        # L'écoute est terminée : passer à la résolution (change de step_id).
+        # Listening is done: move on to resolution (changes step_id).
         if self._learn_task is not None and self._learn_task.done():
             return self.async_show_progress_done(next_step_id="learn_resolve")
 
-        # Démarrer l'écoute si nécessaire, puis afficher la progression.
+        # Start listening if needed, then show progress.
         if self._learn_task is None:
             self._learn_task = self.hass.async_create_task(
                 self._async_wait_for_rf_signal()
@@ -253,18 +253,18 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_learn_resolve(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Résoudre une écoute terminée (ou le formulaire de reprise), puis continuer.
+        """Resolve a finished listen (or the recovery form), then continue.
 
-        ``step_id`` distinct de ``learn`` : la transition ``learn`` →
-        ``learn_resolve`` fait changer le ``step_id``, ce qui déclenche le
-        rafraîchissement du frontend. On y traite aussi les cas qui ne peuvent
-        pas être renvoyés directement depuis l'écran de progression (formulaire de
-        reprise après timeout, création de l'entrée).
+        ``step_id`` distinct from ``learn``: the ``learn`` →
+        ``learn_resolve`` transition changes the ``step_id``, which triggers the
+        frontend refresh. This is also where we handle the cases that cannot
+        be returned directly from the progress screen (recovery form
+        after a timeout, creation of the entry).
         """
         actions = self._actions_to_process()
 
         if user_input is not None:
-            # Soumission du formulaire de reprise : ignorer ou coller un code.
+            # Recovery form submission: skip or paste a code.
             self._learn_timeout = False
             if bool(user_input.get("skip")):
                 self._learn_action_index += 1
@@ -274,7 +274,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._learn_codes[actions[self._learn_action_index]] = manual_code
                     self._learn_action_index += 1
         elif self._learn_task is not None:
-            # Une écoute vient de se terminer : stocker le code ou marquer le timeout.
+            # A listen has just finished: store the code or flag the timeout.
             learned_code = self._learn_task.result()
             self._learn_task = None
             if learned_code is not None:
@@ -283,11 +283,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._learn_timeout = True
 
-        # Toutes les actions traitées : créer l'entrée.
+        # All actions processed: create the entry.
         if self._learn_action_index >= len(actions):
             return self._finish(self._learn_codes)
 
-        # Timeout sur l'écoute précédente : proposer saisie manuelle / ignorer.
+        # Timeout on the previous listen: offer manual entry / skip.
         if self._learn_timeout:
             return self.async_show_form(
                 step_id="learn_resolve",
@@ -304,11 +304,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors={"base": "learn_timeout"},
             )
 
-        # Sinon : écouter l'action suivante.
+        # Otherwise: listen for the next action.
         return await self.async_step_learn()
 
     async def _async_wait_for_rf_signal(self) -> str | None:
-        """Attendre un événement RF de la passerelle sélectionnée."""
+        """Wait for an RF event from the selected gateway."""
         result: str | None = None
         event_received = asyncio.Event()
 
@@ -339,7 +339,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         return result
 
     def _finish(self, codes: dict[str, str]) -> FlowResult:
-        """Créer ou mettre à jour le config entry final."""
+        """Create or update the final config entry."""
         data = {
             CONF_ESPHOME_DEVICE: self._esphome_device,
             CONF_FAN_NAME: self._fan_name,
@@ -359,7 +359,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Reconfigurer une entrée existante : re-déclarer + apprendre le delta."""
+        """Reconfigure an existing entry: re-declare + learn the delta."""
         entry = self._get_reconfigure_entry()
         data = entry.data
 
@@ -393,7 +393,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure_review(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Récap : à apprendre / gardées (re-apprendre ?) / oubliées, puis capture."""
+        """Recap: to learn / kept (re-learn?) / forgotten, then capture."""
         required_actions, _ = split_actions(
             self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
         )
@@ -427,16 +427,16 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class RfFanOptionsFlow(OptionsFlow):
-    """Options flow pour RF fan."""
+    """Options flow for RF fan."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialiser les options."""
+        """Initialize the options."""
         self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Configurer les options d'émission RF."""
+        """Configure the RF transmission options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 

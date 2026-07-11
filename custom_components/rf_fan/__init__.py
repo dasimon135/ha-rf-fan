@@ -1,4 +1,4 @@
-"""Intégration générique pour ventilateurs RF."""
+"""Generic integration for RF fans."""
 
 from __future__ import annotations
 
@@ -18,14 +18,14 @@ PLATFORMS: list[Platform] = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Initialiser un config entry RF fan."""
+    """Initialize an RF fan config entry."""
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"kelvin_position": 0}
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Décharger un config entry RF fan."""
+    """Unload an RF fan config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         hass.data[DOMAIN].pop(entry.entry_id, None)

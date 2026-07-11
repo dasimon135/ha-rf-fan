@@ -1,4 +1,4 @@
-"""Base entité pour RF Fan."""
+"""Base entity for RF Fan."""
 
 from __future__ import annotations
 
@@ -23,14 +23,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class RfFanBaseEntity(Entity):
-    """Entité de base pour le ventilateur RF."""
+    """Base entity for the RF fan."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_assumed_state = True
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        """Initialiser l'entité de base."""
+        """Initialize the base entity."""
         self.hass = hass
         self._config_entry = config_entry
         self._esphome_device: str = config_entry.data[CONF_ESPHOME_DEVICE]
@@ -45,7 +45,7 @@ class RfFanBaseEntity(Entity):
         }
 
     def _repeat_count(self) -> int:
-        """Retourner le nombre de répétitions RF."""
+        """Return the RF repeat count."""
         return int(
             self._config_entry.options.get(
                 CONF_REPEAT_COUNT,
@@ -54,10 +54,10 @@ class RfFanBaseEntity(Entity):
         )
 
     async def _async_transmit_action(self, action: str) -> bool:
-        """Transmettre une action RF via ESPHome si elle est mappée."""
+        """Transmit an RF action via ESPHome if it is mapped."""
         code = self._codes.get(action)
         if not code:
-            _LOGGER.debug("Action non mappée ignorée: %s", action)
+            _LOGGER.debug("Ignoring unmapped action: %s", action)
             return False
 
         service_name = f"{self._esphome_device.replace('-', '_')}_transmit_rf_fan"
@@ -73,19 +73,19 @@ class RfFanBaseEntity(Entity):
                 blocking=True,
             )
         except Exception as err:  # pragma: no cover
-            _LOGGER.warning("Erreur envoi RF (%s): %s", action, err)
+            _LOGGER.warning("RF send error (%s): %s", action, err)
             return False
 
         self._entry_runtime()["last_tx"] = self.hass.loop.time()
         return True
 
     def _recently_transmitted(self) -> bool:
-        """True si une émission a eu lieu très récemment (fenêtre anti-écho)."""
+        """True if a transmission occurred very recently (anti-echo window)."""
         last_tx = self._entry_runtime().get("last_tx", 0.0)
         return (self.hass.loop.time() - last_tx) < ECHO_SUPPRESS_SEC
 
     async def _async_transmit_times(self, action: str, times: int) -> bool:
-        """Émettre `times` fois le code d'une action (cycle). True si au moins une émission."""
+        """Transmit an action's code `times` times (cycle). True if at least one transmission."""
         sent_any = False
         for _ in range(max(0, times)):
             if await self._async_transmit_action(action):
@@ -93,28 +93,28 @@ class RfFanBaseEntity(Entity):
         return sent_any
 
     def _entry_runtime(self) -> dict[str, Any]:
-        """Dict d'état partagé de l'entrée (créé dans __init__.py async_setup_entry)."""
+        """Shared state dict for the entry (created in __init__.py async_setup_entry)."""
         return self.hass.data[DOMAIN][self._config_entry.entry_id]
 
     def _kelvin_signal(self) -> str:
-        """Nom du signal dispatcher de la position couleur, propre à l'entrée."""
+        """Dispatcher signal name for the color position, specific to the entry."""
         return f"{DOMAIN}_{self._config_entry.entry_id}_kelvin"
 
     def _advance_kelvin_position(self) -> int:
-        """Avancer la position couleur d'un cran (mod N) et la retourner."""
+        """Advance the color position by one step (mod N) and return it."""
         runtime = self._entry_runtime()
         runtime["kelvin_position"] = (runtime.get("kelvin_position", 0) + 1) % len(COLOR_TEMP_OPTIONS)
         return runtime["kelvin_position"]
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:
-        """Vérifier que l'événement RF vient de la passerelle configurée."""
+        """Check that the RF event comes from the configured gateway."""
         device = event_data.get("device")
         if not isinstance(device, str) or not device:
             return True
         return device == self._esphome_device
 
     def _event_action(self, event_data: dict[str, Any]) -> str | None:
-        """Extraire l'action RF reçue depuis l'événement ESPHome."""
+        """Extract the received RF action from the ESPHome event."""
         if not self._is_own_event(event_data):
             return None
 

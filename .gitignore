@@ -1,3 +1,6 @@
 __pycache__/
 .pytest_cache/
 .venv-test/
+
+# Local-only captured RF codes (device-specific, not for publication)
+docs/*-codes-manual.md
