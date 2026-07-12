@@ -61,6 +61,32 @@ physically, then press it). The color only changes visibly when the light is on.
 - An RF transmitter supported by ESPHome (e.g. a CC1101 module).
 - Ideally an RF receiver too, for guided learning and physical-remote state sync.
 
+## Hardware (reference gateway)
+
+The reference gateway is an **ESP32** DevKit with a **CC1101** 433 MHz transceiver,
+flashed with ESPHome. Any ESPHome-supported RF transmitter works — this is just the
+setup used to build and test the integration.
+
+> ⚠️ The CC1101 is a **3.3 V** module — do not power it from 5 V.
+
+| CC1101 | ESP32 |
+| --- | --- |
+| VCC | 3V3 |
+| GND | GND |
+| SCK | GPIO18 |
+| MOSI (SI) | GPIO23 |
+| MISO (SO) | GPIO19 |
+| CSN (CS) | GPIO5 |
+| GDO0 | GPIO4 — data (RX **and** TX) |
+| GDO2 | unused |
+
+The radio is driven by the
+[`esphome-radiolib-cc1101`](https://github.com/juanboro/esphome-radiolib-cc1101)
+external component at 433.92 MHz; GDO0 (GPIO4) carries both transmit and receive data.
+A 433 MHz antenna is required. A full working config is in
+[esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml). RX can be noisy depending on
+the local 433 MHz environment; TX is reliable.
+
 ## Installation (HACS)
 
 1. Add this repository as a **custom repository** of type `Integration`.
