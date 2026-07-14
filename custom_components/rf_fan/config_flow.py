@@ -15,6 +15,7 @@ from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 from .actions import (
     caps_from_data,
     classify_reconfigure_actions,
+    pick_best_code,
     split_actions,
     validate_codes,
 )
@@ -42,6 +43,9 @@ from .const import (
 )
 
 LEARN_TIMEOUT_SEC = 30
+# After the first frame, keep listening briefly so a held button's repeats can be
+# collected and the noise-resistant modal frame chosen.
+LEARN_COLLECT_SEC = 1.2
 
 
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -308,13 +312,16 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         return await self.async_step_learn()
 
     async def _async_wait_for_rf_signal(self) -> str | None:
-        """Wait for an RF event from the selected gateway."""
-        result: str | None = None
-        event_received = asyncio.Event()
+        """Wait for RF events from the gateway and return the most repeated code.
+
+        After the first frame, keep collecting briefly: a real (held) button press
+        repeats the same frame, so the modal frame wins over random 433 MHz noise.
+        """
+        frames: list[str] = []
+        first_frame = asyncio.Event()
 
         @callback
         def _handle_event(event: Any) -> None:
-            nonlocal result
             data = event.data
             device = data.get("device")
             if isinstance(device, str) and device != self._esphome_device:
@@ -324,19 +331,22 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             if not isinstance(code, str) or not code.strip():
                 return
 
-            result = code.strip()
-            event_received.set()
+            frames.append(code.strip())
+            first_frame.set()
 
         unsubscribe = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, _handle_event)
 
         try:
-            await asyncio.wait_for(event_received.wait(), timeout=LEARN_TIMEOUT_SEC)
-        except asyncio.TimeoutError:
-            return None
+            try:
+                await asyncio.wait_for(first_frame.wait(), timeout=LEARN_TIMEOUT_SEC)
+            except asyncio.TimeoutError:
+                return None
+            # Gather a few more frames to catch repeats before choosing.
+            await asyncio.sleep(LEARN_COLLECT_SEC)
         finally:
             unsubscribe()
 
-        return result
+        return pick_best_code(frames)
 
     def _finish(self, codes: dict[str, str]) -> FlowResult:
         """Create or update the final config entry."""

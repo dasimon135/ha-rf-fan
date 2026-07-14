@@ -1,1 +1,2 @@
 pytest>=8
+pytest-homeassistant-custom-component

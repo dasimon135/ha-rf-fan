@@ -116,3 +116,25 @@ def classify_reconfigure_actions(
     kept = [a for a in required if existing_codes.get(a)]
     forgotten = [a for a in existing_codes if a not in required]
     return to_learn, kept, forgotten
+
+
+def pick_best_code(frames: list[str]) -> str | None:
+    """Pick the most frequently repeated captured code.
+
+    A real remote press repeats the same frame (especially when the button is held
+    briefly), while ambient 433 MHz noise produces random, non-repeating frames.
+    Returning the modal frame filters out that noise. Ties break to the earliest
+    frame seen. Returns None if no frames were captured.
+    """
+    if not frames:
+        return None
+    counts: dict[str, int] = {}
+    for frame in frames:
+        counts[frame] = counts.get(frame, 0) + 1
+    best: str | None = None
+    best_count = 0
+    for frame in frames:
+        if counts[frame] > best_count:
+            best = frame
+            best_count = counts[frame]
+    return best

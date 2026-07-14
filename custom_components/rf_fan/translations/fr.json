@@ -32,7 +32,7 @@
       },
       "learn": {
         "title": "Ventilateur RF - Apprentissage guidé",
-        "description": "En attente de l'action {action}. Appuyez sur le bouton correspondant dans les {timeout} secondes, ou collez le code manuellement si nécessaire.",
+        "description": "En attente de l'action {action}. Appuyez (et maintenez brièvement) le bouton correspondant dans les {timeout} secondes, ou collez le code manuellement si nécessaire.",
         "data": {
           "code": "Code RF capturé",
           "skip": "Ignorer cette action"
@@ -113,7 +113,7 @@
       }
     },
     "progress": {
-      "listen_rf_signal": "Action « {action} » : appuyez sur le bouton correspondant de la télécommande (≤ {timeout}s)."
+      "listen_rf_signal": "Action « {action} » : appuyez (et maintenez brièvement) le bouton correspondant (≤ {timeout}s)."
     },
     "selector": {
       "light_control": {
