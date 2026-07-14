@@ -17,15 +17,20 @@ console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;bo
 class RfFanCard extends HTMLElement {
   setConfig(config) {
     if (!config || !config.entity || !config.entity.startsWith("fan.")) {
-      throw new Error("rf-fan-card: a `entity` pointing to a fan.* is required");
+      throw new Error("rf-fan-card: an `entity` pointing to a fan.* is required");
     }
     this._config = config;
     this._root = null;
+    this._sig = null;
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    const sig = this._signature();
+    if (sig !== this._sig) {
+      this._sig = sig;
+      this._render();
+    }
   }
 
   getCardSize() {
@@ -33,8 +38,10 @@ class RfFanCard extends HTMLElement {
   }
 
   static getStubConfig(hass) {
-    const fan = Object.keys(hass.states).find((e) => e.startsWith("fan."));
-    return { entity: fan || "fan.example" };
+    const reg = hass.entities || {};
+    const fans = Object.keys(hass.states).filter((e) => e.startsWith("fan."));
+    const rf = fans.find((e) => reg[e] && reg[e].platform === "rf_fan");
+    return { entity: rf || fans[0] || "fan.example" };
   }
 
   // ---- discovery -------------------------------------------------------
@@ -44,24 +51,28 @@ class RfFanCard extends HTMLElement {
     const fanId = this._config.entity;
     const cfg = this._config;
     const reg = hass.entities || {};
-    const deviceId = reg[fanId] ? reg[fanId].device_id : undefined;
+    const fanReg = reg[fanId];
+    const deviceId = fanReg && fanReg.device_id;
 
+    // Only look at entities on the SAME device. If the device can't be
+    // resolved, do NOT guess across the whole system — just show the fan.
     const siblings = deviceId
-      ? Object.keys(reg).filter((e) => reg[e].device_id === deviceId)
-      : Object.keys(hass.states);
+      ? Object.keys(reg).filter((e) => reg[e] && reg[e].device_id === deviceId)
+      : [];
 
     const firstOf = (domain, override) => {
       if (override) return override;
       return siblings.find((e) => e.startsWith(domain + "."));
     };
 
-    // Buttons: timers carry a "<n>h" token in their id; the rest is the calibrate button.
+    // Buttons: timers carry a "<n>h" token; the remaining one is the calibrate button.
+    const isTimer = (e) => /(?:^|[_\s])(\d+)\s*h(?![a-z])/i.test(e);
     const buttons = siblings.filter((e) => e.startsWith("button."));
     const timers = buttons
+      .filter(isTimer)
       .map((e) => ({ id: e, h: (e.match(/(\d+)\s*h(?![a-z])/i) || [])[1] }))
-      .filter((b) => b.h)
       .sort((a, b) => Number(a.h) - Number(b.h));
-    const calibrate = cfg.calibrate_entity || buttons.find((e) => !/(\d+)\s*h(?![a-z])/i.test(e));
+    const calibrate = cfg.calibrate_entity || buttons.find((e) => !isTimer(e));
 
     return {
       fan: fanId,
@@ -71,6 +82,22 @@ class RfFanCard extends HTMLElement {
       timers,
       calibrate,
     };
+  }
+
+  _signature() {
+    if (!this._config || !this._hass) return null;
+    const ent = this._discover();
+    const ids = [ent.fan, ent.light, ent.color, ent.sound, ent.calibrate]
+      .concat(ent.timers.map((t) => t.id))
+      .filter(Boolean);
+    return ids
+      .map((id) => {
+        const s = this._hass.states[id];
+        if (!s) return id + ":none";
+        const a = s.attributes;
+        return `${id}:${s.state}:${a.percentage}:${a.direction}:${a.preset_mode}`;
+      })
+      .join("|");
   }
 
   // ---- helpers ---------------------------------------------------------
@@ -93,70 +120,59 @@ class RfFanCard extends HTMLElement {
     if (!this._hass || !this._config) return;
     const ent = this._discover();
     const fan = this._hass.states[ent.fan];
+    this._ensureRoot();
     if (!fan) {
-      this._ensureRoot();
       this._body.innerHTML = `<div class="warn">Entity ${ent.fan} not found</div>`;
       return;
     }
 
-    this._ensureRoot();
-
     const on = fan.state === "on";
-    const { count, index } = this._speedInfo(fan);
+    const { count, index, pct } = this._speedInfo(fan);
     const spinDur = on && index > 0 ? (3.4 - (index / count) * 3.0).toFixed(2) : 0;
     const name = this._config.name || fan.attributes.friendly_name || "Fan";
 
-    // fan glyph
     const blades = [0, 120, 240]
-      .map(
-        (a) =>
-          `<ellipse cx="50" cy="27" rx="13.5" ry="22" transform="rotate(${a} 50 50)"/>`
-      )
+      .map((a) => `<ellipse cx="50" cy="27" rx="13.5" ry="22" transform="rotate(${a} 50 50)"/>`)
       .join("");
 
-    // speed segments
-    let segs = "";
-    for (let i = 1; i <= count; i++) {
-      segs += `<button class="seg ${i <= index ? "on" : ""}" data-speed="${i}" title="Speed ${i}"></button>`;
+    // speed: segmented for few speeds, slider for many
+    let speedHtml;
+    if (count <= 10) {
+      let segs = "";
+      for (let i = 1; i <= count; i++) {
+        segs += `<button class="seg ${i <= index ? "on" : ""}" data-speed="${i}" title="Vitesse ${i}"></button>`;
+      }
+      speedHtml = `<div class="speed">${segs}</div>`;
+    } else {
+      speedHtml = `<div class="speed"><input class="slider" type="range" min="0" max="100" step="1" value="${pct || 0}" data-slider/></div>`;
     }
 
-    // control rows
     const rows = [];
-
     if (ent.light) {
       const l = this._hass.states[ent.light];
       const lit = l && l.state === "on";
-      rows.push(
-        `<button class="chip ${lit ? "active amber" : ""}" data-act="light"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon><span>Lampe</span></button>`
-      );
+      rows.push(`<button class="chip ${lit ? "active amber" : ""}" data-act="light"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon><span>Lampe</span></button>`);
     }
     if (ent.sound) {
       const s = this._hass.states[ent.sound];
       const son = s && s.state === "on";
-      rows.push(
-        `<button class="chip ${son ? "active" : ""}" data-act="sound"><ha-icon icon="mdi:volume-${son ? "high" : "off"}"></ha-icon><span>Son</span></button>`
-      );
+      rows.push(`<button class="chip ${son ? "active" : ""}" data-act="sound"><ha-icon icon="mdi:volume-${son ? "high" : "off"}"></ha-icon><span>Son</span></button>`);
     }
 
-    // color segments
     let colorRow = "";
     if (ent.color) {
       const c = this._hass.states[ent.color];
       const opts = (c && c.attributes.options) || [];
       const cur = c && c.state;
-      const disabled = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
+      const lightOff = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
       const segsC = opts
-        .map(
-          (o) =>
-            `<button class="cseg ${o === cur ? "active" : ""}" data-color="${o}" ${disabled ? "disabled" : ""}>${o}</button>`
-        )
+        .map((o) => `<button class="cseg ${o === cur ? "active" : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${o}</button>`)
         .join("");
       colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="Recaler la couleur"><ha-icon icon="mdi:target-variant"></ha-icon></button>` : ""}</div>`;
     }
 
-    // direction + preset
-    const modeChips = [];
     const feat = fan.attributes.supported_features || 0;
+    const modeChips = [];
     if (feat & 4) {
       const dir = fan.attributes.direction;
       modeChips.push(
@@ -172,18 +188,11 @@ class RfFanCard extends HTMLElement {
       );
     }
 
-    // timers
     let timerRow = "";
     if (ent.timers.length) {
-      timerRow =
-        `<div class="timers">` +
-        ent.timers
-          .map(
-            (t) =>
-              `<button class="chip" data-timer="${t.id}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${t.h}h</span></button>`
-          )
-          .join("") +
-        `</div>`;
+      timerRow = `<div class="timers">` + ent.timers
+        .map((t) => `<button class="chip" data-timer="${t.id}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${t.h}h</span></button>`)
+        .join("") + `</div>`;
     }
 
     this._body.innerHTML = `
@@ -199,7 +208,7 @@ class RfFanCard extends HTMLElement {
           <circle class="hub2" cx="50" cy="50" r="3"/>
         </svg>
       </div>
-      <div class="speed">${segs}</div>
+      ${speedHtml}
       ${rows.length ? `<div class="chips">${rows.join("")}</div>` : ""}
       ${colorRow}
       ${modeChips.length ? `<div class="chips">${modeChips.join("")}</div>` : ""}
@@ -220,6 +229,14 @@ class RfFanCard extends HTMLElement {
     this.shadowRoot.appendChild(card);
     this._root = card;
     this._body.addEventListener("click", (e) => this._onClick(e));
+    this._body.addEventListener("change", (e) => this._onChange(e));
+  }
+
+  _onChange(e) {
+    const s = e.target.closest("[data-slider]");
+    if (!s) return;
+    const ent = this._discover();
+    this._call("fan", "set_percentage", { entity_id: ent.fan, percentage: Number(s.value) });
   }
 
   _onClick(e) {
@@ -259,6 +276,7 @@ class RfFanCard extends HTMLElement {
       .speed { display:flex; gap:5px; margin:2px 0 12px; }
       .seg { flex:1; height:12px; border:none; border-radius:6px; background: var(--divider-color); cursor:pointer; padding:0; }
       .seg.on { background: var(--primary-color); }
+      .slider { flex:1; accent-color: var(--primary-color); }
       .chips { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0; }
       .chip { display:inline-flex; align-items:center; gap:6px; border:none; border-radius:18px; padding:7px 12px;
               background: var(--divider-color); color: var(--primary-text-color); cursor:pointer; font-size:.85rem; }
