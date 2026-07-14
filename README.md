@@ -94,6 +94,22 @@ the local 433 MHz environment; TX is reliable.
 3. Restart Home Assistant.
 4. Add the **RF Fan** integration and follow the config flow.
 
+## Dashboard card (bundled)
+
+The integration ships an **animated Lovelace card** — no separate install or resource
+to register. On a dashboard, add a card and pick **RF Fan Card** from the picker, or
+use YAML:
+
+```yaml
+type: custom:rf-fan-card
+entity: fan.your_fan
+```
+
+`entity` (a `fan.*`) is the only required field. The card walks up to that fan's
+device and auto-discovers the sibling entities (light, colour-temperature select,
+sound switch, timer/calibrate buttons), showing only the controls that exist. The fan
+blades spin at a speed-proportional rate, and it follows your Home Assistant theme.
+
 ## Reconfiguring an existing fan
 
 To add a capability (or fix a captured code) later, open the integration entry and use
@@ -130,6 +146,7 @@ custom_components/rf_fan/
   button.py          switch.py        manifest.json
   strings.json       translations/{en,fr}.json
   brand/             icon.png  icon@2x.png  logo.png
+  frontend/          rf-fan-card.js   (bundled dashboard card)
 esphome/
   rf_fan_example.yaml
 ```
