@@ -10,7 +10,7 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -42,6 +42,10 @@ class RfFanCard extends HTMLElement {
     const fans = Object.keys(hass.states).filter((e) => e.startsWith("fan."));
     const rf = fans.find((e) => reg[e] && reg[e].platform === "rf_fan");
     return { entity: rf || fans[0] || "fan.example" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("rf-fan-card-editor");
   }
 
   // ---- discovery -------------------------------------------------------
@@ -310,6 +314,46 @@ class RfFanCard extends HTMLElement {
 }
 
 customElements.define("rf-fan-card", RfFanCard);
+
+/** Visual editor: a native ha-form with a fan entity picker + optional name. */
+class RfFanCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _render() {
+    if (!this._hass) return;
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.computeLabel = (s) =>
+        ({ entity: "Fan entity (required)", name: "Name (optional)" }[s.name] || s.name);
+      this._form.addEventListener("value-changed", (e) => {
+        this.dispatchEvent(
+          new CustomEvent("config-changed", {
+            detail: { config: e.detail.value },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      });
+      this.appendChild(this._form);
+    }
+    this._form.hass = this._hass;
+    this._form.schema = [
+      { name: "entity", required: true, selector: { entity: { domain: "fan" } } },
+      { name: "name", selector: { text: {} } },
+    ];
+    this._form.data = this._config;
+  }
+}
+
+customElements.define("rf-fan-card-editor", RfFanCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({

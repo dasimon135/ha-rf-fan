@@ -22,7 +22,7 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
 ]
 
-CARD_VERSION = "1.1.0"
+CARD_VERSION = "1.1.1"
 CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
 
 
