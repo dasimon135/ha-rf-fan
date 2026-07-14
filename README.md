@@ -92,7 +92,9 @@ setup used to build and test the integration.
 The radio is driven by the
 [`esphome-radiolib-cc1101`](https://github.com/juanboro/esphome-radiolib-cc1101)
 external component at 433.92 MHz; GDO0 (GPIO4) carries both transmit and receive data.
-A 433 MHz antenna is required. A full working config is in
+A 433 MHz antenna is required — it connects to the **CC1101 module** (the ESP32 has no
+radio): solder a ~17.3 cm wire (quarter-wave for 433.92 MHz) to the **ANT** pad, unless
+your module already has a spring antenna or an SMA connector. A full working config is in
 [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml). RX can be noisy depending on
 the local 433 MHz environment; TX is reliable.
 
