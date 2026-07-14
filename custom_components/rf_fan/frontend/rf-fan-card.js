@@ -10,7 +10,7 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.2.1";
+const VERSION = "1.3.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -85,13 +85,14 @@ class RfFanCard extends HTMLElement {
       sound: firstOf("switch", cfg.sound_entity),
       timers,
       calibrate,
+      timerSensor: siblings.find((e) => e.startsWith("sensor.")),
     };
   }
 
   _signature() {
     if (!this._config || !this._hass) return null;
     const ent = this._discover();
-    const ids = [ent.fan, ent.light, ent.color, ent.sound, ent.calibrate]
+    const ids = [ent.fan, ent.light, ent.color, ent.sound, ent.calibrate, ent.timerSensor]
       .concat(ent.timers.map((t) => t.id))
       .filter(Boolean);
     return ids
@@ -222,6 +223,15 @@ class RfFanCard extends HTMLElement {
         .join("") + `</div>`;
     }
 
+    let timerLine = "";
+    if (ent.timerSensor) {
+      const ts = this._hass.states[ent.timerSensor];
+      if (ts && ts.state !== "unknown" && ts.state !== "unavailable") {
+        const disp = this._hass.formatEntityState ? this._hass.formatEntityState(ts) : ts.state;
+        timerLine = `<div class="timerline"><ha-icon icon="mdi:timer-sand"></ha-icon><span>${disp}</span></div>`;
+      }
+    }
+
     this._body.innerHTML = `
       <div class="head">
         <div class="title">${name}</div>
@@ -245,6 +255,7 @@ class RfFanCard extends HTMLElement {
       ${rows.length ? `<div class="chips">${rows.join("")}</div>` : ""}
       ${compact ? "" : colorRow}
       ${compact || !modeChips.length ? "" : `<div class="chips">${modeChips.join("")}</div>`}
+      ${compact ? "" : timerLine}
       ${compact ? "" : timerRow}
     `;
   }
@@ -263,6 +274,32 @@ class RfFanCard extends HTMLElement {
     this._root = card;
     this._body.addEventListener("click", (e) => this._onClick(e));
     this._body.addEventListener("change", (e) => this._onChange(e));
+    this._body.addEventListener("pointerdown", (e) => this._onPointerDown(e));
+    this._body.addEventListener("pointerup", () => this._clearHold());
+    this._body.addEventListener("pointerleave", () => this._clearHold());
+    this._body.addEventListener("pointercancel", () => this._clearHold());
+  }
+
+  _onPointerDown(e) {
+    if (!e.target.closest("[data-act='power']")) return;
+    this._holdTimer = window.setTimeout(() => {
+      this._held = true;
+      this._clearHold();
+      this.dispatchEvent(
+        new CustomEvent("hass-more-info", {
+          detail: { entityId: this._discover().fan },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }, 500);
+  }
+
+  _clearHold() {
+    if (this._holdTimer) {
+      window.clearTimeout(this._holdTimer);
+      this._holdTimer = null;
+    }
   }
 
   _onChange(e) {
@@ -273,6 +310,10 @@ class RfFanCard extends HTMLElement {
   }
 
   _onClick(e) {
+    if (this._held) {
+      this._held = false;
+      return;
+    }
     const t = e.target.closest("[data-act],[data-speed],[data-color],[data-dir],[data-preset],[data-timer]");
     if (!t) return;
     const ent = this._discover();
@@ -331,6 +372,8 @@ class RfFanCard extends HTMLElement {
       .mini { border:none; background: var(--divider-color); border-radius:10px; padding:8px; cursor:pointer; color: var(--secondary-text-color); }
       .timers { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
       .timers .chip { flex:1; justify-content:center; }
+      .timerline { display:flex; align-items:center; gap:6px; margin:8px 0 2px; color: var(--secondary-text-color); font-size:.85rem; }
+      .timerline ha-icon { --mdc-icon-size:18px; }
       .warn { color: var(--error-color); padding:12px; }
     `;
   }
@@ -355,7 +398,14 @@ class RfFanCardEditor extends HTMLElement {
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.computeLabel = (s) =>
-        ({ entity: "Fan entity (required)", name: "Name (optional)", layout: "Layout" }[s.name] || s.name);
+        ({
+          entity: "Fan entity (required)",
+          name: "Name (optional)",
+          layout: "Layout",
+          light_entity: "Light entity (override)",
+          color_entity: "Colour select (override)",
+          sound_entity: "Sound switch (override)",
+        }[s.name] || s.name);
       this._form.addEventListener("value-changed", (e) => {
         this.dispatchEvent(
           new CustomEvent("config-changed", {
@@ -383,6 +433,9 @@ class RfFanCardEditor extends HTMLElement {
           },
         },
       },
+      { name: "light_entity", selector: { entity: { domain: "light" } } },
+      { name: "color_entity", selector: { entity: { domain: "select" } } },
+      { name: "sound_entity", selector: { entity: { domain: "switch" } } },
     ];
     this._form.data = this._config;
   }

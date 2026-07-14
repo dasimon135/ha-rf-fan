@@ -173,3 +173,28 @@ def test_single_shot_actions_cover_relative_actions_only():
     # Absolute actions must NOT be single-shot (they keep repeat_count for reliability).
     for absolute in (ACTION_FAN_OFF, ACTION_FAN_ON, speed_action(1), timer_action(4)):
         assert absolute not in SINGLE_SHOT_ACTIONS
+
+
+def test_pick_best_code_none_for_empty():
+    from actions import pick_best_code
+
+    assert pick_best_code([]) is None
+
+
+def test_pick_best_code_single_frame():
+    from actions import pick_best_code
+
+    assert pick_best_code(["raw:1,-2,3"]) == "raw:1,-2,3"
+
+
+def test_pick_best_code_modal_wins_over_noise():
+    from actions import pick_best_code
+
+    frames = ["real", "noise-a", "real", "noise-b", "real"]
+    assert pick_best_code(frames) == "real"
+
+
+def test_pick_best_code_tie_breaks_to_earliest():
+    from actions import pick_best_code
+
+    assert pick_best_code(["a", "b"]) == "a"

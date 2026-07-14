@@ -12,6 +12,7 @@ from homeassistant.components.fan import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
@@ -127,6 +128,12 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             self._event_unsub()
             self._event_unsub = None
 
+    def _clear_timer(self) -> None:
+        """Clear the assumed sleep-timer when the fan is switched off."""
+        if self._entry_runtime().get("timer_ends_at") is not None:
+            self._entry_runtime()["timer_ends_at"] = None
+            async_dispatcher_send(self.hass, self._timer_signal())
+
     async def async_turn_on(
         self,
         percentage: int | None = None,
@@ -154,6 +161,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if sent:
             self._is_on = False
             self._percentage = 0
+            self._clear_timer()
             self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage: int) -> None:
@@ -203,6 +211,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if action == ACTION_FAN_OFF:
             self._is_on = False
             self._percentage = 0
+            self._clear_timer()
             self.async_write_ha_state()
             return
 

@@ -104,6 +104,10 @@ class RfFanBaseEntity(Entity):
         """Dispatcher signal name for the color position, specific to the entry."""
         return f"{DOMAIN}_{self._config_entry.entry_id}_kelvin"
 
+    def _timer_signal(self) -> str:
+        """Dispatcher signal name for the sleep timer, specific to the entry."""
+        return f"{DOMAIN}_{self._config_entry.entry_id}_timer"
+
     def _advance_kelvin_position(self) -> int:
         """Advance the color position by one step (mod N) and return it."""
         runtime = self._entry_runtime()

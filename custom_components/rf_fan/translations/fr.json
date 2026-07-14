@@ -157,6 +157,11 @@
       "sound": {
         "name": "Son"
       }
+    },
+    "sensor": {
+      "sleep_timer": {
+        "name": "Minuterie"
+      }
     }
   },
   "selector": {
