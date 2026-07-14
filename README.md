@@ -11,7 +11,7 @@ frames are `rc_switch`, raw timings, or anything else the gateway understands. A
 Cecotec fan is used as the reference example, but any RF fan works.
 
 <p align="center">
-  <img src="assets/brand/icon@2x.png" width="128" alt="RF Fan icon">
+  <img src="custom_components/rf_fan/brand/icon@2x.png" width="128" alt="RF Fan icon">
 </p>
 
 ## Features
