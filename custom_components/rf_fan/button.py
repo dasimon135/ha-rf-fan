@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import CONF_HAS_COLOR_TEMP, CONF_HAS_TIMERS, TIMER_HOURS, timer_action
 from .entity import RfFanBaseEntity
@@ -44,8 +47,12 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
         self._attr_translation_placeholders = {"hours": str(hours)}
 
     async def async_press(self) -> None:
-        """Emit the corresponding timer action."""
+        """Emit the timer action and record the assumed switch-off time."""
         await self._async_transmit_action(timer_action(self._hours))
+        self._entry_runtime()["timer_ends_at"] = dt_util.utcnow() + timedelta(
+            hours=self._hours
+        )
+        async_dispatcher_send(self.hass, self._timer_signal())
 
 
 class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):

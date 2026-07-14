@@ -1,0 +1,98 @@
+# Blueprint: Control an RF fan by temperature
+#
+# For the RF Fan (rf_fan) custom integration.
+# This integration's fans are plain Home Assistant `fan.*` entities that are
+# driven over one-way RF, so there is NO state feedback from the device.
+# The fan's HA state is assumed to match the last command sent by this
+# automation; keep the ON/OFF thresholds apart (hysteresis) to avoid rapid
+# toggling around a single setpoint.
+#
+# English only.
+
+blueprint:
+  name: RF Fan - Temperature Control
+  description: >
+    Turn an RF fan on when a temperature sensor rises above an ON threshold,
+    and off when it drops below an OFF threshold (hysteresis). Optionally sets
+    the fan speed percentage when turning on. Designed for the RF Fan (rf_fan)
+    integration, whose fans are one-way RF devices without state feedback, so
+    the fan state is assumed from the last command sent.
+  domain: automation
+  input:
+    temperature_sensor:
+      name: Temperature sensor
+      description: The temperature sensor that drives the fan.
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    fan:
+      name: Fan
+      description: The RF fan entity to control.
+      selector:
+        entity:
+          domain: fan
+    temp_on:
+      name: Turn-on temperature
+      description: The fan turns on when the temperature rises above this value.
+      default: 26
+      selector:
+        number:
+          min: 10
+          max: 40
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    temp_off:
+      name: Turn-off temperature
+      description: >
+        The fan turns off when the temperature drops below this value.
+        Keep it lower than the turn-on temperature to create hysteresis.
+      default: 24
+      selector:
+        number:
+          min: 10
+          max: 40
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    speed:
+      name: Fan speed
+      description: Speed percentage applied when the fan turns on.
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+mode: single
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input temperature_sensor
+    above: !input temp_on
+  - platform: numeric_state
+    entity_id: !input temperature_sensor
+    below: !input temp_off
+
+action:
+  - choose:
+      # Temperature is above the ON threshold -> turn the fan on at the chosen speed.
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input temperature_sensor
+            above: !input temp_on
+        sequence:
+          - service: fan.turn_on
+            target:
+              entity_id: !input fan
+            data:
+              percentage: !input speed
+    # Otherwise (temperature below the OFF threshold) -> turn the fan off.
+    default:
+      - service: fan.turn_off
+        target:
+          entity_id: !input fan

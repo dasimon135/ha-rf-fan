@@ -1,5 +1,11 @@
 # RF Fan — Home Assistant integration
 
+[![Release](https://img.shields.io/github/v/release/dasimon135/ha-rf-fan)](https://github.com/dasimon135/ha-rf-fan/releases)
+[![Validate](https://github.com/dasimon135/ha-rf-fan/actions/workflows/validate.yml/badge.svg)](https://github.com/dasimon135/ha-rf-fan/actions/workflows/validate.yml)
+[![Tests](https://github.com/dasimon135/ha-rf-fan/actions/workflows/tests.yml/badge.svg)](https://github.com/dasimon135/ha-rf-fan/actions/workflows/tests.yml)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![License](https://img.shields.io/github/license/dasimon135/ha-rf-fan)](LICENSE)
+
 A **generic** Home Assistant integration for RF (typically 433 MHz) ceiling and wall
 fans that have no manufacturer-specific integration. You pair it with an ESPHome
 gateway that can transmit — and ideally receive — the raw RF frames, then teach Home
@@ -11,7 +17,9 @@ frames are `rc_switch`, raw timings, or anything else the gateway understands. A
 Cecotec fan is used as the reference example, but any RF fan works.
 
 <p align="center">
-  <img src="custom_components/rf_fan/brand/icon@2x.png" width="128" alt="RF Fan icon">
+  <img src="assets/rf-fan-card.gif" width="200" alt="RF Fan animated card">
+  &nbsp;&nbsp;
+  <img src="custom_components/rf_fan/brand/icon@2x.png" width="120" alt="RF Fan icon">
 </p>
 
 ## Features
@@ -43,6 +51,7 @@ Depending on the declared capabilities, a device exposes:
 | `select` "color temperature" | color temp enabled | cycles Warm → Neutral → Cold |
 | `button` calibrate | color temp enabled | resyncs the assumed color position — **emits nothing** |
 | `button` timer ×4 | timers enabled | 1 h / 2 h / 4 h / 8 h |
+| `sensor` sleep timer | timers enabled | assumed switch-off time set by the timer buttons (cleared when the fan is turned off) |
 | `switch` sound | sound enabled | beep on/off |
 
 ### Color temperature (Kelvin)
@@ -110,9 +119,14 @@ device and auto-discovers the sibling entities (light, colour-temperature select
 sound switch, timer/calibrate buttons), showing only the controls that exist. The fan
 blades spin at a speed-proportional rate, and it follows your Home Assistant theme.
 
-Optional fields: `name` (override the title) and `layout` — `full` (default) or
-`compact` (a reduced tile: just the fan, speed and light/sound). All fields are also
-editable from the card's visual editor.
+Optional fields: `name` (override the title), `layout` — `full` (default) or `compact`
+(a reduced tile: just the fan, speed and light/sound) — and entity overrides
+(`light_entity`, `color_entity`, `sound_entity`) if auto-discovery picks the wrong one.
+All fields are editable from the card's visual editor. **Long-press the fan** to open
+its more-info dialog. When a sleep timer is running, the card shows the switch-off time.
+
+An example automation **blueprint** (control the fan by temperature) is in
+[`blueprints/automation/rf_fan/`](blueprints/automation/rf_fan/).
 
 ## Reconfiguring an existing fan
 

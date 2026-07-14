@@ -23,9 +23,10 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.BUTTON,
     Platform.SWITCH,
+    Platform.SENSOR,
 ]
 
-CARD_VERSION = "1.2.1"
+CARD_VERSION = "1.3.0"
 CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
 
 
@@ -55,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "kelvin_position": 0,
         "light_on": None,
+        "timer_ends_at": None,
     }
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
