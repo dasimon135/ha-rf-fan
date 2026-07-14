@@ -10,7 +10,7 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.1.2";
+const VERSION = "1.2.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -152,6 +152,7 @@ class RfFanCard extends HTMLElement {
 
     const on = fan.state === "on";
     const L = this._labels();
+    const compact = this._config.layout === "compact";
     const { count, index, pct } = this._speedInfo(fan);
     const spinDur = on && index > 0 ? (3.4 - (index / count) * 3.0).toFixed(2) : 0;
     const name = this._config.name || fan.attributes.friendly_name || L.fan;
@@ -227,7 +228,7 @@ class RfFanCard extends HTMLElement {
         <div class="state ${on ? "on" : ""}">${on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off}</div>
       </div>
       <div class="hero">
-        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
+        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
           <defs>
             <radialGradient id="rfDisc" cx="50%" cy="42%" r="62%">
               <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.22"/>
@@ -242,9 +243,9 @@ class RfFanCard extends HTMLElement {
       </div>
       ${speedHtml}
       ${rows.length ? `<div class="chips">${rows.join("")}</div>` : ""}
-      ${colorRow}
-      ${modeChips.length ? `<div class="chips">${modeChips.join("")}</div>` : ""}
-      ${timerRow}
+      ${compact ? "" : colorRow}
+      ${compact || !modeChips.length ? "" : `<div class="chips">${modeChips.join("")}</div>`}
+      ${compact ? "" : timerRow}
     `;
   }
 
@@ -298,6 +299,7 @@ class RfFanCard extends HTMLElement {
       .hero { display:flex; justify-content:center; margin:6px 0 10px; }
       .fan { width:150px; height:150px; cursor:pointer; filter: drop-shadow(0 3px 8px rgba(0,0,0,.25)); transition: transform .3s ease; }
       .fan.off { transform: scale(.97); }
+      .fan.compact { width:96px; height:96px; }
       .fan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; transition: opacity .4s ease; }
       .fan.off .blades { animation-play-state: paused; }
       .fan .blades ellipse { fill: var(--primary-color); }
@@ -353,7 +355,7 @@ class RfFanCardEditor extends HTMLElement {
     if (!this._form) {
       this._form = document.createElement("ha-form");
       this._form.computeLabel = (s) =>
-        ({ entity: "Fan entity (required)", name: "Name (optional)" }[s.name] || s.name);
+        ({ entity: "Fan entity (required)", name: "Name (optional)", layout: "Layout" }[s.name] || s.name);
       this._form.addEventListener("value-changed", (e) => {
         this.dispatchEvent(
           new CustomEvent("config-changed", {
@@ -369,6 +371,18 @@ class RfFanCardEditor extends HTMLElement {
     this._form.schema = [
       { name: "entity", required: true, selector: { entity: { domain: "fan" } } },
       { name: "name", selector: { text: {} } },
+      {
+        name: "layout",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "full", label: "Full" },
+              { value: "compact", label: "Compact" },
+            ],
+          },
+        },
+      },
     ];
     this._form.data = this._config;
   }

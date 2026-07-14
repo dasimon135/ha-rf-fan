@@ -32,7 +32,7 @@
       },
       "learn": {
         "title": "RF Fan - Guided Learning",
-        "description": "Listening for action {action}. Press the corresponding remote button within {timeout} seconds, or paste the code manually if needed.",
+        "description": "Listening for action {action}. Press and briefly hold the corresponding remote button within {timeout} seconds, or paste the code manually if needed.",
         "data": {
           "code": "Captured RF code",
           "skip": "Skip this action"
@@ -113,7 +113,7 @@
       }
     },
     "progress": {
-      "listen_rf_signal": "Action \"{action}\": press the matching button on the remote (≤ {timeout}s)."
+      "listen_rf_signal": "Action \"{action}\": press and briefly hold the matching button (≤ {timeout}s)."
     },
     "selector": {
       "light_control": {

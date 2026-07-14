@@ -110,6 +110,10 @@ device and auto-discovers the sibling entities (light, colour-temperature select
 sound switch, timer/calibrate buttons), showing only the controls that exist. The fan
 blades spin at a speed-proportional rate, and it follows your Home Assistant theme.
 
+Optional fields: `name` (override the title) and `layout` — `full` (default) or
+`compact` (a reduced tile: just the fan, speed and light/sound). All fields are also
+editable from the card's visual editor.
+
 ## Reconfiguring an existing fan
 
 To add a capability (or fix a captured code) later, open the integration entry and use
