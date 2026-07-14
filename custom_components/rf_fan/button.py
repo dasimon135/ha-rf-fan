@@ -40,7 +40,8 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
         super().__init__(hass, config_entry)
         self._hours = hours
         self._attr_unique_id = f"{config_entry.entry_id}_timer_{hours}h"
-        self._attr_name = f"Minuterie {hours}h"
+        self._attr_translation_key = "timer"
+        self._attr_translation_placeholders = {"hours": str(hours)}
 
     async def async_press(self) -> None:
         """Emit the corresponding timer action."""
@@ -54,7 +55,7 @@ class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):
         """Initialize the color calibration button."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_kelvin_calibrate"
-        self._attr_name = "Couleur : recaler le suivi sur Chaud"
+        self._attr_translation_key = "recalibrate_color"
 
     async def async_press(self) -> None:
         """Reset the color position to zero without emitting an RF code."""

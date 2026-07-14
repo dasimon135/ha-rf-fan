@@ -145,5 +145,30 @@
         }
       }
     }
+  },
+  "entity": {
+    "button": {
+      "timer": {
+        "name": "Minuterie {hours}h"
+      },
+      "recalibrate_color": {
+        "name": "Recaler la couleur (sur Chaud)"
+      }
+    },
+    "light": {
+      "light": {
+        "name": "Lampe"
+      }
+    },
+    "select": {
+      "color_temperature": {
+        "name": "Température couleur"
+      }
+    },
+    "switch": {
+      "sound": {
+        "name": "Son"
+      }
+    }
   }
 }

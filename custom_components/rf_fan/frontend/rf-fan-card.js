@@ -10,7 +10,7 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.1.1";
+const VERSION = "1.1.2";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -118,6 +118,26 @@ class RfFanCard extends HTMLElement {
     return { step, count, index, pct };
   }
 
+  _labels() {
+    const lang = (this._hass && (this._hass.language || (this._hass.locale && this._hass.locale.language))) || "en";
+    const fr = String(lang).toLowerCase().startsWith("fr");
+    const color = { Chaud: fr ? "Chaud" : "Warm", Neutre: fr ? "Neutre" : "Neutral", Froid: fr ? "Froid" : "Cold" };
+    return {
+      light: fr ? "Lampe" : "Light",
+      sound: fr ? "Son" : "Sound",
+      forward: fr ? "Avant" : "Forward",
+      reverse: fr ? "Arrière" : "Reverse",
+      normal: "Normal",
+      natural: fr ? "Naturel" : "Natural",
+      speed: fr ? "Vitesse" : "Speed",
+      on: fr ? "Marche" : "On",
+      off: fr ? "Arrêt" : "Off",
+      recalibrate: fr ? "Recaler la couleur" : "Recalibrate colour",
+      fan: fr ? "Ventilateur" : "Fan",
+      color: (o) => color[o] || o,
+    };
+  }
+
   // ---- render ----------------------------------------------------------
 
   _render() {
@@ -131,9 +151,10 @@ class RfFanCard extends HTMLElement {
     }
 
     const on = fan.state === "on";
+    const L = this._labels();
     const { count, index, pct } = this._speedInfo(fan);
     const spinDur = on && index > 0 ? (3.4 - (index / count) * 3.0).toFixed(2) : 0;
-    const name = this._config.name || fan.attributes.friendly_name || "Fan";
+    const name = this._config.name || fan.attributes.friendly_name || L.fan;
 
     const blades = [0, 120, 240]
       .map((a) => `<ellipse cx="50" cy="26" rx="12" ry="23" transform="rotate(${a} 50 50)"/>`)
@@ -144,7 +165,7 @@ class RfFanCard extends HTMLElement {
     if (count <= 10) {
       let segs = "";
       for (let i = 1; i <= count; i++) {
-        segs += `<button class="seg ${i <= index ? "on" : ""}" data-speed="${i}" title="Vitesse ${i}"></button>`;
+        segs += `<button class="seg ${i <= index ? "on" : ""}" data-speed="${i}" title="${L.speed} ${i}"></button>`;
       }
       speedHtml = `<div class="speed">${segs}</div>`;
     } else {
@@ -155,12 +176,12 @@ class RfFanCard extends HTMLElement {
     if (ent.light) {
       const l = this._hass.states[ent.light];
       const lit = l && l.state === "on";
-      rows.push(`<button class="chip ${lit ? "active amber" : ""}" data-act="light"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon><span>Lampe</span></button>`);
+      rows.push(`<button class="chip ${lit ? "active amber" : ""}" data-act="light"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon><span>${L.light}</span></button>`);
     }
     if (ent.sound) {
       const s = this._hass.states[ent.sound];
       const son = s && s.state === "on";
-      rows.push(`<button class="chip ${son ? "active" : ""}" data-act="sound"><ha-icon icon="mdi:volume-${son ? "high" : "off"}"></ha-icon><span>Son</span></button>`);
+      rows.push(`<button class="chip ${son ? "active" : ""}" data-act="sound"><ha-icon icon="mdi:volume-${son ? "high" : "off"}"></ha-icon><span>${L.sound}</span></button>`);
     }
 
     let colorRow = "";
@@ -171,9 +192,9 @@ class RfFanCard extends HTMLElement {
       const lightOff = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
       const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
       const segsC = opts
-        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${o}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${L.color(o)}</button>`)
         .join("");
-      colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="Recaler la couleur"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
+      colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="${L.recalibrate}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
     }
 
     const feat = fan.attributes.supported_features || 0;
@@ -181,15 +202,15 @@ class RfFanCard extends HTMLElement {
     if (feat & 4) {
       const dir = fan.attributes.direction;
       modeChips.push(
-        `<button class="chip ${dir !== "reverse" ? "active" : ""}" data-dir="forward"><ha-icon icon="mdi:rotate-right"></ha-icon><span>Avant</span></button>`,
-        `<button class="chip ${dir === "reverse" ? "active" : ""}" data-dir="reverse"><ha-icon icon="mdi:rotate-left"></ha-icon><span>Arrière</span></button>`
+        `<button class="chip ${dir !== "reverse" ? "active" : ""}" data-dir="forward"><ha-icon icon="mdi:rotate-right"></ha-icon><span>${L.forward}</span></button>`,
+        `<button class="chip ${dir === "reverse" ? "active" : ""}" data-dir="reverse"><ha-icon icon="mdi:rotate-left"></ha-icon><span>${L.reverse}</span></button>`
       );
     }
     if (feat & 8) {
       const preset = fan.attributes.preset_mode;
       modeChips.push(
-        `<button class="chip ${preset !== "natural" ? "active" : ""}" data-preset="normal"><ha-icon icon="mdi:fan"></ha-icon><span>Normal</span></button>`,
-        `<button class="chip ${preset === "natural" ? "active" : ""}" data-preset="natural"><ha-icon icon="mdi:weather-windy"></ha-icon><span>Naturel</span></button>`
+        `<button class="chip ${preset !== "natural" ? "active" : ""}" data-preset="normal"><ha-icon icon="mdi:fan"></ha-icon><span>${L.normal}</span></button>`,
+        `<button class="chip ${preset === "natural" ? "active" : ""}" data-preset="natural"><ha-icon icon="mdi:weather-windy"></ha-icon><span>${L.natural}</span></button>`
       );
     }
 
@@ -203,7 +224,7 @@ class RfFanCard extends HTMLElement {
     this._body.innerHTML = `
       <div class="head">
         <div class="title">${name}</div>
-        <div class="state ${on ? "on" : ""}">${on ? (index > 0 ? `Vitesse ${index}/${count}` : "Marche") : "Arrêt"}</div>
+        <div class="state ${on ? "on" : ""}">${on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off}</div>
       </div>
       <div class="hero">
         <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">

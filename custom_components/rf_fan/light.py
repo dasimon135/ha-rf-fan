@@ -44,7 +44,7 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         """Initialize the light entity."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_light"
-        self._attr_name = "Lampe"
+        self._attr_translation_key = "light"
         self._is_on: bool | None = None
         self._event_unsub = None
         self._has_color_temp: bool = config_entry.data.get(CONF_HAS_COLOR_TEMP, False)

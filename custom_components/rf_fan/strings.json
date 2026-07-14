@@ -145,5 +145,30 @@
         }
       }
     }
+  },
+  "entity": {
+    "button": {
+      "timer": {
+        "name": "{hours}h timer"
+      },
+      "recalibrate_color": {
+        "name": "Recalibrate colour (to Warm)"
+      }
+    },
+    "light": {
+      "light": {
+        "name": "Light"
+      }
+    },
+    "select": {
+      "color_temperature": {
+        "name": "Colour temperature"
+      }
+    },
+    "switch": {
+      "sound": {
+        "name": "Sound"
+      }
+    }
   }
 }

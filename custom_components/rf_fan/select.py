@@ -39,7 +39,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         """Initialize the select entity."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_color_temp"
-        self._attr_name = "Température couleur"
+        self._attr_translation_key = "color_temperature"
         self._attr_options = COLOR_TEMP_OPTIONS
         self._event_unsub = None
         self._signal_unsub = None

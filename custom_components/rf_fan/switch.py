@@ -33,7 +33,7 @@ class RfFanSoundSwitch(RfFanBaseEntity, RestoreEntity, SwitchEntity):
         """Initialize the sound switch."""
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_sound"
-        self._attr_name = "Son"
+        self._attr_translation_key = "sound"
         self._is_on: bool | None = None
         self._event_unsub = None
 
