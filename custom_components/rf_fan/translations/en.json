@@ -24,10 +24,7 @@
           "method": "Configuration method"
         },
         "data_description": {
-          "method": {
-            "manual": "Manual entry: paste the RF codes yourself.",
-            "learn": "Guided learning: press each remote button when prompted."
-          }
+          "method": "Manual entry: paste the codes yourself. Guided learning: capture them from remote button presses."
         }
       },
       "learn": {
@@ -115,15 +112,6 @@
     "progress": {
       "listen_rf_signal": "Action \"{action}\": press and briefly hold the matching button (≤ {timeout}s)."
     },
-    "selector": {
-      "light_control": {
-        "options": {
-          "none": "None",
-          "toggle": "Single toggle button",
-          "on_off": "Two buttons (on/off)"
-        }
-      }
-    },
     "error": {
       "required": "This field is required.",
       "light_code_required": "Provide at least one light code (on/off or toggle).",
@@ -168,6 +156,15 @@
     "switch": {
       "sound": {
         "name": "Sound"
+      }
+    }
+  },
+  "selector": {
+    "light_control": {
+      "options": {
+        "none": "None",
+        "toggle": "Single toggle button",
+        "on_off": "Two buttons (on/off)"
       }
     }
   }

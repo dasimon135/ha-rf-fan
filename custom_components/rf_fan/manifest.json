@@ -2,12 +2,18 @@
   "domain": "rf_fan",
   "name": "RF Fan",
   "config_flow": true,
-  "dependencies": [],
-  "after_dependencies": ["frontend"],
+  "dependencies": [
+    "http"
+  ],
+  "after_dependencies": [
+    "frontend"
+  ],
   "documentation": "https://github.com/dasimon135/ha-rf-fan",
   "issue_tracker": "https://github.com/dasimon135/ha-rf-fan/issues",
   "integration_type": "device",
   "iot_class": "assumed_state",
-  "codeowners": ["@dasimon135"],
-  "version": "1.2.0"
+  "codeowners": [
+    "@dasimon135"
+  ],
+  "version": "1.2.1"
 }

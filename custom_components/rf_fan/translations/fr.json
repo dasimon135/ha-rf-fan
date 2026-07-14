@@ -24,10 +24,7 @@
           "method": "Méthode de configuration"
         },
         "data_description": {
-          "method": {
-            "manual": "Saisie manuelle : collez vous-même les codes RF.",
-            "learn": "Apprentissage guidé : appuyez sur chaque bouton quand il est demandé."
-          }
+          "method": "Saisie manuelle : collez les codes. Apprentissage guidé : capture à l'appui sur chaque bouton."
         }
       },
       "learn": {
@@ -115,15 +112,6 @@
     "progress": {
       "listen_rf_signal": "Action « {action} » : appuyez (et maintenez brièvement) le bouton correspondant (≤ {timeout}s)."
     },
-    "selector": {
-      "light_control": {
-        "options": {
-          "none": "Aucune",
-          "toggle": "Bouton toggle unique",
-          "on_off": "Deux boutons (on/off)"
-        }
-      }
-    },
     "error": {
       "required": "Ce champ est obligatoire.",
       "light_code_required": "Renseignez au moins un code lumière (ON/OFF ou bascule).",
@@ -168,6 +156,15 @@
     "switch": {
       "sound": {
         "name": "Son"
+      }
+    }
+  },
+  "selector": {
+    "light_control": {
+      "options": {
+        "none": "Aucune",
+        "toggle": "Bouton toggle unique",
+        "on_off": "Deux boutons (on/off)"
       }
     }
   }
