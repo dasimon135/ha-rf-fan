@@ -132,7 +132,7 @@ class RfFanCard extends HTMLElement {
     const name = this._config.name || fan.attributes.friendly_name || "Fan";
 
     const blades = [0, 120, 240]
-      .map((a) => `<ellipse cx="50" cy="27" rx="13.5" ry="22" transform="rotate(${a} 50 50)"/>`)
+      .map((a) => `<ellipse cx="50" cy="26" rx="12" ry="23" transform="rotate(${a} 50 50)"/>`)
       .join("");
 
     // speed: segmented for few speeds, slider for many
@@ -165,10 +165,11 @@ class RfFanCard extends HTMLElement {
       const opts = (c && c.attributes.options) || [];
       const cur = c && c.state;
       const lightOff = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
+      const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
       const segsC = opts
-        .map((o) => `<button class="cseg ${o === cur ? "active" : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${o}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${o}</button>`)
         .join("");
-      colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="Recaler la couleur"><ha-icon icon="mdi:target-variant"></ha-icon></button>` : ""}</div>`;
+      colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="Recaler la couleur"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
     }
 
     const feat = fan.attributes.supported_features || 0;
@@ -202,7 +203,13 @@ class RfFanCard extends HTMLElement {
       </div>
       <div class="hero">
         <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
-          <circle class="disc" cx="50" cy="50" r="48"/>
+          <defs>
+            <radialGradient id="rfDisc" cx="50%" cy="42%" r="62%">
+              <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.22"/>
+              <stop offset="100%" stop-color="var(--primary-color)" stop-opacity="0.05"/>
+            </radialGradient>
+          </defs>
+          <circle class="disc" cx="50" cy="50" r="48" fill="url(#rfDisc)"/>
           <g class="blades">${blades}</g>
           <circle class="hub" cx="50" cy="50" r="7.5"/>
           <circle class="hub2" cx="50" cy="50" r="3"/>
@@ -264,9 +271,9 @@ class RfFanCard extends HTMLElement {
       .state { font-size:.85rem; color: var(--secondary-text-color); }
       .state.on { color: var(--primary-color); }
       .hero { display:flex; justify-content:center; margin:6px 0 10px; }
-      .fan { width:150px; height:150px; cursor:pointer; }
-      .fan .disc { fill: var(--primary-color); opacity:.10; }
-      .fan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; }
+      .fan { width:150px; height:150px; cursor:pointer; filter: drop-shadow(0 3px 8px rgba(0,0,0,.25)); transition: transform .3s ease; }
+      .fan.off { transform: scale(.97); }
+      .fan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; transition: opacity .4s ease; }
       .fan.off .blades { animation-play-state: paused; }
       .fan .blades ellipse { fill: var(--primary-color); }
       .fan.off .blades ellipse { fill: var(--disabled-text-color); }
@@ -283,6 +290,9 @@ class RfFanCard extends HTMLElement {
       .chip ha-icon { --mdc-icon-size:20px; }
       .chip.active { background: var(--primary-color); color: var(--text-primary-color, #fff); }
       .chip.active.amber { background:#f5a623; }
+      .chip, .seg, .cseg, .mini { transition: filter .15s ease, transform .1s ease, background .2s ease; }
+      .chip:hover, .seg:hover, .cseg:not(:disabled):hover, .mini:hover { filter: brightness(1.12); }
+      .chip:active, .seg:active, .cseg:not(:disabled):active, .mini:active, .fan:active { transform: scale(.95); }
       .crow { display:flex; align-items:center; gap:8px; margin:8px 0; }
       .crow > ha-icon { color: var(--secondary-text-color); --mdc-icon-size:20px; }
       .csegs { display:flex; flex:1; gap:0; border-radius:10px; overflow:hidden; }
