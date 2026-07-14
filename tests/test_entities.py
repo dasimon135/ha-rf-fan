@@ -204,6 +204,47 @@ async def test_color_select_gated_by_light(hass: HomeAssistant) -> None:
     assert hass.states.get(select_id).state != STATE_UNAVAILABLE
 
 
+async def test_color_cycle_repeats_per_step_and_gaps(hass: HomeAssistant, monkeypatch) -> None:
+    """Colour cycling sends each step with repeat_count and separates distinct steps.
+
+    The fan debounces a rapid repeat burst into a single colour step, so every step is
+    transmitted `repeat_count` times (reliability); distinct steps are separated by a gap
+    (`entity.sleep`) so the receiver registers them as separate presses. A 2-step change
+    must therefore emit two presses with exactly one gap between them.
+    """
+    _entry, calls = await _setup_full(hass, repeat_count=2)
+    light_id = _one_id(hass, "light")
+    select_id = _one_id(hass, "select")
+
+    # Record gap sleeps without actually waiting on the event loop.
+    sleeps: list[float] = []
+
+    async def _fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _fake_sleep)
+
+    # Turn the light on (the colour cycle needs the lamp powered). The OFF->ON
+    # transition bumps the assumed position 0->1 (Chaud -> Neutre).
+    await hass.services.async_call(
+        "light", "turn_on", {"entity_id": light_id}, blocking=True
+    )
+    await hass.async_block_till_done()
+    calls.clear()
+
+    # Neutre(1) -> Chaud(0): steps = (0 - 1) % 3 = 2 → two presses, one gap between.
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": select_id, "option": "Chaud"}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    kelvin = [c for c in calls if c.get("action") == "light_kelvin"]
+    assert len(kelvin) == 2, "a 2-step colour change must send two presses"
+    assert all(c["repeat_count"] == 2 for c in kelvin), "each step keeps repeat_count for reliability"
+    assert len(sleeps) == 1, "exactly one gap between the two presses"
+    assert hass.states.get(select_id).state == "Chaud"
+
+
 async def test_fan_direction_and_preset(hass: HomeAssistant) -> None:
     """set_direction / set_preset_mode update the assumed attributes."""
     await _setup_full(hass)

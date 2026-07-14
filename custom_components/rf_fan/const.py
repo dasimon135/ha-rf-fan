@@ -44,17 +44,22 @@ ACTION_LIGHT_KELVIN: Final = "light_kelvin"
 ACTION_SOUND_TOGGLE: Final = "sound_toggle"
 TIMER_HOURS: Final = (1, 2, 4, 8)
 
-# Relative/toggle actions that must fire EXACTLY once. Each press flips or steps a
-# state (toggle the light or sound, flip direction/natural preset, or advance the
-# color cycle). The captured RF code already contains the remote's own repeat burst
-# = one physical press, so replaying it repeat_count>1 times would double-actuate and
-# cancel out (toggles) or overshoot (kelvin). These always transmit once, regardless
-# of the configured repeat_count. Absolute actions (speeds, timers, on/off) keep it.
+# Relative/toggle actions that must fire EXACTLY once. Each press flips a state
+# (toggle the light or sound, flip direction or the natural preset). The fan debounces
+# a rapid repeat burst into a single actuation, so replaying such a code repeat_count>1
+# times would double-actuate and cancel the toggle back out. These always transmit once,
+# regardless of the configured repeat_count. Absolute actions (speeds, timers, on/off)
+# keep repeat_count for reliability.
+#
+# NOTE: the colour cycle (ACTION_LIGHT_KELVIN) is deliberately NOT single-shot. The fan
+# debounces a repeat burst into a single colour step (exactly as it does for a speed
+# press), so each step is sent with repeat_count for reliability; distinct steps are
+# separated by KELVIN_STEP_GAP_SEC so the receiver registers them as separate presses
+# (see select.py).
 SINGLE_SHOT_ACTIONS: Final = frozenset(
     {
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
-        ACTION_LIGHT_KELVIN,
         ACTION_FAN_REVERSE,
         ACTION_FAN_NATURAL,
     }
@@ -66,6 +71,10 @@ PRESET_NATURAL: Final = "natural"
 
 # Color positions (kelvin select): hardware cycle order
 COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
+
+# Pause (seconds) between successive colour-cycle steps so a debouncing receiver
+# registers each as a separate press. A rapid burst with no gap merges into one step.
+KELVIN_STEP_GAP_SEC: Final = 0.4
 
 # Global per-entry anti-echo window: after any transmission, all RF reception for the
 # entry is ignored for this number of seconds to discard the echo of our own transmission
