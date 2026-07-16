@@ -26,7 +26,7 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
 ]
 
-CARD_VERSION = "1.4.0"
+CARD_VERSION = "1.4.1"
 CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
 
 

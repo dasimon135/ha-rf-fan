@@ -10,7 +10,7 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.4.0";
+const VERSION = "1.4.1";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -357,7 +357,11 @@ class RfFanCard extends HTMLElement {
   // custom properties inherit through the shadow boundary.
   _openCardDialog() {
     if (this._dialog) return;
+    // Self-heal: clear any orphaned popup a prior instance may have left, so a
+    // stale full-screen overlay can never linger and swallow page clicks.
+    document.querySelectorAll("[data-rf-fan-popup]").forEach((h) => h.remove());
     const host = document.createElement("div");
+    host.setAttribute("data-rf-fan-popup", "");
     const sr = host.attachShadow({ mode: "open" });
     sr.innerHTML = `<style>
       .scrim { position:fixed; inset:0; z-index:1000; display:grid; place-items:center;
@@ -378,7 +382,9 @@ class RfFanCard extends HTMLElement {
     card.hass = this._hass;
     sr.querySelector(".wrap").appendChild(card);
     const close = () => this._closeCardDialog();
-    sr.querySelector(".scrim").addEventListener("click", (e) => { if (e.target === e.currentTarget) close(); });
+    // Tapping anywhere off the card (scrim OR the empty area around it) closes
+    // it — far easier to dismiss on a phone than aiming at a thin margin.
+    sr.querySelector(".scrim").addEventListener("click", (e) => { if (!e.composedPath().includes(card)) close(); });
     sr.querySelector(".x").addEventListener("click", close);
     this._dialogKey = (e) => { if (e.key === "Escape") close(); };
     window.addEventListener("keydown", this._dialogKey);
