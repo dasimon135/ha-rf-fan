@@ -10,7 +10,7 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -31,10 +31,11 @@ class RfFanCard extends HTMLElement {
       this._sig = sig;
       this._render();
     }
+    if (this._dialogCard) this._dialogCard.hass = hass;
   }
 
   getCardSize() {
-    return 5;
+    return this._config && this._config.layout === "tile" ? 1 : 5;
   }
 
   static getStubConfig(hass) {
@@ -146,6 +147,8 @@ class RfFanCard extends HTMLElement {
     const ent = this._discover();
     const fan = this._hass.states[ent.fan];
     this._ensureRoot();
+    const tile = this._config.layout === "tile";
+    this._root.classList.toggle("tilecard", tile);
     if (!fan) {
       this._body.innerHTML = `<div class="warn">Entity ${ent.fan} not found</div>`;
       return;
@@ -161,6 +164,31 @@ class RfFanCard extends HTMLElement {
     const blades = [0, 120, 240]
       .map((a) => `<ellipse cx="50" cy="26" rx="12" ry="23" transform="rotate(${a} 50 50)"/>`)
       .join("");
+
+    // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
+    // the name/state opens the full card in a popup (see _openCardDialog).
+    if (tile) {
+      const sub = on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off;
+      this._body.innerHTML = `
+        <div class="tile ${on ? "" : "off"}">
+          <button class="tdot" data-act="power" aria-label="${L.on}/${L.off}">
+            <svg viewBox="0 0 100 100" class="tfan ${on ? "on" : "off"}" style="--spin-dur:${spinDur}s">
+              <g class="blades">${blades}</g>
+              <circle class="hub" cx="50" cy="50" r="9"/>
+              <circle class="hub2" cx="50" cy="50" r="3.5"/>
+            </svg>
+          </button>
+          <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${name}">
+            <span class="tname">${name}</span>
+            <span class="tsub">${sub}</span>
+          </div>
+          <div class="tctl">
+            <button class="tbtn" data-tspeed="down" aria-label="Lower">−</button>
+            <button class="tbtn" data-tspeed="up" aria-label="Raise">+</button>
+          </div>
+        </div>`;
+      return;
+    }
 
     // speed: segmented for few speeds, slider for many
     let speedHtml;
@@ -273,6 +301,12 @@ class RfFanCard extends HTMLElement {
     this.shadowRoot.appendChild(card);
     this._root = card;
     this._body.addEventListener("click", (e) => this._onClick(e));
+    this._body.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.closest("[data-act='tileinfo']")) {
+        e.preventDefault();
+        this._onTileTap();
+      }
+    });
     this._body.addEventListener("change", (e) => this._onChange(e));
     this._body.addEventListener("pointerdown", (e) => this._onPointerDown(e));
     this._body.addEventListener("pointerup", () => this._clearHold());
@@ -302,6 +336,67 @@ class RfFanCard extends HTMLElement {
     }
   }
 
+  // Tile tap → full card in a popup (or HA's native more-info when
+  // `tile_tap: more-info` is configured).
+  _onTileTap() {
+    if (this._config.tile_tap === "more-info") {
+      this.dispatchEvent(
+        new CustomEvent("hass-more-info", {
+          detail: { entityId: this._discover().fan },
+          bubbles: true,
+          composed: true,
+        })
+      );
+      return;
+    }
+    this._openCardDialog();
+  }
+
+  // Self-contained modal overlay (no external dependency). Mounted on
+  // document.body so it is never clipped by the tile's grid cell; HA theme
+  // custom properties inherit through the shadow boundary.
+  _openCardDialog() {
+    if (this._dialog) return;
+    const host = document.createElement("div");
+    const sr = host.attachShadow({ mode: "open" });
+    sr.innerHTML = `<style>
+      .scrim { position:fixed; inset:0; z-index:1000; display:grid; place-items:center;
+        box-sizing:border-box; padding:16px; background:rgba(0,0,0,.5); animation:rff .15s ease; }
+      @keyframes rff { from{opacity:0} to{opacity:1} }
+      .wrap { position:relative; width:100%; max-width:400px; }
+      .x { position:absolute; top:-12px; right:-12px; z-index:1; width:34px; height:34px;
+        border-radius:50%; border:none; cursor:pointer; font-size:17px; line-height:1;
+        display:grid; place-items:center;
+        background:var(--card-background-color,#fff); color:var(--primary-text-color,#222);
+        box-shadow:0 2px 10px rgba(0,0,0,.35); }
+      .x:focus-visible { outline:2px solid var(--primary-color,#03a9f4); outline-offset:2px; }
+      @media (prefers-reduced-motion: reduce) { .scrim { animation:none } }
+    </style>
+    <div class="scrim"><div class="wrap"><button class="x" aria-label="Close">✕</button></div></div>`;
+    const card = document.createElement("rf-fan-card");
+    card.setConfig({ ...this._config, layout: "full" });
+    card.hass = this._hass;
+    sr.querySelector(".wrap").appendChild(card);
+    const close = () => this._closeCardDialog();
+    sr.querySelector(".scrim").addEventListener("click", (e) => { if (e.target === e.currentTarget) close(); });
+    sr.querySelector(".x").addEventListener("click", close);
+    this._dialogKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", this._dialogKey);
+    document.body.appendChild(host);
+    this._dialog = host;
+    this._dialogCard = card;
+  }
+
+  _closeCardDialog() {
+    if (this._dialogKey) window.removeEventListener("keydown", this._dialogKey);
+    if (this._dialog) this._dialog.remove();
+    this._dialog = null;
+    this._dialogCard = null;
+    this._dialogKey = null;
+  }
+
+  disconnectedCallback() { this._closeCardDialog(); }
+
   _onChange(e) {
     const s = e.target.closest("[data-slider]");
     if (!s) return;
@@ -314,11 +409,16 @@ class RfFanCard extends HTMLElement {
       this._held = false;
       return;
     }
-    const t = e.target.closest("[data-act],[data-speed],[data-color],[data-dir],[data-preset],[data-timer]");
+    const t = e.target.closest("[data-act],[data-speed],[data-color],[data-dir],[data-preset],[data-timer],[data-tspeed]");
     if (!t) return;
     const ent = this._discover();
     if (t.dataset.act === "power") this._call("fan", "toggle", { entity_id: ent.fan });
-    else if (t.dataset.speed) {
+    else if (t.dataset.act === "tileinfo") this._onTileTap();
+    else if (t.dataset.tspeed) {
+      const { step, count, index } = this._speedInfo(this._hass.states[ent.fan]);
+      const next = Math.max(0, Math.min(count, index + (t.dataset.tspeed === "up" ? 1 : -1)));
+      this._call("fan", "set_percentage", { entity_id: ent.fan, percentage: Math.round(next * step) });
+    } else if (t.dataset.speed) {
       const { step } = this._speedInfo(this._hass.states[ent.fan]);
       this._call("fan", "set_percentage", { entity_id: ent.fan, percentage: Math.round(Number(t.dataset.speed) * step) });
     } else if (t.dataset.act === "light" && ent.light) this._call("light", "toggle", { entity_id: ent.light });
@@ -333,6 +433,32 @@ class RfFanCard extends HTMLElement {
   _css() {
     return `
       ha-card { padding: 16px; }
+      /* Tile (ultra-compact) layout — config: layout: tile */
+      ha-card.tilecard { padding: 10px 12px; }
+      .tile { display:flex; align-items:center; gap:12px; }
+      .tdot { flex:0 0 auto; width:42px; height:42px; border-radius:50%; border:none; cursor:pointer;
+              display:grid; place-items:center; padding:0; background: var(--divider-color); }
+      .tile:not(.off) .tdot { background: color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color));
+              box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 55%, transparent),
+                          0 0 14px 1px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+      .tfan { width:26px; height:26px; }
+      .tfan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; }
+      .tfan.off .blades { animation-play-state: paused; }
+      .tfan .blades ellipse { fill: var(--primary-color); }
+      .tile.off .tfan .blades ellipse { fill: var(--disabled-text-color); }
+      .tfan .hub { fill: var(--card-background-color); }
+      .tfan .hub2 { fill: var(--primary-color); }
+      .tinfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px;
+               cursor:pointer; border-radius:8px; outline:none; }
+      .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--primary-color); }
+      .tname { font-weight:600; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tsub { font-size:.78rem; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tctl { flex:0 0 auto; display:flex; gap:6px; }
+      .tbtn { width:34px; height:34px; border-radius:9px; border:1px solid var(--divider-color);
+              background: var(--card-background-color); color: var(--primary-text-color); font-size:1.1rem;
+              cursor:pointer; transition: transform .12s, border-color .2s; }
+      .tbtn:hover { border-color: var(--primary-color); }
+      .tbtn:active { transform: scale(.9); }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
       .title { font-size:1.15rem; font-weight:600; }
       .state { font-size:.85rem; color: var(--secondary-text-color); }
@@ -429,6 +555,7 @@ class RfFanCardEditor extends HTMLElement {
             options: [
               { value: "full", label: "Full" },
               { value: "compact", label: "Compact" },
+              { value: "tile", label: "Tile" },
             ],
           },
         },
