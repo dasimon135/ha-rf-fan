@@ -160,18 +160,25 @@ def test_single_shot_actions_cover_relative_actions_only():
         SINGLE_SHOT_ACTIONS,
     )
 
-    # Relative / toggle / cycle actions must fire exactly once.
+    # Relative / toggle actions must fire exactly once (a repeat would cancel the toggle).
     for relative in (
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
-        ACTION_LIGHT_KELVIN,
         ACTION_FAN_REVERSE,
         ACTION_FAN_NATURAL,
     ):
         assert relative in SINGLE_SHOT_ACTIONS
 
-    # Absolute actions must NOT be single-shot (they keep repeat_count for reliability).
-    for absolute in (ACTION_FAN_OFF, ACTION_FAN_ON, speed_action(1), timer_action(4)):
+    # Absolute actions keep repeat_count for reliability → NOT single-shot. The colour
+    # cycle (kelvin) is also NOT single-shot: the fan debounces a repeat burst into one
+    # step, so each step is repeated for reliability and steps are gap-separated.
+    for absolute in (
+        ACTION_FAN_OFF,
+        ACTION_FAN_ON,
+        speed_action(1),
+        timer_action(4),
+        ACTION_LIGHT_KELVIN,
+    ):
         assert absolute not in SINGLE_SHOT_ACTIONS
 
 

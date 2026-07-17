@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from asyncio import sleep
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -88,12 +89,20 @@ class RfFanBaseEntity(Entity):
         last_tx = self._entry_runtime().get("last_tx", 0.0)
         return (self.hass.loop.time() - last_tx) < ECHO_SUPPRESS_SEC
 
-    async def _async_transmit_times(self, action: str, times: int) -> bool:
-        """Transmit an action's code `times` times (cycle). True if at least one transmission."""
+    async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
+        """Transmit an action's code `times` times (cycle).
+
+        `gap` seconds are awaited between successive presses so a debouncing receiver
+        registers each as a distinct press; without a gap a rapid burst merges into a
+        single step. Returns True if at least one transmission succeeded.
+        """
         sent_any = False
-        for _ in range(max(0, times)):
+        count = max(0, times)
+        for index in range(count):
             if await self._async_transmit_action(action):
                 sent_any = True
+            if gap and index < count - 1:
+                await sleep(gap)
         return sent_any
 
     def _entry_runtime(self) -> dict[str, Any]:

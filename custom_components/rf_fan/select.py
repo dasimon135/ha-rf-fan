@@ -16,6 +16,7 @@ from .const import (
     COLOR_TEMP_OPTIONS,
     CONF_HAS_COLOR_TEMP,
     EVENT_RF_FAN_RECEIVED,
+    KELVIN_STEP_GAP_SEC,
 )
 from .entity import RfFanBaseEntity
 
@@ -62,7 +63,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
             return
         target = COLOR_TEMP_OPTIONS.index(option)
         steps = (target - runtime.get("kelvin_position", 0)) % len(COLOR_TEMP_OPTIONS)
-        await self._async_transmit_times(ACTION_LIGHT_KELVIN, steps)
+        await self._async_transmit_times(ACTION_LIGHT_KELVIN, steps, gap=KELVIN_STEP_GAP_SEC)
         runtime["kelvin_position"] = target
         self.async_write_ha_state()
 
