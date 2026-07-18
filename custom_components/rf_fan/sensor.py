@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -35,6 +36,8 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_assumed_state = False
+    # Informational estimate about the device, not a primary reading.
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the sleep-timer sensor."""
