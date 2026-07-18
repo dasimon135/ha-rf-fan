@@ -134,6 +134,14 @@
       }
     }
   },
+  "exceptions": {
+    "gateway_service_missing": {
+      "message": "The ESPHome gateway \"{device}\" does not expose the RF transmit service ({service}). Check that the gateway is online and that its configuration still includes the transmit_rf_fan service."
+    },
+    "transmit_failed": {
+      "message": "Failed to send the RF command \"{action}\" via the ESPHome gateway \"{device}\": {error}"
+    }
+  },
   "entity": {
     "button": {
       "timer": {

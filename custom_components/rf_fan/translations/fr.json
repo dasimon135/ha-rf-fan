@@ -134,6 +134,14 @@
       }
     }
   },
+  "exceptions": {
+    "gateway_service_missing": {
+      "message": "La passerelle ESPHome « {device} » n'expose pas le service d'émission RF ({service}). Vérifiez que la passerelle est en ligne et que sa configuration inclut toujours le service transmit_rf_fan."
+    },
+    "transmit_failed": {
+      "message": "Échec de l'envoi de la commande RF « {action} » via la passerelle ESPHome « {device} » : {error}"
+    }
+  },
   "entity": {
     "button": {
       "timer": {

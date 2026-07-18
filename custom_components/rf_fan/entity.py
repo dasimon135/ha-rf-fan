@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import Entity
 
 from .const import (
@@ -56,13 +57,35 @@ class RfFanBaseEntity(Entity):
         )
 
     async def _async_transmit_action(self, action: str) -> bool:
-        """Transmit an RF action via ESPHome if it is mapped."""
+        """Transmit an RF action via ESPHome if it is mapped.
+
+        Returns False only when the action has no mapped code (callers rely on
+        this to fall back to an alternative action). Hard failures — the gateway
+        service is not registered, or the service call itself fails — raise
+        HomeAssistantError so the user gets feedback in the UI instead of a
+        silently ignored command.
+        """
         code = self._codes.get(action)
         if not code:
             _LOGGER.debug("Ignoring unmapped action: %s", action)
             return False
 
         service_name = f"{self._esphome_device.replace('-', '_')}_transmit_rf_fan"
+        if not self.hass.services.has_service("esphome", service_name):
+            _LOGGER.warning(
+                "ESPHome gateway service esphome.%s is not available; cannot send %s",
+                service_name,
+                action,
+            )
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="gateway_service_missing",
+                translation_placeholders={
+                    "device": self._esphome_device,
+                    "service": f"esphome.{service_name}",
+                },
+            )
+
         # Relative/toggle actions must fire exactly once (the captured code already
         # holds the remote's repeat burst); only absolute actions use repeat_count.
         repeat_count = 1 if action in SINGLE_SHOT_ACTIONS else self._repeat_count()
@@ -77,9 +100,17 @@ class RfFanBaseEntity(Entity):
                 },
                 blocking=True,
             )
-        except Exception as err:  # pragma: no cover
+        except Exception as err:
             _LOGGER.warning("RF send error (%s): %s", action, err)
-            return False
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="transmit_failed",
+                translation_placeholders={
+                    "action": action,
+                    "device": self._esphome_device,
+                    "error": str(err),
+                },
+            ) from err
 
         self._entry_runtime()["last_tx"] = self.hass.loop.time()
         return True
