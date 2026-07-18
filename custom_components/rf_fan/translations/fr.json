@@ -57,7 +57,7 @@
           "fan_speed_6": "Code vitesse 6",
           "light_on": "Code lumière ON",
           "light_off": "Code lumière OFF",
-          "light_toggle": "Code bascule lumière (optionnel)",
+          "light_toggle": "Code bascule lumière",
           "fan_reverse": "Code sens inverse",
           "fan_natural": "Code flux naturel",
           "light_kelvin": "Code température de couleur (cycle kelvin)",
@@ -114,7 +114,6 @@
     },
     "error": {
       "required": "Ce champ est obligatoire.",
-      "light_code_required": "Renseignez au moins un code lumière (ON/OFF ou bascule).",
       "required_esphome_device": "Plusieurs devices ESPHome compatibles ont été trouvés. Choisissez-en un.",
       "unknown_esphome_device": "Aucun device ESPHome compatible n'a été trouvé avec ce nom.",
       "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action."
