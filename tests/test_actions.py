@@ -1,4 +1,9 @@
-from actions import caps_from_data, split_actions, validate_codes
+from actions import (
+    caps_from_data,
+    classify_reconfigure_actions,
+    split_actions,
+    validate_codes,
+)
 from const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_OFF,
@@ -103,9 +108,6 @@ def test_caps_from_data_reads_true():
     assert caps_from_data({"has_direction": True})["has_direction"] is True
 
 
-from actions import classify_reconfigure_actions
-from const import ACTION_FAN_OFF, ACTION_LIGHT_TOGGLE, speed_action, timer_action
-
 
 def test_classify_all_kept_when_codes_complete():
     required = [ACTION_FAN_OFF, speed_action(1), ACTION_LIGHT_TOGGLE]
@@ -137,7 +139,7 @@ def test_classify_forgotten_action_dropped():
 def test_classify_empty_code_counts_as_missing():
     required = [ACTION_FAN_OFF, speed_action(1)]
     existing = {ACTION_FAN_OFF: "a", speed_action(1): ""}
-    to_learn, kept, forgotten = classify_reconfigure_actions(required, existing)
+    to_learn, kept, _forgotten = classify_reconfigure_actions(required, existing)
     assert to_learn == [speed_action(1)]
     assert kept == [ACTION_FAN_OFF]
 
@@ -145,7 +147,7 @@ def test_classify_empty_code_counts_as_missing():
 def test_classify_preserves_required_order():
     required = [ACTION_FAN_OFF, speed_action(1), speed_action(2), ACTION_LIGHT_TOGGLE]
     existing = {speed_action(1): "b", ACTION_LIGHT_TOGGLE: "c"}
-    to_learn, kept, forgotten = classify_reconfigure_actions(required, existing)
+    to_learn, kept, _forgotten = classify_reconfigure_actions(required, existing)
     assert to_learn == [ACTION_FAN_OFF, speed_action(2)]
     assert kept == [speed_action(1), ACTION_LIGHT_TOGGLE]
 

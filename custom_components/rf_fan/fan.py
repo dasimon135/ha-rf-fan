@@ -105,7 +105,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         return 100 / self._speed_count
 
     async def async_added_to_hass(self) -> None:
-        """Restore the assumed state (on/off, speed, direction, preset), then subscribe to RF events."""
+        """Restore the assumed state, then subscribe to RF events."""
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in ("on", "off"):
             self._is_on = last_state.state == "on"
@@ -171,11 +171,11 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             return
 
         step = 100 / self._speed_count
-        speed_index = max(1, min(self._speed_count, int(round(percentage / step))))
+        speed_index = max(1, min(self._speed_count, round(percentage / step)))
         sent = await self._async_transmit_action(speed_action(speed_index))
         if sent:
             self._is_on = True
-            self._percentage = int(round(speed_index * step))
+            self._percentage = round(speed_index * step)
             self.async_write_ha_state()
 
     async def async_set_direction(self, direction: str) -> None:
@@ -218,7 +218,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if action == ACTION_FAN_ON:
             self._is_on = True
             if self._percentage is None or self._percentage <= 0:
-                self._percentage = int(round(100 / self._speed_count))
+                self._percentage = round(100 / self._speed_count)
             self.async_write_ha_state()
             return
 
@@ -241,6 +241,6 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         for idx in range(1, self._speed_count + 1):
             if action == speed_action(idx):
                 self._is_on = True
-                self._percentage = int(round(idx * (100 / self._speed_count)))
+                self._percentage = round(idx * (100 / self._speed_count))
                 self.async_write_ha_state()
                 return

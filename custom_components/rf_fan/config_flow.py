@@ -6,7 +6,6 @@ import asyncio
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -130,11 +129,14 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             SelectSelectorConfig(options=LIGHT_CONTROL_OPTIONS, translation_key="light_control")
         )
         fields[vol.Required(CONF_HAS_FAN_ON, default=self._has_fan_on)] = bool
-        fields[vol.Required(CONF_HAS_DIRECTION, default=self._caps.get(CONF_HAS_DIRECTION, False))] = bool
-        fields[vol.Required(CONF_HAS_NATURAL_PRESET, default=self._caps.get(CONF_HAS_NATURAL_PRESET, False))] = bool
-        fields[vol.Required(CONF_HAS_COLOR_TEMP, default=self._caps.get(CONF_HAS_COLOR_TEMP, False))] = bool
-        fields[vol.Required(CONF_HAS_TIMERS, default=self._caps.get(CONF_HAS_TIMERS, False))] = bool
-        fields[vol.Required(CONF_HAS_SOUND, default=self._caps.get(CONF_HAS_SOUND, False))] = bool
+        for capability in (
+            CONF_HAS_DIRECTION,
+            CONF_HAS_NATURAL_PRESET,
+            CONF_HAS_COLOR_TEMP,
+            CONF_HAS_TIMERS,
+            CONF_HAS_SOUND,
+        ):
+            fields[vol.Required(capability, default=self._caps.get(capability, False))] = bool
         return vol.Schema(fields)
 
     async def async_step_user(
@@ -375,7 +377,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             try:
                 await asyncio.wait_for(first_frame.wait(), timeout=LEARN_TIMEOUT_SEC)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return None
             # Gather a few more frames to catch repeats before choosing.
             await asyncio.sleep(LEARN_COLLECT_SEC)

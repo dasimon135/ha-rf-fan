@@ -20,14 +20,14 @@ import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from homeassistant.const import STATE_UNAVAILABLE  # noqa: E402
-from homeassistant.core import HomeAssistant, State  # noqa: E402
-from pytest_homeassistant_custom_component.common import (  # noqa: E402
+from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.core import HomeAssistant, State
+from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     mock_restore_cache,
 )
 
-from custom_components.rf_fan.const import DOMAIN  # noqa: E402
+from custom_components.rf_fan.const import DOMAIN
 
 DEVICE = "esp32-test"
 # The gateway service name mirrors config_flow: dashes become underscores.
@@ -126,7 +126,7 @@ async def test_single_shot_vs_absolute_repeat_count(hass: HomeAssistant) -> None
     (`light_toggle`) → repeat_count 1. Setting a fan speed is absolute
     (`fan_speed_1`) → repeat_count 2.
     """
-    entry, calls = await _setup_full(hass, repeat_count=2)
+    _entry, calls = await _setup_full(hass, repeat_count=2)
 
     light_id = _one_id(hass, "light")
     fan_id = _one_id(hass, "fan")
@@ -240,7 +240,7 @@ async def test_color_cycle_repeats_per_step_and_gaps(hass: HomeAssistant, monkey
 
     kelvin = [c for c in calls if c.get("action") == "light_kelvin"]
     assert len(kelvin) == 2, "a 2-step colour change must send two presses"
-    assert all(c["repeat_count"] == 2 for c in kelvin), "each step keeps repeat_count for reliability"
+    assert all(c["repeat_count"] == 2 for c in kelvin), "each step keeps repeat_count"
     assert len(sleeps) == 1, "exactly one gap between the two presses"
     assert hass.states.get(select_id).state == "Chaud"
 

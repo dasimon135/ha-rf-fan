@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
