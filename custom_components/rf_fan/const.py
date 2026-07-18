@@ -9,6 +9,11 @@ DOMAIN: Final = "rf_fan"
 EVENT_RF_FAN_RECEIVED: Final = "esphome.rf_fan_received"
 
 CONF_ESPHOME_DEVICE: Final = "esphome_device"
+# Raw ESPHome service prefix (e.g. "rf_fan_gateway" for the service
+# esphome.rf_fan_gateway_transmit_rf_fan). Captured at config-flow time from the
+# live service registry; CONF_ESPHOME_DEVICE keeps the prettified (dashed)
+# display name. Entries created before v2 are migrated with a best-effort guess.
+CONF_GATEWAY_SERVICE: Final = "gateway_service"
 CONF_FAN_NAME: Final = "fan_name"
 CONF_SPEED_COUNT: Final = "speed_count"
 CONF_HAS_LIGHT: Final = "has_light"

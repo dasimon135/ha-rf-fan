@@ -17,6 +17,7 @@ from .const import (
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
+    CONF_GATEWAY_SERVICE,
     CONF_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
@@ -38,6 +39,11 @@ class RfFanBaseEntity(Entity):
         self.hass = hass
         self._config_entry = config_entry
         self._esphome_device: str = config_entry.data[CONF_ESPHOME_DEVICE]
+        # Raw service prefix stored at flow time (v2 entries); tolerant fallback
+        # derivation for entries that have not been migrated yet.
+        self._gateway_service: str = config_entry.data.get(
+            CONF_GATEWAY_SERVICE, self._esphome_device.replace("-", "_")
+        )
         self._fan_name: str = config_entry.data[CONF_FAN_NAME]
         self._codes: dict[str, str] = config_entry.data[CONF_CODES]
 
@@ -71,7 +77,7 @@ class RfFanBaseEntity(Entity):
             _LOGGER.debug("Ignoring unmapped action: %s", action)
             return False
 
-        service_name = f"{self._esphome_device.replace('-', '_')}_transmit_rf_fan"
+        service_name = f"{self._gateway_service}_transmit_rf_fan"
         if not self.hass.services.has_service("esphome", service_name):
             _LOGGER.warning(
                 "ESPHome gateway service esphome.%s is not available; cannot send %s",
@@ -180,7 +186,8 @@ class RfFanBaseEntity(Entity):
         device = event_data.get("device")
         if not isinstance(device, str) or not device:
             return True
-        return device == self._esphome_device
+        # Normalize the ESPHome dash/underscore ambiguity on both sides.
+        return device.replace("-", "_") == self._gateway_service
 
     def _event_action(self, event_data: dict[str, Any]) -> str | None:
         """Extract the received RF action from the ESPHome event."""

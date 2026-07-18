@@ -28,6 +28,7 @@ from .const import (
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
+    CONF_GATEWAY_SERVICE,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_DIRECTION,
     CONF_HAS_FAN_ON,
@@ -56,7 +57,7 @@ LEARN_COLLECT_SEC = 1.2
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
-    VERSION = 1
+    VERSION = 2
 
     @staticmethod
     @callback
@@ -67,6 +68,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the flow."""
         self._esphome_device: str = ""
+        self._gateway_service: str = ""
         self._fan_name: str = ""
         self._speed_count: int = DEFAULT_SPEED_COUNT
         self._light_control: str = LIGHT_CONTROL_TOGGLE
@@ -82,15 +84,33 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._pending_actions: list[str] | None = None
         self._repeat_count: int = DEFAULT_REPEAT_COUNT
 
-    def _available_esphome_devices(self) -> list[str]:
-        """List ESPHome devices exposing a transmit_rf_fan service."""
+    _SERVICE_SUFFIX = "_transmit_rf_fan"
+
+    def _gateway_service_prefixes(self) -> list[str]:
+        """Raw esphome service prefixes exposing a transmit_rf_fan service."""
         esphome_services = self.hass.services.async_services().get("esphome", {})
-        devices = []
-        suffix = "_transmit_rf_fan"
-        for service_name in esphome_services:
-            if service_name.endswith(suffix):
-                devices.append(service_name[: -len(suffix)].replace("_", "-"))
-        return sorted(devices)
+        return sorted(
+            service_name[: -len(self._SERVICE_SUFFIX)]
+            for service_name in esphome_services
+            if service_name.endswith(self._SERVICE_SUFFIX)
+        )
+
+    def _available_esphome_devices(self) -> list[str]:
+        """List ESPHome devices exposing a transmit_rf_fan service (display names)."""
+        return [prefix.replace("_", "-") for prefix in self._gateway_service_prefixes()]
+
+    def _resolve_gateway_service(self, display_name: str) -> str:
+        """Resolve a display name back to the RAW esphome service prefix.
+
+        The raw prefix is read from the live service registry (no lossy
+        dash/underscore guess). Falls back to a best-effort derivation when the
+        name was typed manually while the gateway is offline.
+        """
+        normalized = display_name.replace("_", "-")
+        for prefix in self._gateway_service_prefixes():
+            if prefix.replace("_", "-") == normalized:
+                return prefix
+        return display_name.replace("-", "_")
 
     def _base_schema(self, *, include_device: bool) -> vol.Schema:
         """Build the step 1 schema, reusable for reconfiguration."""
@@ -138,6 +158,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
             else:
                 self._esphome_device = selected_device
+                self._gateway_service = self._resolve_gateway_service(selected_device)
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
                 # Stable id: gateway + fan name (slugify normalizes the
                 # dash/underscore ambiguity of ESPHome device names).
@@ -335,7 +356,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         def _handle_event(event: Any) -> None:
             data = event.data
             device = data.get("device")
-            if isinstance(device, str) and device != self._esphome_device:
+            if (
+                isinstance(device, str)
+                and device
+                and device.replace("-", "_") != self._gateway_service
+            ):
                 return
 
             code = data.get("code")
@@ -363,6 +388,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         """Create or update the final config entry."""
         data = {
             CONF_ESPHOME_DEVICE: self._esphome_device,
+            CONF_GATEWAY_SERVICE: self._gateway_service,
             CONF_FAN_NAME: self._fan_name,
             CONF_SPEED_COUNT: self._speed_count,
             CONF_LIGHT_CONTROL: self._light_control,
@@ -387,6 +413,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is None:
             self._reconfigure = True
             self._esphome_device = data[CONF_ESPHOME_DEVICE]
+            self._gateway_service = data.get(
+                CONF_GATEWAY_SERVICE, data[CONF_ESPHOME_DEVICE].replace("-", "_")
+            )
             self._fan_name = data.get(CONF_FAN_NAME, entry.title)
             self._speed_count = int(data.get(CONF_SPEED_COUNT, DEFAULT_SPEED_COUNT))
             self._light_control = data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_TOGGLE)

@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from .const import CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +49,27 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         [StaticPathConfig(CARD_URL, str(card_path), True)]
     )
     frontend.add_extra_js_url(hass, f"{CARD_URL}?v={CARD_VERSION}")
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entries.
+
+    v1 -> v2: store the raw ESPHome service prefix (gateway_service). New
+    entries capture it from the live service registry at flow time; for
+    migrated entries the historical dash->underscore derivation is used, which
+    matches the exact behavior these entries relied on so far.
+    """
+    if entry.version > 2:
+        # Entry created by a newer version of the integration: cannot downgrade.
+        return False
+    if entry.version < 2:
+        data = dict(entry.data)
+        data.setdefault(
+            CONF_GATEWAY_SERVICE, data[CONF_ESPHOME_DEVICE].replace("-", "_")
+        )
+        hass.config_entries.async_update_entry(entry, data=data, version=2)
+        _LOGGER.debug("Migrated config entry %s to version 2", entry.entry_id)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
