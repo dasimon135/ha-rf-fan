@@ -26,7 +26,6 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
 ]
 
-CARD_VERSION = "1.4.1"
 CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
 
 
@@ -43,12 +42,16 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     """Serve the card file and add it as a frontend module."""
     from homeassistant.components import frontend
     from homeassistant.components.http import StaticPathConfig
+    from homeassistant.loader import async_get_integration
 
     card_path = Path(__file__).parent / "frontend" / "rf-fan-card.js"
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL, str(card_path), True)]
     )
-    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={CARD_VERSION}")
+    # Cache-bust with the integration version from manifest.json: single
+    # source of truth, so the browser refetches the card on every release.
+    integration = await async_get_integration(hass, DOMAIN)
+    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
