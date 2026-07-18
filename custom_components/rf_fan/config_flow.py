@@ -61,7 +61,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> RfFanOptionsFlow:
         """Return the options flow."""
-        return RfFanOptionsFlow(config_entry)
+        return RfFanOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize the flow."""
@@ -443,10 +443,6 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 class RfFanOptionsFlow(OptionsFlow):
     """Options flow for RF fan."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize the options."""
-        self._config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -460,9 +456,9 @@ class RfFanOptionsFlow(OptionsFlow):
                 {
                     vol.Required(
                         CONF_REPEAT_COUNT,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_REPEAT_COUNT,
-                            self._config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
+                            self.config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=1, max=8))
                 }
