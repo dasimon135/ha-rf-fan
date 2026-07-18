@@ -129,7 +129,11 @@
         "title": "RF Transmission Options",
         "description": "Adjust RF reliability settings.",
         "data": {
-          "repeat_count": "RF repeat count"
+          "repeat_count": "RF repeat count",
+          "disable_card": "Disable automatic dashboard card loading"
+        },
+        "data_description": {
+          "disable_card": "Skip auto-loading the bundled RF Fan card in the frontend. Applies to all RF fans and requires a Home Assistant restart. The card file stays served at /rf_fan_frontend/rf-fan-card.js so you can manage the dashboard resource manually (see the README)."
         }
       }
     }

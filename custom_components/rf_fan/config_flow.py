@@ -25,6 +25,7 @@ from .actions import (
 )
 from .const import (
     CONF_CODES,
+    CONF_DISABLE_CARD,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
     CONF_GATEWAY_SERVICE,
@@ -498,7 +499,11 @@ class RfFanOptionsFlow(OptionsFlow):
                             CONF_REPEAT_COUNT,
                             self.config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
                         ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=8))
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=8)),
+                    vol.Required(
+                        CONF_DISABLE_CARD,
+                        default=self.config_entry.options.get(CONF_DISABLE_CARD, False),
+                    ): bool,
                 }
             ),
         )

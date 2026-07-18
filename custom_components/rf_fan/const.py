@@ -25,6 +25,10 @@ LIGHT_CONTROL_ON_OFF: Final = "on_off"
 LIGHT_CONTROL_OPTIONS: Final = [LIGHT_CONTROL_NONE, LIGHT_CONTROL_TOGGLE, LIGHT_CONTROL_ON_OFF]
 CONF_REPEAT_COUNT: Final = "repeat_count"
 CONF_CODES: Final = "codes"
+# Option: skip auto-loading the bundled Lovelace card (global effect: the card
+# is registered once for the whole frontend, so any entry opting out disables
+# the auto-load; a restart is required for a change to take effect).
+CONF_DISABLE_CARD: Final = "disable_card"
 
 DEFAULT_SPEED_COUNT: Final = 3
 DEFAULT_REPEAT_COUNT: Final = 2

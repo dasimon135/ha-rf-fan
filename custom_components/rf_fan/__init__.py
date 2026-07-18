@@ -11,7 +11,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
+from .const import CONF_DISABLE_CARD, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +35,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     try:
         await _async_register_card(hass)
     except Exception:  # pragma: no cover - card registration is best-effort
-        _LOGGER.warning("RF Fan: could not register the bundled card", exc_info=True)
+        _LOGGER.error(
+            "RF Fan: failed to register the bundled Lovelace card; it will not "
+            "load automatically and the dashboard card will show as missing. "
+            "You can add it manually as a dashboard resource pointing at %s "
+            "(see the README section 'Dashboard card'), then restart Home "
+            "Assistant to retry automatic registration",
+            CARD_URL,
+            exc_info=True,
+        )
     return True
 
 
@@ -49,6 +57,21 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL, str(card_path), True)]
     )
+
+    # Opt-out (integration options): keep serving the file so a manually
+    # managed dashboard resource still works, but skip the auto-load.
+    if any(
+        entry.options.get(CONF_DISABLE_CARD, False)
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    ):
+        _LOGGER.info(
+            "RF Fan: automatic loading of the bundled card is disabled in the "
+            "integration options; the card file remains served at %s for "
+            "manual resource management",
+            CARD_URL,
+        )
+        return
+
     # Cache-bust with the integration version from manifest.json: single
     # source of truth, so the browser refetches the card on every release.
     integration = await async_get_integration(hass, DOMAIN)
