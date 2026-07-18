@@ -7,9 +7,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 
 from .actions import (
@@ -114,7 +118,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Step 1: general fan information."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
@@ -152,7 +156,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_method(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Choose between manual entry and learning."""
         if user_input is not None:
             if user_input["method"] == "learn":
@@ -180,7 +184,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_codes(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manual step: mapping of action -> RF code."""
         errors: dict[str, str] = {}
         actions = self._actions_to_process()
@@ -219,7 +223,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Progress screen: listen for the current action.
 
         This step returns ONLY ``SHOW_PROGRESS`` or ``SHOW_PROGRESS_DONE``:
@@ -256,7 +260,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn_resolve(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Resolve a finished listen (or the recovery form), then continue.
 
         ``step_id`` distinct from ``learn``: the ``learn`` →
@@ -348,7 +352,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return pick_best_code(frames)
 
-    def _finish(self, codes: dict[str, str]) -> FlowResult:
+    def _finish(self, codes: dict[str, str]) -> ConfigFlowResult:
         """Create or update the final config entry."""
         data = {
             CONF_ESPHOME_DEVICE: self._esphome_device,
@@ -368,7 +372,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Reconfigure an existing entry: re-declare + learn the delta."""
         entry = self._get_reconfigure_entry()
         data = entry.data
@@ -402,7 +406,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure_review(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Recap: to learn / kept (re-learn?) / forgotten, then capture."""
         required_actions, _ = split_actions(
             self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
@@ -445,7 +449,7 @@ class RfFanOptionsFlow(OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Configure the RF transmission options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
