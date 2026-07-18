@@ -15,6 +15,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.util import slugify
 
 from .actions import (
     caps_from_data,
@@ -138,6 +139,12 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._esphome_device = selected_device
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
+                # Stable id: gateway + fan name (slugify normalizes the
+                # dash/underscore ambiguity of ESPHome device names).
+                await self.async_set_unique_id(
+                    f"{slugify(selected_device)}_{slugify(self._fan_name)}"
+                )
+                self._abort_if_unique_id_configured()
                 self._speed_count = int(user_input[CONF_SPEED_COUNT])
                 self._light_control = user_input[CONF_LIGHT_CONTROL]
                 self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])

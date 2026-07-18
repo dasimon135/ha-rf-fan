@@ -120,6 +120,7 @@
       "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action."
     },
     "abort": {
+      "already_configured": "Un ventilateur portant ce nom est déjà configuré sur cette passerelle.",
       "reconfigure_successful": "Reconfiguration enregistrée et rechargée."
     }
   },

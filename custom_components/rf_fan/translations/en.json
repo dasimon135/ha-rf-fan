@@ -120,6 +120,7 @@
       "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action."
     },
     "abort": {
+      "already_configured": "A fan with this name is already configured on this gateway.",
       "reconfigure_successful": "Reconfiguration saved and reloaded."
     }
   },
