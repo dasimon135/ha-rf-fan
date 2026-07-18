@@ -134,6 +134,12 @@
       }
     }
   },
+  "issues": {
+    "gateway_service_missing": {
+      "title": "RF gateway unavailable for {fan_name}",
+      "description": "The ESPHome gateway \"{device}\" no longer exposes the RF transmit service ({service}). \"{fan_name}\" cannot send RF commands until the gateway is back online with the transmit_rf_fan service in its configuration. This issue clears automatically once a command is sent successfully again."
+    }
+  },
   "exceptions": {
     "gateway_service_missing": {
       "message": "The ESPHome gateway \"{device}\" does not expose the RF transmit service ({service}). Check that the gateway is online and that its configuration still includes the transmit_rf_fan service."

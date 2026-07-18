@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
 
 from .const import (
@@ -77,6 +78,19 @@ class RfFanBaseEntity(Entity):
                 service_name,
                 action,
             )
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self._gateway_issue_id(),
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key="gateway_service_missing",
+                translation_placeholders={
+                    "fan_name": self._fan_name,
+                    "device": self._esphome_device,
+                    "service": f"esphome.{service_name}",
+                },
+            )
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="gateway_service_missing",
@@ -85,6 +99,9 @@ class RfFanBaseEntity(Entity):
                     "service": f"esphome.{service_name}",
                 },
             )
+
+        # The service is back: clear the repair issue if one was raised.
+        ir.async_delete_issue(self.hass, DOMAIN, self._gateway_issue_id())
 
         # Relative/toggle actions must fire exactly once (the captured code already
         # holds the remote's repeat burst); only absolute actions use repeat_count.
@@ -114,6 +131,10 @@ class RfFanBaseEntity(Entity):
 
         self._entry_runtime()["last_tx"] = self.hass.loop.time()
         return True
+
+    def _gateway_issue_id(self) -> str:
+        """Repair-issue id for a missing gateway service, specific to the entry."""
+        return f"gateway_service_missing_{self._config_entry.entry_id}"
 
     def _recently_transmitted(self) -> bool:
         """True if a transmission occurred very recently (anti-echo window)."""

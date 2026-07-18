@@ -134,6 +134,12 @@
       }
     }
   },
+  "issues": {
+    "gateway_service_missing": {
+      "title": "Passerelle RF indisponible pour {fan_name}",
+      "description": "La passerelle ESPHome « {device} » n'expose plus le service d'émission RF ({service}). « {fan_name} » ne peut plus envoyer de commandes RF tant que la passerelle n'est pas de retour en ligne avec le service transmit_rf_fan dans sa configuration. Ce problème disparaît automatiquement dès qu'une commande est de nouveau envoyée avec succès."
+    }
+  },
   "exceptions": {
     "gateway_service_missing": {
       "message": "La passerelle ESPHome « {device} » n'expose pas le service d'émission RF ({service}). Vérifiez que la passerelle est en ligne et que sa configuration inclut toujours le service transmit_rf_fan."
