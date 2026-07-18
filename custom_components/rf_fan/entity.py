@@ -6,8 +6,9 @@ import logging
 from asyncio import sleep
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
 
 from .const import (
@@ -15,11 +16,13 @@ from .const import (
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
+    CONF_GATEWAY_SERVICE,
     CONF_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
     SINGLE_SHOT_ACTIONS,
 )
+from .data import RfFanConfigEntry, RfFanRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,11 +34,16 @@ class RfFanBaseEntity(Entity):
     _attr_should_poll = False
     _attr_assumed_state = True
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, config_entry: RfFanConfigEntry) -> None:
         """Initialize the base entity."""
         self.hass = hass
         self._config_entry = config_entry
         self._esphome_device: str = config_entry.data[CONF_ESPHOME_DEVICE]
+        # Raw service prefix stored at flow time (v2 entries); tolerant fallback
+        # derivation for entries that have not been migrated yet.
+        self._gateway_service: str = config_entry.data.get(
+            CONF_GATEWAY_SERVICE, self._esphome_device.replace("-", "_")
+        )
         self._fan_name: str = config_entry.data[CONF_FAN_NAME]
         self._codes: dict[str, str] = config_entry.data[CONF_CODES]
 
@@ -56,13 +64,51 @@ class RfFanBaseEntity(Entity):
         )
 
     async def _async_transmit_action(self, action: str) -> bool:
-        """Transmit an RF action via ESPHome if it is mapped."""
+        """Transmit an RF action via ESPHome if it is mapped.
+
+        Returns False only when the action has no mapped code (callers rely on
+        this to fall back to an alternative action). Hard failures — the gateway
+        service is not registered, or the service call itself fails — raise
+        HomeAssistantError so the user gets feedback in the UI instead of a
+        silently ignored command.
+        """
         code = self._codes.get(action)
         if not code:
             _LOGGER.debug("Ignoring unmapped action: %s", action)
             return False
 
-        service_name = f"{self._esphome_device.replace('-', '_')}_transmit_rf_fan"
+        service_name = f"{self._gateway_service}_transmit_rf_fan"
+        if not self.hass.services.has_service("esphome", service_name):
+            _LOGGER.warning(
+                "ESPHome gateway service esphome.%s is not available; cannot send %s",
+                service_name,
+                action,
+            )
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self._gateway_issue_id(),
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key="gateway_service_missing",
+                translation_placeholders={
+                    "fan_name": self._fan_name,
+                    "device": self._esphome_device,
+                    "service": f"esphome.{service_name}",
+                },
+            )
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="gateway_service_missing",
+                translation_placeholders={
+                    "device": self._esphome_device,
+                    "service": f"esphome.{service_name}",
+                },
+            )
+
+        # The service is back: clear the repair issue if one was raised.
+        ir.async_delete_issue(self.hass, DOMAIN, self._gateway_issue_id())
+
         # Relative/toggle actions must fire exactly once (the captured code already
         # holds the remote's repeat burst); only absolute actions use repeat_count.
         repeat_count = 1 if action in SINGLE_SHOT_ACTIONS else self._repeat_count()
@@ -77,17 +123,28 @@ class RfFanBaseEntity(Entity):
                 },
                 blocking=True,
             )
-        except Exception as err:  # pragma: no cover
+        except Exception as err:
             _LOGGER.warning("RF send error (%s): %s", action, err)
-            return False
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="transmit_failed",
+                translation_placeholders={
+                    "action": action,
+                    "device": self._esphome_device,
+                    "error": str(err),
+                },
+            ) from err
 
-        self._entry_runtime()["last_tx"] = self.hass.loop.time()
+        self._runtime.last_tx = self.hass.loop.time()
         return True
+
+    def _gateway_issue_id(self) -> str:
+        """Repair-issue id for a missing gateway service, specific to the entry."""
+        return f"gateway_service_missing_{self._config_entry.entry_id}"
 
     def _recently_transmitted(self) -> bool:
         """True if a transmission occurred very recently (anti-echo window)."""
-        last_tx = self._entry_runtime().get("last_tx", 0.0)
-        return (self.hass.loop.time() - last_tx) < ECHO_SUPPRESS_SEC
+        return (self.hass.loop.time() - self._runtime.last_tx) < ECHO_SUPPRESS_SEC
 
     async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
         """Transmit an action's code `times` times (cycle).
@@ -105,9 +162,10 @@ class RfFanBaseEntity(Entity):
                 await sleep(gap)
         return sent_any
 
-    def _entry_runtime(self) -> dict[str, Any]:
-        """Shared state dict for the entry (created in __init__.py async_setup_entry)."""
-        return self.hass.data[DOMAIN][self._config_entry.entry_id]
+    @property
+    def _runtime(self) -> RfFanRuntimeData:
+        """Typed runtime data for the entry (set in __init__.py async_setup_entry)."""
+        return self._config_entry.runtime_data
 
     def _kelvin_signal(self) -> str:
         """Dispatcher signal name for the color position, specific to the entry."""
@@ -119,16 +177,17 @@ class RfFanBaseEntity(Entity):
 
     def _advance_kelvin_position(self) -> int:
         """Advance the color position by one step (mod N) and return it."""
-        runtime = self._entry_runtime()
-        runtime["kelvin_position"] = (runtime.get("kelvin_position", 0) + 1) % len(COLOR_TEMP_OPTIONS)
-        return runtime["kelvin_position"]
+        runtime = self._runtime
+        runtime.kelvin_position = (runtime.kelvin_position + 1) % len(COLOR_TEMP_OPTIONS)
+        return runtime.kelvin_position
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:
         """Check that the RF event comes from the configured gateway."""
         device = event_data.get("device")
         if not isinstance(device, str) or not device:
             return True
-        return device == self._esphome_device
+        # Normalize the ESPHome dash/underscore ambiguity on both sides.
+        return device.replace("-", "_") == self._gateway_service
 
     def _event_action(self, event_data: dict[str, Any]) -> str | None:
         """Extract the received RF action from the ESPHome event."""

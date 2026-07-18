@@ -9,6 +9,11 @@ DOMAIN: Final = "rf_fan"
 EVENT_RF_FAN_RECEIVED: Final = "esphome.rf_fan_received"
 
 CONF_ESPHOME_DEVICE: Final = "esphome_device"
+# Raw ESPHome service prefix (e.g. "rf_fan_gateway" for the service
+# esphome.rf_fan_gateway_transmit_rf_fan). Captured at config-flow time from the
+# live service registry; CONF_ESPHOME_DEVICE keeps the prettified (dashed)
+# display name. Entries created before v2 are migrated with a best-effort guess.
+CONF_GATEWAY_SERVICE: Final = "gateway_service"
 CONF_FAN_NAME: Final = "fan_name"
 CONF_SPEED_COUNT: Final = "speed_count"
 CONF_HAS_LIGHT: Final = "has_light"
@@ -20,6 +25,10 @@ LIGHT_CONTROL_ON_OFF: Final = "on_off"
 LIGHT_CONTROL_OPTIONS: Final = [LIGHT_CONTROL_NONE, LIGHT_CONTROL_TOGGLE, LIGHT_CONTROL_ON_OFF]
 CONF_REPEAT_COUNT: Final = "repeat_count"
 CONF_CODES: Final = "codes"
+# Option: skip auto-loading the bundled Lovelace card (global effect: the card
+# is registered once for the whole frontend, so any entry opting out disables
+# the auto-load; a restart is required for a change to take effect).
+CONF_DISABLE_CARD: Final = "disable_card"
 
 DEFAULT_SPEED_COUNT: Final = 3
 DEFAULT_REPEAT_COUNT: Final = 2

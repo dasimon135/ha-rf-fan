@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -35,6 +36,8 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_assumed_state = False
+    # Informational estimate about the device, not a primary reading.
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the sleep-timer sensor."""
@@ -46,7 +49,7 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the switch-off time, or None once it has passed / been cleared."""
-        ends = self._entry_runtime().get("timer_ends_at")
+        ends = self._runtime.timer_ends_at
         if ends is None or ends <= dt_util.utcnow():
             return None
         return ends
@@ -57,7 +60,7 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
         if last_state is not None and last_state.state not in ("unknown", "unavailable"):
             parsed = dt_util.parse_datetime(last_state.state)
             if parsed is not None and parsed > dt_util.utcnow():
-                self._entry_runtime()["timer_ends_at"] = parsed
+                self._runtime.timer_ends_at = parsed
         self._signal_unsub = async_dispatcher_connect(
             self.hass, self._timer_signal(), self._on_timer_changed
         )

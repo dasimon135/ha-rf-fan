@@ -48,30 +48,30 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         """Return the assumed color position."""
-        return COLOR_TEMP_OPTIONS[self._entry_runtime().get("kelvin_position", 0)]
+        return COLOR_TEMP_OPTIONS[self._runtime.kelvin_position]
 
     @property
     def available(self) -> bool:
         """Unavailable while the light is known to be off (the color cycle needs it on)."""
-        return self._entry_runtime().get("light_on") is not False
+        return self._runtime.light_on is not False
 
     async def async_select_option(self, option: str) -> None:
         """Cycle to the requested color position (ignored while the light is off)."""
-        runtime = self._entry_runtime()
-        if runtime.get("light_on") is False:
+        runtime = self._runtime
+        if runtime.light_on is False:
             # The lamp only cycles color while powered on; skip to avoid desync.
             return
         target = COLOR_TEMP_OPTIONS.index(option)
-        steps = (target - runtime.get("kelvin_position", 0)) % len(COLOR_TEMP_OPTIONS)
+        steps = (target - runtime.kelvin_position) % len(COLOR_TEMP_OPTIONS)
         await self._async_transmit_times(ACTION_LIGHT_KELVIN, steps, gap=KELVIN_STEP_GAP_SEC)
-        runtime["kelvin_position"] = target
+        runtime.kelvin_position = target
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         """Restore the color position, then subscribe to RF events and the kelvin signal."""
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in COLOR_TEMP_OPTIONS:
-            self._entry_runtime()["kelvin_position"] = COLOR_TEMP_OPTIONS.index(last_state.state)
+            self._runtime.kelvin_position = COLOR_TEMP_OPTIONS.index(last_state.state)
 
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
         self._signal_unsub = async_dispatcher_connect(

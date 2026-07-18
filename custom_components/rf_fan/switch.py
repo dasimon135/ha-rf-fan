@@ -6,6 +6,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -28,6 +29,9 @@ async def async_setup_entry(
 
 class RfFanSoundSwitch(RfFanBaseEntity, RestoreEntity, SwitchEntity):
     """Sound switch with assumed state (single toggle)."""
+
+    # The beep is a device setting rather than something being switched on/off.
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the sound switch."""

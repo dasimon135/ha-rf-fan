@@ -130,6 +130,21 @@ its more-info dialog. When a sleep timer is running, the card shows the switch-o
 An example automation **blueprint** (control the fan by temperature) is in
 [`blueprints/automation/rf_fan/`](blueprints/automation/rf_fan/).
 
+### Disabling automatic card loading
+
+The card is auto-loaded for the whole frontend when the integration starts. If you
+prefer to manage the dashboard resource yourself (or not load the card at all),
+enable **Disable automatic dashboard card loading** in the integration options
+(**Settings → Devices & services → RF Fan → Configure**) and restart Home
+Assistant. The setting is global: enabling it on any RF fan entry disables the
+auto-load for all of them.
+
+The card file remains served at `/rf_fan_frontend/rf-fan-card.js`, so you can
+still register it manually under **Settings → Dashboards → ⋮ → Resources** (type
+*JavaScript module*). Add a `?v=<version>` query suffix and bump it after
+updates to bust the browser cache. If automatic registration ever fails, the
+integration logs an error at startup and this manual route works as a fallback.
+
 ## Reconfiguring an existing fan
 
 To add a capability (or fix a captured code) later, open the integration entry and use

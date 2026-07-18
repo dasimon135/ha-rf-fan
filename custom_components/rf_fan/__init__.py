@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from .const import CONF_DISABLE_CARD, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
+from .data import RfFanConfigEntry, RfFanRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +27,6 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
 ]
 
-CARD_VERSION = "1.4.1"
 CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
 
 
@@ -35,7 +35,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     try:
         await _async_register_card(hass)
     except Exception:  # pragma: no cover - card registration is best-effort
-        _LOGGER.warning("RF Fan: could not register the bundled card", exc_info=True)
+        _LOGGER.error(
+            "RF Fan: failed to register the bundled Lovelace card; it will not "
+            "load automatically and the dashboard card will show as missing. "
+            "You can add it manually as a dashboard resource pointing at %s "
+            "(see the README section 'Dashboard card'), then restart Home "
+            "Assistant to retry automatic registration",
+            CARD_URL,
+            exc_info=True,
+        )
     return True
 
 
@@ -43,28 +51,61 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     """Serve the card file and add it as a frontend module."""
     from homeassistant.components import frontend
     from homeassistant.components.http import StaticPathConfig
+    from homeassistant.loader import async_get_integration
 
     card_path = Path(__file__).parent / "frontend" / "rf-fan-card.js"
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL, str(card_path), True)]
     )
-    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={CARD_VERSION}")
+
+    # Opt-out (integration options): keep serving the file so a manually
+    # managed dashboard resource still works, but skip the auto-load.
+    if any(
+        entry.options.get(CONF_DISABLE_CARD, False)
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    ):
+        _LOGGER.info(
+            "RF Fan: automatic loading of the bundled card is disabled in the "
+            "integration options; the card file remains served at %s for "
+            "manual resource management",
+            CARD_URL,
+        )
+        return
+
+    # Cache-bust with the integration version from manifest.json: single
+    # source of truth, so the browser refetches the card on every release.
+    integration = await async_get_integration(hass, DOMAIN)
+    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entries.
+
+    v1 -> v2: store the raw ESPHome service prefix (gateway_service). New
+    entries capture it from the live service registry at flow time; for
+    migrated entries the historical dash->underscore derivation is used, which
+    matches the exact behavior these entries relied on so far.
+    """
+    if entry.version > 2:
+        # Entry created by a newer version of the integration: cannot downgrade.
+        return False
+    if entry.version < 2:
+        data = dict(entry.data)
+        data.setdefault(
+            CONF_GATEWAY_SERVICE, data[CONF_ESPHOME_DEVICE].replace("-", "_")
+        )
+        hass.config_entries.async_update_entry(entry, data=data, version=2)
+        _LOGGER.debug("Migrated config entry %s to version 2", entry.entry_id)
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:
     """Initialize an RF fan config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        "kelvin_position": 0,
-        "light_on": None,
-        "timer_ends_at": None,
-    }
+    entry.runtime_data = RfFanRuntimeData()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:
     """Unload an RF fan config entry."""
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
-    return unloaded
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

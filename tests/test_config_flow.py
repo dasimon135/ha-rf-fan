@@ -28,12 +28,12 @@ import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER  # noqa: E402
-from homeassistant.core import HomeAssistant  # noqa: E402
-from homeassistant.data_entry_flow import FlowResultType  # noqa: E402
-from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: E402
+from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED  # noqa: E402
+from custom_components.rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED
 
 DEVICE = "esp32-test"
 EVENT_PROGRESSED = "data_entry_flow_progressed"
@@ -69,7 +69,7 @@ async def _start_learn(hass: HomeAssistant):
 
 async def test_learn_progress_event_fires_on_rf_signal(hass: HomeAssistant) -> None:
     """Regression: a `data_entry_flow_progressed` must be emitted on RF reception."""
-    flow, result = await _start_learn(hass)
+    _flow, result = await _start_learn(hass)
     assert result["type"] == FlowResultType.SHOW_PROGRESS
     assert result["description_placeholders"]["action"] == "fan_off"
 

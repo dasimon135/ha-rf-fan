@@ -6,11 +6,15 @@ import asyncio
 from typing import Any
 
 import voluptuous as vol
-
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.util import slugify
 
 from .actions import (
     caps_from_data,
@@ -21,8 +25,10 @@ from .actions import (
 )
 from .const import (
     CONF_CODES,
+    CONF_DISABLE_CARD,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
+    CONF_GATEWAY_SERVICE,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_DIRECTION,
     CONF_HAS_FAN_ON,
@@ -51,17 +57,18 @@ LEARN_COLLECT_SEC = 1.2
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
-    VERSION = 1
+    VERSION = 2
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> RfFanOptionsFlow:
         """Return the options flow."""
-        return RfFanOptionsFlow(config_entry)
+        return RfFanOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize the flow."""
         self._esphome_device: str = ""
+        self._gateway_service: str = ""
         self._fan_name: str = ""
         self._speed_count: int = DEFAULT_SPEED_COUNT
         self._light_control: str = LIGHT_CONTROL_TOGGLE
@@ -77,15 +84,33 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._pending_actions: list[str] | None = None
         self._repeat_count: int = DEFAULT_REPEAT_COUNT
 
-    def _available_esphome_devices(self) -> list[str]:
-        """List ESPHome devices exposing a transmit_rf_fan service."""
+    _SERVICE_SUFFIX = "_transmit_rf_fan"
+
+    def _gateway_service_prefixes(self) -> list[str]:
+        """Raw esphome service prefixes exposing a transmit_rf_fan service."""
         esphome_services = self.hass.services.async_services().get("esphome", {})
-        devices = []
-        suffix = "_transmit_rf_fan"
-        for service_name in esphome_services:
-            if service_name.endswith(suffix):
-                devices.append(service_name[: -len(suffix)].replace("_", "-"))
-        return sorted(devices)
+        return sorted(
+            service_name[: -len(self._SERVICE_SUFFIX)]
+            for service_name in esphome_services
+            if service_name.endswith(self._SERVICE_SUFFIX)
+        )
+
+    def _available_esphome_devices(self) -> list[str]:
+        """List ESPHome devices exposing a transmit_rf_fan service (display names)."""
+        return [prefix.replace("_", "-") for prefix in self._gateway_service_prefixes()]
+
+    def _resolve_gateway_service(self, display_name: str) -> str:
+        """Resolve a display name back to the RAW esphome service prefix.
+
+        The raw prefix is read from the live service registry (no lossy
+        dash/underscore guess). Falls back to a best-effort derivation when the
+        name was typed manually while the gateway is offline.
+        """
+        normalized = display_name.replace("_", "-")
+        for prefix in self._gateway_service_prefixes():
+            if prefix.replace("_", "-") == normalized:
+                return prefix
+        return display_name.replace("-", "_")
 
     def _base_schema(self, *, include_device: bool) -> vol.Schema:
         """Build the step 1 schema, reusable for reconfiguration."""
@@ -105,16 +130,19 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             SelectSelectorConfig(options=LIGHT_CONTROL_OPTIONS, translation_key="light_control")
         )
         fields[vol.Required(CONF_HAS_FAN_ON, default=self._has_fan_on)] = bool
-        fields[vol.Required(CONF_HAS_DIRECTION, default=self._caps.get(CONF_HAS_DIRECTION, False))] = bool
-        fields[vol.Required(CONF_HAS_NATURAL_PRESET, default=self._caps.get(CONF_HAS_NATURAL_PRESET, False))] = bool
-        fields[vol.Required(CONF_HAS_COLOR_TEMP, default=self._caps.get(CONF_HAS_COLOR_TEMP, False))] = bool
-        fields[vol.Required(CONF_HAS_TIMERS, default=self._caps.get(CONF_HAS_TIMERS, False))] = bool
-        fields[vol.Required(CONF_HAS_SOUND, default=self._caps.get(CONF_HAS_SOUND, False))] = bool
+        for capability in (
+            CONF_HAS_DIRECTION,
+            CONF_HAS_NATURAL_PRESET,
+            CONF_HAS_COLOR_TEMP,
+            CONF_HAS_TIMERS,
+            CONF_HAS_SOUND,
+        ):
+            fields[vol.Required(capability, default=self._caps.get(capability, False))] = bool
         return vol.Schema(fields)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Step 1: general fan information."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
@@ -133,7 +161,14 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
             else:
                 self._esphome_device = selected_device
+                self._gateway_service = self._resolve_gateway_service(selected_device)
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
+                # Stable id: gateway + fan name (slugify normalizes the
+                # dash/underscore ambiguity of ESPHome device names).
+                await self.async_set_unique_id(
+                    f"{slugify(selected_device)}_{slugify(self._fan_name)}"
+                )
+                self._abort_if_unique_id_configured()
                 self._speed_count = int(user_input[CONF_SPEED_COUNT])
                 self._light_control = user_input[CONF_LIGHT_CONTROL]
                 self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
@@ -152,7 +187,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_method(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Choose between manual entry and learning."""
         if user_input is not None:
             if user_input["method"] == "learn":
@@ -180,7 +215,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_codes(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manual step: mapping of action -> RF code."""
         errors: dict[str, str] = {}
         actions = self._actions_to_process()
@@ -219,7 +254,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Progress screen: listen for the current action.
 
         This step returns ONLY ``SHOW_PROGRESS`` or ``SHOW_PROGRESS_DONE``:
@@ -256,7 +291,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn_resolve(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Resolve a finished listen (or the recovery form), then continue.
 
         ``step_id`` distinct from ``learn``: the ``learn`` →
@@ -324,7 +359,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         def _handle_event(event: Any) -> None:
             data = event.data
             device = data.get("device")
-            if isinstance(device, str) and device != self._esphome_device:
+            if (
+                isinstance(device, str)
+                and device
+                and device.replace("-", "_") != self._gateway_service
+            ):
                 return
 
             code = data.get("code")
@@ -339,7 +378,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             try:
                 await asyncio.wait_for(first_frame.wait(), timeout=LEARN_TIMEOUT_SEC)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return None
             # Gather a few more frames to catch repeats before choosing.
             await asyncio.sleep(LEARN_COLLECT_SEC)
@@ -348,10 +387,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return pick_best_code(frames)
 
-    def _finish(self, codes: dict[str, str]) -> FlowResult:
+    def _finish(self, codes: dict[str, str]) -> ConfigFlowResult:
         """Create or update the final config entry."""
         data = {
             CONF_ESPHOME_DEVICE: self._esphome_device,
+            CONF_GATEWAY_SERVICE: self._gateway_service,
             CONF_FAN_NAME: self._fan_name,
             CONF_SPEED_COUNT: self._speed_count,
             CONF_LIGHT_CONTROL: self._light_control,
@@ -368,7 +408,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Reconfigure an existing entry: re-declare + learn the delta."""
         entry = self._get_reconfigure_entry()
         data = entry.data
@@ -376,6 +416,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is None:
             self._reconfigure = True
             self._esphome_device = data[CONF_ESPHOME_DEVICE]
+            self._gateway_service = data.get(
+                CONF_GATEWAY_SERVICE, data[CONF_ESPHOME_DEVICE].replace("-", "_")
+            )
             self._fan_name = data.get(CONF_FAN_NAME, entry.title)
             self._speed_count = int(data.get(CONF_SPEED_COUNT, DEFAULT_SPEED_COUNT))
             self._light_control = data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_TOGGLE)
@@ -402,7 +445,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure_review(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Recap: to learn / kept (re-learn?) / forgotten, then capture."""
         required_actions, _ = split_actions(
             self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
@@ -439,13 +482,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 class RfFanOptionsFlow(OptionsFlow):
     """Options flow for RF fan."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize the options."""
-        self._config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Configure the RF transmission options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -456,11 +495,15 @@ class RfFanOptionsFlow(OptionsFlow):
                 {
                     vol.Required(
                         CONF_REPEAT_COUNT,
-                        default=self._config_entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_REPEAT_COUNT,
-                            self._config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
+                            self.config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
                         ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=8))
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=8)),
+                    vol.Required(
+                        CONF_DISABLE_CARD,
+                        default=self.config_entry.options.get(CONF_DISABLE_CARD, False),
+                    ): bool,
                 }
             ),
         )

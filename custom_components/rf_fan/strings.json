@@ -57,7 +57,7 @@
           "fan_speed_6": "Code for speed 6",
           "light_on": "Code for light on",
           "light_off": "Code for light off",
-          "light_toggle": "Code for light toggle (optional)",
+          "light_toggle": "Code for light toggle",
           "fan_reverse": "Code for reverse direction",
           "fan_natural": "Code for natural airflow",
           "light_kelvin": "Code for color temperature (kelvin cycle)",
@@ -114,12 +114,12 @@
     },
     "error": {
       "required": "This field is required.",
-      "light_code_required": "Provide at least one light code (on/off or toggle).",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose one.",
       "unknown_esphome_device": "No compatible ESPHome device was found with this name.",
       "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action."
     },
     "abort": {
+      "already_configured": "A fan with this name is already configured on this gateway.",
       "reconfigure_successful": "Reconfiguration saved and reloaded."
     }
   },
@@ -129,9 +129,27 @@
         "title": "RF Transmission Options",
         "description": "Adjust RF reliability settings.",
         "data": {
-          "repeat_count": "RF repeat count"
+          "repeat_count": "RF repeat count",
+          "disable_card": "Disable automatic dashboard card loading"
+        },
+        "data_description": {
+          "disable_card": "Skip auto-loading the bundled RF Fan card in the frontend. Applies to all RF fans and requires a Home Assistant restart. The card file stays served at /rf_fan_frontend/rf-fan-card.js so you can manage the dashboard resource manually (see the README)."
         }
       }
+    }
+  },
+  "issues": {
+    "gateway_service_missing": {
+      "title": "RF gateway unavailable for {fan_name}",
+      "description": "The ESPHome gateway \"{device}\" no longer exposes the RF transmit service ({service}). \"{fan_name}\" cannot send RF commands until the gateway is back online with the transmit_rf_fan service in its configuration. This issue clears automatically once a command is sent successfully again."
+    }
+  },
+  "exceptions": {
+    "gateway_service_missing": {
+      "message": "The ESPHome gateway \"{device}\" does not expose the RF transmit service ({service}). Check that the gateway is online and that its configuration still includes the transmit_rf_fan service."
+    },
+    "transmit_failed": {
+      "message": "Failed to send the RF command \"{action}\" via the ESPHome gateway \"{device}\": {error}"
     }
   },
   "entity": {

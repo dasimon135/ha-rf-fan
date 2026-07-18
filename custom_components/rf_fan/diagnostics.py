@@ -8,9 +8,9 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_CODES, CONF_ESPHOME_DEVICE
+from .const import CONF_CODES, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE
 
-TO_REDACT = {CONF_ESPHOME_DEVICE}
+TO_REDACT = {CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE}
 
 
 async def async_get_config_entry_diagnostics(

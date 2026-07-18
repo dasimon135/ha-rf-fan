@@ -6,6 +6,13 @@ on:
   pull_request:
 
 jobs:
+  ruff:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
+
   pytest:
     name: pytest
     runs-on: ubuntu-latest
@@ -13,7 +20,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          # HA 2026.5 (hacs.json target) requires Python >= 3.14.
+          python-version: "3.14"
       - name: Install test dependencies
         run: pip install -r requirements-test.txt
       - name: Run tests

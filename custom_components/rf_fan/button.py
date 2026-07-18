@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -49,14 +50,15 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Emit the timer action and record the assumed switch-off time."""
         await self._async_transmit_action(timer_action(self._hours))
-        self._entry_runtime()["timer_ends_at"] = dt_util.utcnow() + timedelta(
-            hours=self._hours
-        )
+        self._runtime.timer_ends_at = dt_util.utcnow() + timedelta(hours=self._hours)
         async_dispatcher_send(self.hass, self._timer_signal())
 
 
 class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):
     """Calibration button: resets the assumed color position to "Warm"."""
+
+    # Pure UI resync (no RF emitted): a configuration control, not a device control.
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize the color calibration button."""
@@ -66,6 +68,5 @@ class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Reset the color position to zero without emitting an RF code."""
-        runtime = self._entry_runtime()
-        runtime["kelvin_position"] = 0
+        self._runtime.kelvin_position = 0
         async_dispatcher_send(self.hass, self._kelvin_signal())
