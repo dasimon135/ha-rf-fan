@@ -130,8 +130,8 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
 
     def _clear_timer(self) -> None:
         """Clear the assumed sleep-timer when the fan is switched off."""
-        if self._entry_runtime().get("timer_ends_at") is not None:
-            self._entry_runtime()["timer_ends_at"] = None
+        if self._runtime.timer_ends_at is not None:
+            self._runtime.timer_ends_at = None
             async_dispatcher_send(self.hass, self._timer_signal())
 
     async def async_turn_on(

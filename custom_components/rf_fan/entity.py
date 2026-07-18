@@ -6,7 +6,6 @@ import logging
 from asyncio import sleep
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
@@ -23,6 +22,7 @@ from .const import (
     ECHO_SUPPRESS_SEC,
     SINGLE_SHOT_ACTIONS,
 )
+from .data import RfFanConfigEntry, RfFanRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class RfFanBaseEntity(Entity):
     _attr_should_poll = False
     _attr_assumed_state = True
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, config_entry: RfFanConfigEntry) -> None:
         """Initialize the base entity."""
         self.hass = hass
         self._config_entry = config_entry
@@ -135,7 +135,7 @@ class RfFanBaseEntity(Entity):
                 },
             ) from err
 
-        self._entry_runtime()["last_tx"] = self.hass.loop.time()
+        self._runtime.last_tx = self.hass.loop.time()
         return True
 
     def _gateway_issue_id(self) -> str:
@@ -144,8 +144,7 @@ class RfFanBaseEntity(Entity):
 
     def _recently_transmitted(self) -> bool:
         """True if a transmission occurred very recently (anti-echo window)."""
-        last_tx = self._entry_runtime().get("last_tx", 0.0)
-        return (self.hass.loop.time() - last_tx) < ECHO_SUPPRESS_SEC
+        return (self.hass.loop.time() - self._runtime.last_tx) < ECHO_SUPPRESS_SEC
 
     async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
         """Transmit an action's code `times` times (cycle).
@@ -163,9 +162,10 @@ class RfFanBaseEntity(Entity):
                 await sleep(gap)
         return sent_any
 
-    def _entry_runtime(self) -> dict[str, Any]:
-        """Shared state dict for the entry (created in __init__.py async_setup_entry)."""
-        return self.hass.data[DOMAIN][self._config_entry.entry_id]
+    @property
+    def _runtime(self) -> RfFanRuntimeData:
+        """Typed runtime data for the entry (set in __init__.py async_setup_entry)."""
+        return self._config_entry.runtime_data
 
     def _kelvin_signal(self) -> str:
         """Dispatcher signal name for the color position, specific to the entry."""
@@ -177,9 +177,9 @@ class RfFanBaseEntity(Entity):
 
     def _advance_kelvin_position(self) -> int:
         """Advance the color position by one step (mod N) and return it."""
-        runtime = self._entry_runtime()
-        runtime["kelvin_position"] = (runtime.get("kelvin_position", 0) + 1) % len(COLOR_TEMP_OPTIONS)
-        return runtime["kelvin_position"]
+        runtime = self._runtime
+        runtime.kelvin_position = (runtime.kelvin_position + 1) % len(COLOR_TEMP_OPTIONS)
+        return runtime.kelvin_position
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:
         """Check that the RF event comes from the configured gateway."""

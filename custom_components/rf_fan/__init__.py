@@ -12,6 +12,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
+from .data import RfFanConfigEntry, RfFanRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,20 +76,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:
     """Initialize an RF fan config entry."""
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        "kelvin_position": 0,
-        "light_on": None,
-        "timer_ends_at": None,
-    }
+    entry.runtime_data = RfFanRuntimeData()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:
     """Unload an RF fan config entry."""
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
-    return unloaded
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

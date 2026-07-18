@@ -50,9 +50,7 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Emit the timer action and record the assumed switch-off time."""
         await self._async_transmit_action(timer_action(self._hours))
-        self._entry_runtime()["timer_ends_at"] = dt_util.utcnow() + timedelta(
-            hours=self._hours
-        )
+        self._runtime.timer_ends_at = dt_util.utcnow() + timedelta(hours=self._hours)
         async_dispatcher_send(self.hass, self._timer_signal())
 
 
@@ -70,6 +68,5 @@ class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Reset the color position to zero without emitting an RF code."""
-        runtime = self._entry_runtime()
-        runtime["kelvin_position"] = 0
+        self._runtime.kelvin_position = 0
         async_dispatcher_send(self.hass, self._kelvin_signal())
