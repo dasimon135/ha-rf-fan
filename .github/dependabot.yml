@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # pytest is pinned transitively by pytest-homeassistant-custom-component;
+      # bumping it independently creates an unresolvable dependency conflict.
+      - dependency-name: pytest
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
