@@ -177,6 +177,14 @@ class RfFanCard extends HTMLElement {
     // the name/state opens the full card in a popup (see _openCardDialog).
     if (tile) {
       const sub = on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off;
+      // The light is the other thing you reach for on a ceiling fan, so it gets a
+      // control of its own rather than only living in the popup. Omitted entirely
+      // on a fan without a light so the row does not gain a dead button.
+      const lightSt = ent.light && this._hass.states[ent.light];
+      const lit = Boolean(lightSt && lightSt.state === "on");
+      const lightBtn = ent.light
+        ? `<button class="tbtn tlight${lit ? " active" : ""}" data-act="light" aria-label="${esc(L.light)}"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon></button>`
+        : "";
       this._body.innerHTML = `
         <div class="tile ${on ? "" : "off"}">
           <button class="tdot" data-act="power" aria-label="${L.on}/${L.off}">
@@ -191,6 +199,7 @@ class RfFanCard extends HTMLElement {
             <span class="tsub">${esc(sub)}</span>
           </div>
           <div class="tctl">
+            ${lightBtn}
             <button class="tbtn" data-tspeed="down" aria-label="Lower">−</button>
             <button class="tbtn" data-tspeed="up" aria-label="Raise">+</button>
           </div>
@@ -473,6 +482,9 @@ class RfFanCard extends HTMLElement {
               cursor:pointer; transition: transform .12s, border-color .2s; }
       .tbtn:hover { border-color: var(--primary-color); }
       .tbtn:active { transform: scale(.9); }
+      .tlight { display:grid; place-items:center; color: var(--secondary-text-color); }
+      .tlight ha-icon { --mdc-icon-size:20px; }
+      .tlight.active { background:#f5a623; border-color:#f5a623; color:#fff; }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
       .title { font-size:1.15rem; font-weight:600; }
       .state { font-size:.85rem; color: var(--secondary-text-color); }

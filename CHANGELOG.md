@@ -40,6 +40,11 @@ Audit pass: the fixes below all come with regression tests (the suite goes from
 
 ### Added
 
+- **Light toggle on the `tile` layout.** The light is the other thing you reach for
+  on a ceiling fan; it no longer requires opening the popup. Shown only when the
+  fan actually has a light, and it lights up amber while the light is on.
+- **First tests for the bundled card** (`tests/frontend/`), run by `node --test`
+  against a minimal DOM stub — no dependency, no build step, and a new CI job.
 - **Duplicate captured codes are rejected.** The repeats of a held button kept
   arriving after the learning flow had moved on, so the same frame was easily
   stored for two actions — which makes the received-frame lookup ambiguous and

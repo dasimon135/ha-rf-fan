@@ -26,3 +26,16 @@ jobs:
         run: pip install -r requirements-test.txt
       - name: Run tests
         run: python -m pytest tests/ -q
+
+  card:
+    name: card (node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # No dependencies: the card is rendered against a minimal DOM stub
+      # (tests/frontend/dom_stub.mjs) with node's built-in test runner.
+      - name: Run card tests
+        run: node --test "tests/frontend/*.test.mjs"

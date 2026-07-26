@@ -121,11 +121,22 @@ device and auto-discovers the sibling entities (light, colour-temperature select
 sound switch, timer/calibrate buttons), showing only the controls that exist. The fan
 blades spin at a speed-proportional rate, and it follows your Home Assistant theme.
 
-Optional fields: `name` (override the title), `layout` — `full` (default) or `compact`
-(a reduced tile: just the fan, speed and light/sound) — and entity overrides
+Optional fields: `name` (override the title), `layout`, and entity overrides
 (`light_entity`, `color_entity`, `sound_entity`) if auto-discovery picks the wrong one.
 All fields are editable from the card's visual editor. **Long-press the fan** to open
 its more-info dialog. When a sleep timer is running, the card shows the switch-off time.
+
+`layout` takes one of:
+
+| Value | What you get |
+| --- | --- |
+| `full` (default) | Everything: hero fan, speed, light/sound, colour, direction/preset, timers |
+| `compact` | Reduced: fan, speed and light/sound only |
+| `tile` | One row aligned with HA's native tiles: power dot, name/state, light toggle, speed − / + |
+
+On the `tile` layout the light toggle only appears when the fan actually has a light,
+and tapping the name opens the full card in a popup — set `tile_tap: more-info` to get
+Home Assistant's native more-info dialog instead.
 
 An example automation **blueprint** (control the fan by temperature) is in
 [`blueprints/automation/rf_fan/`](blueprints/automation/rf_fan/).
