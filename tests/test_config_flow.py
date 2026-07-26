@@ -202,7 +202,11 @@ async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
         )
-        assert result["step_id"] == "reconfigure"
+        # Reconfiguring opens on a menu; take the full re-declaration path.
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+        )
+        assert result["step_id"] == "reconfigure_capabilities"
 
         # Re-declare the same basics, but with the timers enabled.
         result = await flow.async_configure(
@@ -268,6 +272,10 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
         result = await flow.async_init(
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        # Reconfiguring opens on a menu; take the full re-declaration path.
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
         )
         result = await flow.async_configure(
             result["flow_id"],
@@ -339,6 +347,10 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
         )
+        # Reconfiguring opens on a menu; take the full re-declaration path.
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+        )
         result = await flow.async_configure(
             result["flow_id"],
             {
@@ -391,3 +403,199 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
         "timer_8h": "t8",
     }
     assert entry.data["has_timers"] is True
+
+
+async def test_learn_rejects_a_code_already_used_by_another_action(
+    hass: HomeAssistant,
+) -> None:
+    """Re-capturing the same frame for the next action must not be accepted silently.
+
+    The repeats of a held button keep arriving while the flow has already moved on
+    to the next action, so the same code easily gets stored twice. Two actions
+    sharing one code make the reverse lookup ambiguous, so the capture is refused
+    and the recovery form is offered instead.
+    """
+    flow, result = await _start_learn(hass)
+    flow_id = result["flow_id"]
+    assert result["description_placeholders"]["action"] == "fan_off"
+
+    # First action captured normally.
+    hass.bus.async_fire(EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "SAME"})
+    await hass.async_block_till_done()
+    result = await flow.async_configure(flow_id)
+    assert result["description_placeholders"]["action"] == "fan_speed_1"
+
+    # Leftover repeats of the very same frame land on the next action.
+    hass.bus.async_fire(EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "SAME"})
+    await hass.async_block_till_done()
+    result = await flow.async_configure(flow_id)
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "duplicate_code"}
+    # Still waiting on fan_speed_1: the duplicate was not stored.
+    assert result["description_placeholders"]["action"] == "fan_speed_1"
+
+    # Pasting a distinct code by hand gets the flow moving again.
+    result = await flow.async_configure(flow_id, {"code": "OTHER", "skip": False})
+    assert result["description_placeholders"]["action"] == "fan_speed_2"
+
+
+async def test_reconfigure_rename_updates_the_title_and_unique_id(
+    hass: HomeAssistant,
+) -> None:
+    """Renaming a fan must rename the entry, not just the data field.
+
+    The entry title is what the Integrations page shows, and the unique id is what
+    stops the same fan being added twice — both were left on the old name, so a
+    renamed fan kept its old identity and its old label.
+    """
+    entry = _basic_entry(hass)
+    hass.config_entries.async_update_entry(entry, unique_id="esp32_test_recon")
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        # Reconfiguring opens on a menu; take the full re-declaration path.
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+        )
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Ventilateur Chambre",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "has_direction": False,
+                "has_natural_preset": False,
+                "has_color_temp": False,
+                "has_timers": False,
+                "has_sound": False,
+            },
+        )
+        assert result["step_id"] == "reconfigure_review"
+        result = await flow.async_configure(result["flow_id"], {})
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data["fan_name"] == "Ventilateur Chambre"
+    assert entry.title == "Ventilateur Chambre"
+    assert entry.unique_id == "esp32_test_ventilateur_chambre"
+
+
+async def test_reconfigure_refuses_a_name_already_used_on_the_same_gateway(
+    hass: HomeAssistant,
+) -> None:
+    """Renaming onto another fan's name would give two entries the same identity."""
+    taken = MockConfigEntry(
+        domain=DOMAIN,
+        title="Chambre",
+        unique_id="esp32_test_chambre",
+        data={**_basic_entry(hass).data, "fan_name": "Chambre"},
+    )
+    taken.add_to_hass(hass)
+
+    entry = _basic_entry(hass)
+    hass.config_entries.async_update_entry(entry, unique_id="esp32_test_recon")
+    flow = hass.config_entries.flow
+
+    result = await flow.async_init(
+        DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+    )
+    # Reconfiguring opens on a menu; take the full re-declaration path.
+    result = await flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+    )
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "fan_name": "Chambre",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_fan_on": False,
+            "has_direction": False,
+            "has_natural_preset": False,
+            "has_color_temp": False,
+            "has_timers": False,
+            "has_sound": False,
+        },
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure_capabilities"
+    assert result["errors"] == {"fan_name": "name_already_used"}
+    # Nothing was committed.
+    assert entry.data["fan_name"] == "Recon"
+
+
+async def test_reconfigure_opens_on_a_menu(hass: HomeAssistant) -> None:
+    """Reconfiguring offers a short path that skips re-declaring the capabilities."""
+    entry = _basic_entry(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+    )
+
+    assert result["type"] == FlowResultType.MENU
+    assert set(result["menu_options"]) == {
+        "reconfigure_capabilities",
+        "reconfigure_codes",
+    }
+
+
+async def test_relearn_one_code_without_redeclaring_anything(
+    hass: HomeAssistant,
+) -> None:
+    """The codes-only path goes straight to the per-action recap and relearns one.
+
+    Everything else — the other codes, the speed count, the capabilities — must
+    come out untouched: this is a repair for a single mis-captured button.
+    """
+    entry = _basic_entry(hass)
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_codes"}
+        )
+        assert result["step_id"] == "reconfigure_review"
+
+        # Only the light toggle is re-learned.
+        result = await flow.async_configure(
+            result["flow_id"], {"relearn_light_toggle": True}
+        )
+        assert result["step_id"] == "method"
+
+        result = await flow.async_configure(result["flow_id"], {"method": "learn"})
+        assert result["type"] == FlowResultType.SHOW_PROGRESS
+        assert result["description_placeholders"]["action"] == "light_toggle"
+
+        hass.bus.async_fire(
+            EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "c_tog_v2"}
+        )
+        await hass.async_block_till_done()
+        result = await flow.async_configure(result["flow_id"])
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    assert entry.data["codes"] == {
+        "fan_off": "c_off",
+        "fan_speed_1": "c1",
+        "fan_speed_2": "c2",
+        "fan_speed_3": "c3",
+        "light_toggle": "c_tog_v2",
+    }
+    assert entry.data["speed_count"] == 3
+    assert entry.data["light_control"] == "toggle"
+    assert entry.data["has_light"] is True
+    assert entry.title == "Recon"

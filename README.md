@@ -121,11 +121,22 @@ device and auto-discovers the sibling entities (light, colour-temperature select
 sound switch, timer/calibrate buttons), showing only the controls that exist. The fan
 blades spin at a speed-proportional rate, and it follows your Home Assistant theme.
 
-Optional fields: `name` (override the title), `layout` — `full` (default) or `compact`
-(a reduced tile: just the fan, speed and light/sound) — and entity overrides
+Optional fields: `name` (override the title), `layout`, and entity overrides
 (`light_entity`, `color_entity`, `sound_entity`) if auto-discovery picks the wrong one.
 All fields are editable from the card's visual editor. **Long-press the fan** to open
 its more-info dialog. When a sleep timer is running, the card shows the switch-off time.
+
+`layout` takes one of:
+
+| Value | What you get |
+| --- | --- |
+| `full` (default) | Everything: hero fan, speed, light/sound, colour, direction/preset, timers |
+| `compact` | Reduced: fan, speed and light/sound only |
+| `tile` | One row aligned with HA's native tiles: power dot, name/state, light toggle, speed − / + |
+
+On the `tile` layout the light toggle only appears when the fan actually has a light,
+and tapping the name opens the full card in a popup — set `tile_tap: more-info` to get
+Home Assistant's native more-info dialog instead.
 
 An example automation **blueprint** (control the fan by temperature) is in
 [`blueprints/automation/rf_fan/`](blueprints/automation/rf_fan/).
@@ -150,11 +161,21 @@ integration logs an error at startup and this manual route works as a fallback.
 To add a capability (or fix a captured code) later, open the integration entry and use
 **⋮ → Reconfigure** (on the *RF Fan* integration card, not the device page):
 
+You land on a menu with two paths:
+
+**Relearn RF codes** — for a button that was mis-captured. Goes straight to the review
+screen: tick the action(s) to re-capture and learn them again. Nothing else is touched.
+
+**Change the fan declaration** — for adding or removing a capability:
+
 1. Re-declare the capabilities (existing values are pre-filled) and enable the new ones.
 2. On the review screen you see what will be **learned** (newly required buttons),
    **kept** (existing codes — tick a box to re-learn one), and **removed**.
 3. Choose learning or manual entry; only the delta is asked for.
-4. The entry reloads in place — your dashboards and automations keep working.
+
+Either way the entry reloads in place — your dashboards and automations keep working.
+Renaming the fan here also renames the entry itself; a name already used by another fan
+on the same gateway is refused.
 
 > A full Home Assistant **restart** is required after updating the integration so the
 > new config-flow steps load.
@@ -177,13 +198,18 @@ example is in [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml).
 ```text
 custom_components/rf_fan/
   __init__.py        actions.py       config_flow.py   const.py
-  entity.py          fan.py           light.py         select.py
-  button.py          switch.py        manifest.json
+  data.py            diagnostics.py   entity.py        manifest.json
+  fan.py             light.py         select.py        sensor.py
+  button.py          switch.py
   strings.json       translations/{en,fr}.json
   brand/             icon.png  icon@2x.png  logo.png
   frontend/          rf-fan-card.js   (bundled dashboard card)
+blueprints/automation/rf_fan/
+  fan_temperature_control.yaml
 esphome/
   rf_fan_example.yaml
+scripts/
+  Dockerfile.tests   run-tests.ps1    run-tests.sh
 ```
 
 ## Brand icon
@@ -201,17 +227,41 @@ Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
 - No native RF acknowledgement — state is assumed, not confirmed.
 - The protocols that actually work depend on what your ESPHome gateway can sniff and
   replay correctly.
+- **The reference gateway is hard-wired to `rc_switch` protocol 1.** It publishes the
+  sniffed frame but not `x.protocol`, and replays it with `protocol: 1`. Remotes using
+  protocols 2–8 therefore learn fine but do not actuate the fan. If your remote is not
+  protocol 1, adapt `esphome/rf_fan_example.yaml` (the integration itself is unaffected:
+  it treats codes as opaque strings).
+- A physical press of the very button Home Assistant just triggered is ignored for
+  `ECHO_SUPPRESS_SEC` (see `const.py`) — that window is what discards the gateway's echo
+  of our own transmission. Pressing any *other* button is honoured immediately.
 
 ## Development
 
-Pure logic tests run anywhere:
+The pure logic tests (`tests/test_actions.py`) run anywhere:
 
 ```bash
 python -m pytest tests/test_actions.py -q
 ```
 
-The config-flow tests require `pytest-homeassistant-custom-component` (a Home Assistant
-test environment) and skip cleanly when it is unavailable.
+Everything else needs a Home Assistant test environment
+(`pytest-homeassistant-custom-component`). Those modules skip themselves cleanly when it
+is unavailable, so the pure suite never breaks — but they are most of the coverage, so
+run the full suite before pushing. Home Assistant's runner imports the POSIX-only
+`fcntl`, so on Windows it has to go through Docker:
+
+```powershell
+.\scripts\run-tests.ps1            # whole suite, same image as CI
+.\scripts\run-tests.ps1 tests/test_echo_suppression.py -q
+.\scripts\run-tests.ps1 -Rebuild   # after editing requirements-test.txt
+```
+
+```bash
+sh scripts/run-tests.sh            # same thing from a POSIX shell
+```
+
+On Linux/macOS a plain `pip install -r requirements-test.txt && python -m pytest tests/`
+works too.
 
 ## License
 

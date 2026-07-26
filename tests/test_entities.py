@@ -14,109 +14,23 @@ direction/preset).
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    mock_restore_cache,
-)
+from pytest_homeassistant_custom_component.common import mock_restore_cache
 
-from custom_components.rf_fan.const import DOMAIN
-
-DEVICE = "esp32-test"
-# The gateway service name mirrors config_flow: dashes become underscores.
-TRANSMIT_SERVICE = "esp32_test_transmit_rf_fan"
-
-# Codes for every action. light_on/light_off/fan_on are deliberately left out so
-# the light falls back to `light_toggle` and the fan turns on via a speed action —
-# this is what lets us assert the single-shot vs absolute repeat_count.
-CODES = {
-    "fan_off": "c_off",
-    "fan_speed_1": "c_s1",
-    "fan_speed_2": "c_s2",
-    "fan_speed_3": "c_s3",
-    "light_toggle": "c_lt",
-    "light_kelvin": "c_kel",
-    "fan_reverse": "c_rev",
-    "fan_natural": "c_nat",
-    "timer_1h": "c_t1",
-    "timer_2h": "c_t2",
-    "timer_4h": "c_t4",
-    "timer_8h": "c_t8",
-    "sound_toggle": "c_snd",
-}
+from tests.ha_helpers import last_call as _last_call
+from tests.ha_helpers import one_id as _one_id
+from tests.ha_helpers import setup_full as _setup_full
 
 
 @pytest.fixture(autouse=True)
 def _auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading of the custom component for all tests in the module."""
     yield
-
-
-def _full_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
-    """Create and register a full-capability entry (all flags + all codes)."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Full",
-        data={
-            "esphome_device": DEVICE,
-            "fan_name": "Full",
-            "speed_count": 3,
-            "light_control": "toggle",
-            "has_fan_on": False,
-            "has_direction": True,
-            "has_natural_preset": True,
-            "has_color_temp": True,
-            "has_timers": True,
-            "has_sound": True,
-            "has_light": True,
-            "repeat_count": repeat_count,
-            "codes": dict(CODES),
-        },
-    )
-    entry.add_to_hass(hass)
-    return entry
-
-
-def _register_stub(hass: HomeAssistant) -> list[dict[str, Any]]:
-    """Register the esphome transmit stub and return the list capturing its calls."""
-    calls: list[dict[str, Any]] = []
-
-    def _capture(call) -> None:
-        calls.append(dict(call.data))
-
-    hass.services.async_register("esphome", TRANSMIT_SERVICE, _capture)
-    return calls
-
-
-def _last_call(calls: list[dict[str, Any]], action: str) -> dict[str, Any] | None:
-    """Return the most recent captured call for `action` (or None)."""
-    for data in reversed(calls):
-        if data.get("action") == action:
-            return data
-    return None
-
-
-async def _setup_full(hass: HomeAssistant, repeat_count: int = 2):
-    """Register the stub, set up a full entry, and return (entry, calls)."""
-    calls = _register_stub(hass)
-    entry = _full_entry(hass, repeat_count=repeat_count)
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-    return entry, calls
-
-
-def _one_id(hass: HomeAssistant, domain: str) -> str:
-    """Return the single entity_id for a platform domain (fan/light/select/...)."""
-    ids = hass.states.async_entity_ids(domain)
-    assert ids, f"no {domain} entity was created"
-    return ids[0]
 
 
 async def test_single_shot_vs_absolute_repeat_count(hass: HomeAssistant) -> None:
@@ -264,3 +178,53 @@ async def test_fan_direction_and_preset(hass: HomeAssistant) -> None:
     )
     await hass.async_block_till_done()
     assert hass.states.get(fan_id).attributes["preset_mode"] == "natural"
+
+
+async def test_turn_on_applies_the_requested_preset(hass: HomeAssistant) -> None:
+    """`fan.turn_on` with a preset_mode must actually apply the preset.
+
+    The service schema accepts it, so silently dropping it leaves scripts and
+    blueprints believing the fan switched to natural airflow when it did not.
+    """
+    _entry, calls = await _setup_full(hass)
+    fan_id = _one_id(hass, "fan")
+
+    await hass.services.async_call(
+        "fan", "turn_on", {"entity_id": fan_id, "preset_mode": "natural"}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert _last_call(calls, "fan_natural") is not None, "fan_natural was never sent"
+    state = hass.states.get(fan_id)
+    assert state.state == "on"
+    assert state.attributes["preset_mode"] == "natural"
+
+
+async def test_colour_position_is_not_moved_when_nothing_is_transmitted(
+    hass: HomeAssistant,
+) -> None:
+    """With no `light_kelvin` code, selecting a colour must not fake the new position."""
+    entry, _calls = await _setup_full(hass)
+
+    codes = dict(entry.data["codes"])
+    codes.pop("light_kelvin")
+    hass.config_entries.async_update_entry(entry, data={**entry.data, "codes": codes})
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    light_id = _one_id(hass, "light")
+    select_id = _one_id(hass, "select")
+
+    # Powering the light on bumps the assumed position 0 -> 1 (Chaud -> Neutre).
+    await hass.services.async_call(
+        "light", "turn_on", {"entity_id": light_id}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(select_id).state == "Neutre"
+
+    await hass.services.async_call(
+        "select", "select_option", {"entity_id": select_id, "option": "Froid"}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get(select_id).state == "Neutre", "position moved without any RF"

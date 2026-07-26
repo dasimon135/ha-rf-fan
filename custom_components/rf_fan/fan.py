@@ -140,20 +140,24 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         preset_mode: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """Turn on the fan."""
+        """Turn on the fan, optionally at a given speed and/or preset."""
         if percentage is not None:
             await self.async_set_percentage(percentage)
-            return
+        else:
+            sent = await self._async_transmit_action(ACTION_FAN_ON)
+            if not sent:
+                sent = await self._async_transmit_action(speed_action(1))
 
-        sent = await self._async_transmit_action(ACTION_FAN_ON)
-        if not sent:
-            sent = await self._async_transmit_action(speed_action(1))
+            if sent:
+                self._is_on = True
+                if self._percentage is None or self._percentage <= 0:
+                    self._percentage = round(100 / self._speed_count)
+                self.async_write_ha_state()
 
-        if sent:
-            self._is_on = True
-            if self._percentage is None or self._percentage <= 0:
-                self._percentage = round(100 / self._speed_count)
-            self.async_write_ha_state()
+        # Applied last: the airflow preset is a separate button on the remote, and
+        # the fan has to be running for it to take effect.
+        if preset_mode is not None:
+            await self.async_set_preset_mode(preset_mode)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the fan."""
@@ -201,7 +205,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Update the local state when the physical remote is used."""
-        if self._recently_transmitted():
+        if self._is_echo(event.data):
             return
 
         action = self._event_action(event.data)

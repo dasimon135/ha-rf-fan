@@ -49,7 +49,10 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Emit the timer action and record the assumed switch-off time."""
-        await self._async_transmit_action(timer_action(self._hours))
+        if not await self._async_transmit_action(timer_action(self._hours)):
+            # Nothing went on the air (unmapped code): claiming a switch-off time
+            # would make the sensor announce an extinction that will never happen.
+            return
         self._runtime.timer_ends_at = dt_util.utcnow() + timedelta(hours=self._hours)
         async_dispatcher_send(self.hass, self._timer_signal())
 

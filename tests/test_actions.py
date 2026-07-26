@@ -1,6 +1,7 @@
 from actions import (
     caps_from_data,
     classify_reconfigure_actions,
+    expected_unique_ids,
     split_actions,
     validate_codes,
 )
@@ -51,7 +52,12 @@ def test_split_fan_on_only_when_declared():
 
 
 def _speeds(n):
-    return {ACTION_FAN_OFF: "c", **{speed_action(i): "c" for i in range(1, n + 1)}}
+    """Codes for fan_off + n speeds. Distinct, as a real entry always is: a code
+    reused by two actions is itself a validation error (`duplicate_code`)."""
+    return {
+        ACTION_FAN_OFF: "c_off",
+        **{speed_action(i): f"c_s{i}" for i in range(1, n + 1)},
+    }
 
 
 def test_validate_codes_missing_required_speed():
@@ -64,7 +70,7 @@ def test_validate_codes_missing_required_speed():
 
 def test_validate_codes_no_special_light_rule():
     required, _ = split_actions(6, light_control="toggle")
-    codes = {ACTION_FAN_OFF: "c", **{speed_action(i): "c" for i in range(1, 7)}}
+    codes = _speeds(6)
     errors = validate_codes(codes, required)
     assert errors.get(ACTION_LIGHT_TOGGLE) == "required"
 
@@ -207,3 +213,65 @@ def test_pick_best_code_tie_breaks_to_earliest():
     from actions import pick_best_code
 
     assert pick_best_code(["a", "b"]) == "a"
+
+
+def test_expected_unique_ids_minimal_entry():
+    """A speeds-only fan owns just the fan entity."""
+    ids = expected_unique_ids("e1", {"has_light": False})
+    assert ids == {"e1_fan"}
+
+
+def test_expected_unique_ids_light_is_on_by_default():
+    """`has_light` defaults to True, matching light.py's own default."""
+    assert expected_unique_ids("e1", {}) == {"e1_fan", "e1_light"}
+
+
+def test_expected_unique_ids_color_temp_adds_select_and_calibrate():
+    ids = expected_unique_ids("e1", {"has_light": False, "has_color_temp": True})
+    assert ids == {"e1_fan", "e1_color_temp", "e1_kelvin_calibrate"}
+
+
+def test_expected_unique_ids_timers_add_sensor_and_one_button_per_delay():
+    ids = expected_unique_ids("e1", {"has_light": False, "has_timers": True})
+    assert ids == {
+        "e1_fan",
+        "e1_sleep_timer",
+        "e1_timer_1h",
+        "e1_timer_2h",
+        "e1_timer_4h",
+        "e1_timer_8h",
+    }
+
+
+def test_expected_unique_ids_sound_adds_the_switch():
+    ids = expected_unique_ids("e1", {"has_light": False, "has_sound": True})
+    assert ids == {"e1_fan", "e1_sound"}
+
+
+def test_validate_codes_flags_a_code_reused_by_two_actions():
+    """Two actions sharing one code make the reverse lookup ambiguous.
+
+    `_event_action` maps a received frame back to an action by comparing codes, so
+    a duplicate silently makes one of the two actions unreachable from the remote.
+    The first occurrence is kept; the later one is flagged.
+    """
+    errors = validate_codes(
+        {"fan_off": "AAA", "fan_speed_1": "AAA"}, ["fan_off", "fan_speed_1"]
+    )
+    assert errors == {"fan_speed_1": "duplicate_code"}
+
+
+def test_validate_codes_missing_wins_over_duplicate():
+    """A blank field is reported as missing, never as a duplicate."""
+    errors = validate_codes(
+        {"fan_off": "AAA", "fan_speed_1": "", "fan_speed_2": "AAA"},
+        ["fan_off", "fan_speed_1", "fan_speed_2"],
+    )
+    assert errors == {"fan_speed_1": "required", "fan_speed_2": "duplicate_code"}
+
+
+def test_validate_codes_accepts_all_distinct_codes():
+    errors = validate_codes(
+        {"fan_off": "A", "fan_speed_1": "B"}, ["fan_off", "fan_speed_1"]
+    )
+    assert errors == {}

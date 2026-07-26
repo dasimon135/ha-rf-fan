@@ -1,6 +1,12 @@
 __pycache__/
 .pytest_cache/
+.ruff_cache/
+.venv/
 .venv-test/
+.venv314/
+
+# Local agent configuration (machine-specific, not part of the integration)
+.claude/
 
 # Local-only captured RF codes (device-specific, not for publication)
 docs/*-codes-manual.md

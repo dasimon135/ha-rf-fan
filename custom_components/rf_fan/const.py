@@ -85,11 +85,15 @@ COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
 # registers each as a separate press. A rapid burst with no gap merges into one step.
 KELVIN_STEP_GAP_SEC: Final = 0.4
 
-# Global per-entry anti-echo window: after any transmission, all RF reception for the
-# entry is ignored for this number of seconds to discard the echo of our own transmission
-# sent back by the gateway (side effect: a physical remote press within this window, just
-# after an HA command, is ignored).
-ECHO_SUPPRESS_SEC: Final = 1.0
+# Anti-echo window: the gateway sniffs its own transmissions, so every code we send
+# comes back as a reception a moment later. For this number of seconds after sending a
+# code, receptions OF THAT SAME CODE are discarded. Matching per code (rather than
+# muting all reception) means a press of a different remote button right after a Home
+# Assistant command is still honoured. Remaining side effect: pressing on the remote the
+# very button Home Assistant just triggered, within the window, is ignored — the window
+# is sized to cover a slow gateway rather than to be minimal, because the alternative
+# (a late echo) silently flips the toggle actions back.
+ECHO_SUPPRESS_SEC: Final = 2.0
 
 
 def speed_action(index: int) -> str:

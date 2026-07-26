@@ -10,9 +10,24 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.4.1";
+// Keep in step with manifest.json: the integration cache-busts the card with the
+// manifest version, so a mismatch here makes the console banner lie about which
+// build the browser actually loaded — exactly when you are chasing a stale cache.
+const VERSION = "1.6.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
+
+// Everything interpolated into innerHTML goes through this: entity names are
+// user-editable, so an unescaped `<` in a friendly name would break the markup.
+const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ESCAPES[c]);
+
+// "1h", "2 h", "_4h_" — the duration token in a timer button's name or id.
+const HOUR_TOKEN = /(\d+)\s*h(?![a-z])/i;
+
+// FanEntityFeature bits (homeassistant/components/fan/const.py).
+const FEATURE_DIRECTION = 4;
+const FEATURE_PRESET_MODE = 8;
 
 class RfFanCard extends HTMLElement {
   setConfig(config) {
@@ -70,14 +85,32 @@ class RfFanCard extends HTMLElement {
       return siblings.find((e) => e.startsWith(domain + "."));
     };
 
-    // Buttons: timers carry a "<n>h" token; the remaining one is the calibrate button.
-    const isTimer = (e) => /(?:^|[_\s])(\d+)\s*h(?![a-z])/i.test(e);
+    // Buttons: prefer the registry's translation_key, which survives a rename of
+    // the entity_id. Fall back to the "<n>h" token in the id for registries that
+    // do not expose it — that guess breaks on a renamed entity, which would make
+    // a timer masquerade as the calibrate button and fire the wrong RF code.
     const buttons = siblings.filter((e) => e.startsWith("button."));
+    const keyOf = (e) => (reg[e] || {}).translation_key;
+    const keyed = buttons.some(keyOf);
+    const hasHourToken = (s) => HOUR_TOKEN.test(s || "");
+    const isTimer = (e) => (keyed ? keyOf(e) === "timer" : hasHourToken(e));
+    const isCalibrate = (e) =>
+      keyed ? keyOf(e) === "recalibrate_color" : !hasHourToken(e);
+
+    // The hour is not in the translation key (it is a placeholder), so read it
+    // from the friendly name first and only then from the id.
+    const hoursOf = (e) => {
+      const st = hass.states[e];
+      const name = st && st.attributes && st.attributes.friendly_name;
+      const from = (s) => ((s || "").match(HOUR_TOKEN) || [])[1];
+      return from(name) || from(e);
+    };
+
     const timers = buttons
       .filter(isTimer)
-      .map((e) => ({ id: e, h: (e.match(/(\d+)\s*h(?![a-z])/i) || [])[1] }))
+      .map((e) => ({ id: e, h: hoursOf(e) }))
       .sort((a, b) => Number(a.h) - Number(b.h));
-    const calibrate = cfg.calibrate_entity || buttons.find((e) => !isTimer(e));
+    const calibrate = cfg.calibrate_entity || buttons.find(isCalibrate);
 
     return {
       fan: fanId,
@@ -150,7 +183,7 @@ class RfFanCard extends HTMLElement {
     const tile = this._config.layout === "tile";
     this._root.classList.toggle("tilecard", tile);
     if (!fan) {
-      this._body.innerHTML = `<div class="warn">Entity ${ent.fan} not found</div>`;
+      this._body.innerHTML = `<div class="warn">Entity ${esc(ent.fan)} not found</div>`;
       return;
     }
 
@@ -169,6 +202,14 @@ class RfFanCard extends HTMLElement {
     // the name/state opens the full card in a popup (see _openCardDialog).
     if (tile) {
       const sub = on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off;
+      // The light is the other thing you reach for on a ceiling fan, so it gets a
+      // control of its own rather than only living in the popup. Omitted entirely
+      // on a fan without a light so the row does not gain a dead button.
+      const lightSt = ent.light && this._hass.states[ent.light];
+      const lit = Boolean(lightSt && lightSt.state === "on");
+      const lightBtn = ent.light
+        ? `<button class="tbtn tlight${lit ? " active" : ""}" data-act="light" aria-label="${esc(L.light)}"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon></button>`
+        : "";
       this._body.innerHTML = `
         <div class="tile ${on ? "" : "off"}">
           <button class="tdot" data-act="power" aria-label="${L.on}/${L.off}">
@@ -178,11 +219,12 @@ class RfFanCard extends HTMLElement {
               <circle class="hub2" cx="50" cy="50" r="3.5"/>
             </svg>
           </button>
-          <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${name}">
-            <span class="tname">${name}</span>
-            <span class="tsub">${sub}</span>
+          <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${esc(name)}">
+            <span class="tname">${esc(name)}</span>
+            <span class="tsub">${esc(sub)}</span>
           </div>
           <div class="tctl">
+            ${lightBtn}
             <button class="tbtn" data-tspeed="down" aria-label="Lower">−</button>
             <button class="tbtn" data-tspeed="up" aria-label="Raise">+</button>
           </div>
@@ -222,21 +264,21 @@ class RfFanCard extends HTMLElement {
       const lightOff = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
       const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
       const segsC = opts
-        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${L.color(o)}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}" ${lightOff ? "disabled" : ""}>${esc(L.color(o))}</button>`)
         .join("");
       colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="${L.recalibrate}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
     }
 
     const feat = fan.attributes.supported_features || 0;
     const modeChips = [];
-    if (feat & 4) {
+    if (feat & FEATURE_DIRECTION) {
       const dir = fan.attributes.direction;
       modeChips.push(
         `<button class="chip ${dir !== "reverse" ? "active" : ""}" data-dir="forward"><ha-icon icon="mdi:rotate-right"></ha-icon><span>${L.forward}</span></button>`,
         `<button class="chip ${dir === "reverse" ? "active" : ""}" data-dir="reverse"><ha-icon icon="mdi:rotate-left"></ha-icon><span>${L.reverse}</span></button>`
       );
     }
-    if (feat & 8) {
+    if (feat & FEATURE_PRESET_MODE) {
       const preset = fan.attributes.preset_mode;
       modeChips.push(
         `<button class="chip ${preset !== "natural" ? "active" : ""}" data-preset="normal"><ha-icon icon="mdi:fan"></ha-icon><span>${L.normal}</span></button>`,
@@ -247,7 +289,7 @@ class RfFanCard extends HTMLElement {
     let timerRow = "";
     if (ent.timers.length) {
       timerRow = `<div class="timers">` + ent.timers
-        .map((t) => `<button class="chip" data-timer="${t.id}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${t.h}h</span></button>`)
+        .map((t) => `<button class="chip" data-timer="${esc(t.id)}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${esc(t.h)}h</span></button>`)
         .join("") + `</div>`;
     }
 
@@ -256,14 +298,14 @@ class RfFanCard extends HTMLElement {
       const ts = this._hass.states[ent.timerSensor];
       if (ts && ts.state !== "unknown" && ts.state !== "unavailable") {
         const disp = this._hass.formatEntityState ? this._hass.formatEntityState(ts) : ts.state;
-        timerLine = `<div class="timerline"><ha-icon icon="mdi:timer-sand"></ha-icon><span>${disp}</span></div>`;
+        timerLine = `<div class="timerline"><ha-icon icon="mdi:timer-sand"></ha-icon><span>${esc(disp)}</span></div>`;
       }
     }
 
     this._body.innerHTML = `
       <div class="head">
-        <div class="title">${name}</div>
-        <div class="state ${on ? "on" : ""}">${on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off}</div>
+        <div class="title">${esc(name)}</div>
+        <div class="state ${on ? "on" : ""}">${esc(on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off)}</div>
       </div>
       <div class="hero">
         <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
@@ -465,6 +507,9 @@ class RfFanCard extends HTMLElement {
               cursor:pointer; transition: transform .12s, border-color .2s; }
       .tbtn:hover { border-color: var(--primary-color); }
       .tbtn:active { transform: scale(.9); }
+      .tlight { display:grid; place-items:center; color: var(--secondary-text-color); }
+      .tlight ha-icon { --mdc-icon-size:20px; }
+      .tlight.active { background:#f5a623; border-color:#f5a623; color:#fff; }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
       .title { font-size:1.15rem; font-weight:600; }
       .state { font-size:.85rem; color: var(--secondary-text-color); }

@@ -70,15 +70,15 @@ blueprint:
 
 mode: single
 
-trigger:
-  - platform: numeric_state
+triggers:
+  - trigger: numeric_state
     entity_id: !input temperature_sensor
     above: !input temp_on
-  - platform: numeric_state
+  - trigger: numeric_state
     entity_id: !input temperature_sensor
     below: !input temp_off
 
-action:
+actions:
   - choose:
       # Temperature is above the ON threshold -> turn the fan on at the chosen speed.
       - conditions:
@@ -86,13 +86,13 @@ action:
             entity_id: !input temperature_sensor
             above: !input temp_on
         sequence:
-          - service: fan.turn_on
+          - action: fan.turn_on
             target:
               entity_id: !input fan
             data:
               percentage: !input speed
     # Otherwise (temperature below the OFF threshold) -> turn the fan off.
     default:
-      - service: fan.turn_off
+      - action: fan.turn_off
         target:
           entity_id: !input fan
