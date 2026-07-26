@@ -34,8 +34,9 @@ Cecotec fan is used as the reference example, but any RF fan works.
   - Optional dedicated fan "on" button.
   - Optional **reverse direction**, **natural-airflow preset**, **color temperature
     (Kelvin)**, **sleep timers** (1/2/4/8 h), and **sound** toggle.
-- **Reconfigure in place** — add or change capabilities on an existing entry and learn
-  only the new buttons, keeping the codes you already captured (see below).
+- **Reconfigure in place** — either relearn a single mis-captured button, or add and
+  change capabilities and learn only the new ones, keeping the codes you already
+  captured (see below).
 - **Assumed state** (`assumed_state`) with dead-reckoning, plus partial state sync when
   the physical remote is used (if the gateway reports received frames).
 - **Configurable RF repeat count**.
@@ -51,7 +52,7 @@ Depending on the declared capabilities, a device exposes:
 | `select` "color temperature" | color temp enabled | cycles Warm → Neutral → Cold |
 | `button` calibrate | color temp enabled | resyncs the assumed color position — **emits nothing** |
 | `button` timer ×4 | timers enabled | 1 h / 2 h / 4 h / 8 h |
-| `sensor` sleep timer | timers enabled | assumed switch-off time set by the timer buttons (cleared when the fan is turned off) |
+| `sensor` sleep timer | timers enabled | assumed switch-off time set by the timer buttons (clears itself when it elapses, or when the fan is turned off) |
 | `switch` sound | sound enabled | beep on/off |
 
 ### Color temperature (Kelvin)
@@ -210,6 +211,11 @@ esphome/
   rf_fan_example.yaml
 scripts/
   Dockerfile.tests   run-tests.ps1    run-tests.sh
+tests/
+  test_actions.py    (pure logic, runs anywhere — no Home Assistant needed)
+  test_*.py          (entities, config flow, diagnostics, blueprint — need phcc)
+  ha_helpers.py      (shared fixtures for the phcc tests)
+  frontend/          card tests, run by `node --test` against a DOM stub
 ```
 
 ## Brand icon
@@ -235,6 +241,23 @@ Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
 - A physical press of the very button Home Assistant just triggered is ignored for
   `ECHO_SUPPRESS_SEC` (see `const.py`) — that window is what discards the gateway's echo
   of our own transmission. Pressing any *other* button is honoured immediately.
+
+## Troubleshooting
+
+The fan never reports anything back, so every state you see is dead-reckoned from the
+commands sent. When it drifts, **Settings → Devices & services → RF Fan → ⋮ → Download
+diagnostics** dumps what the integration currently believes, under `runtime`:
+
+| Field | Meaning |
+| --- | --- |
+| `kelvin_position` / `colour` | assumed position in the colour cycle |
+| `light_on` | assumed light state (`null` until a command or a sniffed frame settles it) |
+| `timer_ends_at` | assumed switch-off time, or `null` |
+| `armed_echo_codes` | codes whose echo window is still open — a remote press of one of those is being discarded on purpose |
+
+A drifted colour position is resynced with the **calibrate** button (it emits nothing, it
+just resets the assumption to Warm). A button that was mis-captured is fixed with
+**⋮ → Reconfigure → Relearn RF codes**.
 
 ## Development
 
@@ -262,6 +285,15 @@ sh scripts/run-tests.sh            # same thing from a POSIX shell
 
 On Linux/macOS a plain `pip install -r requirements-test.txt && python -m pytest tests/`
 works too.
+
+The bundled card has its own tests. They need no dependency and no build step — the card
+is rendered against a minimal DOM stub by node's built-in runner:
+
+```bash
+node --test "tests/frontend/*.test.mjs"
+```
+
+CI runs all three (ruff, pytest, card) on every push and pull request.
 
 ## License
 
