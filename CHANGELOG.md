@@ -5,6 +5,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-07-26
+
+Documentation only; no code change.
+
+### Changed
+
+- The entities table said the sleep timer clears "when the fan is turned off". It
+  also clears itself when it elapses — as of 1.6.0 the table documented the bug
+  rather than the fix.
+- The features list described reconfiguration as capability-only, missing the
+  relearn-a-single-code path added in 1.6.0.
+- The project structure listed no tests, although `tests/frontend/` has its own
+  runner and CI job.
+- `.github/copilot-instructions.md` claimed Python 3.12+ (3.14 is required since
+  the HA 2026.5 target) and knew nothing about the bundled card, the test layout,
+  or the rule that RF codes are opaque strings never to be parsed.
+
+### Added
+
+- A **Troubleshooting** section. The fan reports nothing back, so every state
+  shown is dead-reckoned; the diagnostics `runtime` dump is the only way to see
+  what the integration currently believes, and nothing pointed at it.
+
 ## [1.6.0] - 2026-07-26
 
 Audit pass: every fix below comes with a regression test. The suite goes from 34
@@ -115,6 +138,7 @@ CI green (hassfest / HACS / pytest).
 
 CI, diagnostics, robust learning, compact card.
 
+[1.6.1]: https://github.com/dasimon135/ha-rf-fan/releases/tag/v1.6.1
 [1.6.0]: https://github.com/dasimon135/ha-rf-fan/releases/tag/v1.6.0
 [1.5.0]: https://github.com/dasimon135/ha-rf-fan/releases/tag/v1.5.0
 [1.4.0]: https://github.com/dasimon135/ha-rf-fan/releases/tag/v1.4.0
