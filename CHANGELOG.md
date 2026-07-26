@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.0] - 2026-07-26
 
-Audit pass: the fixes below all come with regression tests (the suite goes from
-34 to 59 tests).
+Audit pass: every fix below comes with a regression test. The suite goes from 34
+to 67 Python tests, plus 11 new tests for the bundled card.
 
 ### Fixed
 
@@ -48,6 +48,13 @@ Audit pass: the fixes below all come with regression tests (the suite goes from
 - **Diagnostics now carry the assumed state** (`runtime` section: colour
   position, light, sleep timer, number of armed anti-echo windows). The fan
   reports nothing back, so this was the one thing a bug report could not show.
+- **Renaming a fan during a reconfiguration now renames the entry.** Only the
+  data field changed: the Integrations page kept showing the old title and the
+  entry kept its old unique id, so the renamed fan still answered to its former
+  identity. A name already used by another fan on the same gateway is refused
+  (new `name_already_used` error) instead of creating an indistinguishable pair.
+- **Tests for the shipped blueprint**, put through Home Assistant's own blueprint
+  schema and then validated as a substituted automation.
 - **Duplicate captured codes are rejected.** The repeats of a held button kept
   arriving after the learning flow had moved on, so the same frame was easily
   stored for two actions — which makes the received-frame lookup ambiguous and
@@ -69,6 +76,9 @@ Audit pass: the fixes below all come with regression tests (the suite goes from
   id pattern remains as a fallback for registries that do not expose the key.
 - The setup step that picks manual vs guided learning is translated (it showed
   the raw `manual` / `learn` keys; `vol.In` labels are never translated).
+- The blueprint uses the current automation syntax (`triggers:` / `trigger:` /
+  `actions:` / `action:`). The pre-2024.10 spelling still works, but a shipped
+  blueprint gets copied as a template, so it should teach the current form.
 - Ruff `target-version` py313 → py314, matching CI and the HA 2026.5 target.
 - README: documented the `rc_switch` protocol-1 limitation of the reference
   gateway, the anti-echo trade-off, and the Docker test workflow.

@@ -88,6 +88,15 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
     _SERVICE_SUFFIX = "_transmit_rf_fan"
 
+    @staticmethod
+    def _unique_id_for(esphome_device: str, fan_name: str) -> str:
+        """Stable id for a fan: gateway + name.
+
+        slugify normalizes the dash/underscore ambiguity of ESPHome device names,
+        so the same fan resolves to the same id however the gateway was typed.
+        """
+        return f"{slugify(esphome_device)}_{slugify(fan_name)}"
+
     def _gateway_service_prefixes(self) -> list[str]:
         """Raw esphome service prefixes exposing a transmit_rf_fan service."""
         esphome_services = self.hass.services.async_services().get("esphome", {})
@@ -165,10 +174,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._esphome_device = selected_device
                 self._gateway_service = self._resolve_gateway_service(selected_device)
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
-                # Stable id: gateway + fan name (slugify normalizes the
-                # dash/underscore ambiguity of ESPHome device names).
                 await self.async_set_unique_id(
-                    f"{slugify(selected_device)}_{slugify(self._fan_name)}"
+                    self._unique_id_for(selected_device, self._fan_name)
                 )
                 self._abort_if_unique_id_configured()
                 self._speed_count = int(user_input[CONF_SPEED_COUNT])
@@ -422,7 +429,14 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         if self._reconfigure:
             entry = self._get_reconfigure_entry()
-            return self.async_update_reload_and_abort(entry, data=data)
+            # Carry a rename through to the entry itself: the title is what the
+            # Integrations page shows, the unique id is what prevents a duplicate.
+            return self.async_update_reload_and_abort(
+                entry,
+                data=data,
+                title=self._fan_name,
+                unique_id=self._unique_id_for(self._esphome_device, self._fan_name),
+            )
         return self.async_create_entry(title=self._fan_name, data=data)
 
     async def async_step_reconfigure(
@@ -454,7 +468,27 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 data_schema=self._base_schema(include_device=False),
             )
 
-        self._fan_name = user_input[CONF_FAN_NAME].strip()
+        fan_name = user_input[CONF_FAN_NAME].strip()
+        # A rename changes the entry identity: refuse one that another fan on the
+        # same gateway already answers to, rather than ending up with two entries
+        # HA cannot tell apart.
+        new_unique_id = self._unique_id_for(self._esphome_device, fan_name)
+        if any(
+            other.unique_id == new_unique_id and other.entry_id != entry.entry_id
+            for other in self._async_current_entries()
+        ):
+            self._fan_name = fan_name
+            self._speed_count = int(user_input[CONF_SPEED_COUNT])
+            self._light_control = user_input[CONF_LIGHT_CONTROL]
+            self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
+            self._caps = caps_from_data(user_input)
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=self._base_schema(include_device=False),
+                errors={CONF_FAN_NAME: "name_already_used"},
+            )
+
+        self._fan_name = fan_name
         self._speed_count = int(user_input[CONF_SPEED_COUNT])
         self._light_control = user_input[CONF_LIGHT_CONTROL]
         self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])

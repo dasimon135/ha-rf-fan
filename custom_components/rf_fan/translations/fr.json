@@ -117,7 +117,8 @@
       "required_esphome_device": "Plusieurs devices ESPHome compatibles ont été trouvés. Choisissez-en un.",
       "unknown_esphome_device": "Aucun device ESPHome compatible n'a été trouvé avec ce nom.",
       "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action.",
-      "duplicate_code": "Ce code est déjà attribué à une autre action. Deux actions partageant un même code ne peuvent pas être distinguées lors de l'utilisation de la télécommande physique. Appuyez sur un autre bouton, ou collez un code distinct."
+      "duplicate_code": "Ce code est déjà attribué à une autre action. Deux actions partageant un même code ne peuvent pas être distinguées lors de l'utilisation de la télécommande physique. Appuyez sur un autre bouton, ou collez un code distinct.",
+      "name_already_used": "Un autre ventilateur de cette passerelle porte déjà ce nom. Choisissez-en un autre."
     },
     "abort": {
       "already_configured": "Un ventilateur portant ce nom est déjà configuré sur cette passerelle.",

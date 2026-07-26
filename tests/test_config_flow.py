@@ -426,3 +426,87 @@ async def test_learn_rejects_a_code_already_used_by_another_action(
     # Pasting a distinct code by hand gets the flow moving again.
     result = await flow.async_configure(flow_id, {"code": "OTHER", "skip": False})
     assert result["description_placeholders"]["action"] == "fan_speed_2"
+
+
+async def test_reconfigure_rename_updates_the_title_and_unique_id(
+    hass: HomeAssistant,
+) -> None:
+    """Renaming a fan must rename the entry, not just the data field.
+
+    The entry title is what the Integrations page shows, and the unique id is what
+    stops the same fan being added twice — both were left on the old name, so a
+    renamed fan kept its old identity and its old label.
+    """
+    entry = _basic_entry(hass)
+    hass.config_entries.async_update_entry(entry, unique_id="esp32_test_recon")
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Ventilateur Chambre",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "has_direction": False,
+                "has_natural_preset": False,
+                "has_color_temp": False,
+                "has_timers": False,
+                "has_sound": False,
+            },
+        )
+        assert result["step_id"] == "reconfigure_review"
+        result = await flow.async_configure(result["flow_id"], {})
+        await hass.async_block_till_done()
+
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data["fan_name"] == "Ventilateur Chambre"
+    assert entry.title == "Ventilateur Chambre"
+    assert entry.unique_id == "esp32_test_ventilateur_chambre"
+
+
+async def test_reconfigure_refuses_a_name_already_used_on_the_same_gateway(
+    hass: HomeAssistant,
+) -> None:
+    """Renaming onto another fan's name would give two entries the same identity."""
+    taken = MockConfigEntry(
+        domain=DOMAIN,
+        title="Chambre",
+        unique_id="esp32_test_chambre",
+        data={**_basic_entry(hass).data, "fan_name": "Chambre"},
+    )
+    taken.add_to_hass(hass)
+
+    entry = _basic_entry(hass)
+    hass.config_entries.async_update_entry(entry, unique_id="esp32_test_recon")
+    flow = hass.config_entries.flow
+
+    result = await flow.async_init(
+        DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+    )
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "fan_name": "Chambre",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_fan_on": False,
+            "has_direction": False,
+            "has_natural_preset": False,
+            "has_color_temp": False,
+            "has_timers": False,
+            "has_sound": False,
+        },
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+    assert result["errors"] == {"fan_name": "name_already_used"}
+    # Nothing was committed.
+    assert entry.data["fan_name"] == "Recon"
