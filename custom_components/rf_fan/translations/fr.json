@@ -68,21 +68,6 @@
           "sound_toggle": "Code son"
         }
       },
-      "reconfigure": {
-        "title": "Ventilateur RF - Reconfiguration",
-        "description": "Re-déclarez les capacités du ventilateur. Les codes existants sont conservés ; seuls les nouveaux boutons requis seront appris ensuite.",
-        "data": {
-          "fan_name": "Nom d'affichage du ventilateur",
-          "speed_count": "Nombre de vitesses distinctes",
-          "light_control": "Commande de la lumière",
-          "has_fan_on": "Le ventilateur a un bouton marche dédié",
-          "has_direction": "Sens inverse (bouton reverse)",
-          "has_natural_preset": "Flux d'air naturel",
-          "has_color_temp": "Température de couleur (Kelvin)",
-          "has_timers": "Minuteries (1h/2h/4h/8h)",
-          "has_sound": "Son (bip)"
-        }
-      },
       "reconfigure_review": {
         "title": "Ventilateur RF - Vérification",
         "description": "À apprendre : {to_learn}\nGardées (cocher pour ré-apprendre) : {kept}\nRetirées : {forgotten}",
@@ -106,6 +91,28 @@
           "relearn_timer_4h": "Ré-apprendre : minuterie 4h",
           "relearn_timer_8h": "Ré-apprendre : minuterie 8h",
           "relearn_sound_toggle": "Ré-apprendre : son"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurer le ventilateur",
+        "menu_options": {
+          "reconfigure_codes": "Réapprendre des codes RF (un bouton mal capté)",
+          "reconfigure_capabilities": "Modifier la déclaration (nom, vitesses, fonctions)"
+        }
+      },
+      "reconfigure_capabilities": {
+        "title": "Ventilateur RF - Reconfiguration",
+        "description": "Re-déclarez les capacités du ventilateur. Les codes existants sont conservés ; seuls les nouveaux boutons requis seront appris ensuite.",
+        "data": {
+          "fan_name": "Nom d'affichage du ventilateur",
+          "speed_count": "Nombre de vitesses distinctes",
+          "light_control": "Commande de la lumière",
+          "has_fan_on": "Le ventilateur a un bouton marche dédié",
+          "has_direction": "Sens inverse (bouton reverse)",
+          "has_natural_preset": "Flux d'air naturel",
+          "has_color_temp": "Température de couleur (Kelvin)",
+          "has_timers": "Minuteries (1h/2h/4h/8h)",
+          "has_sound": "Son (bip)"
         }
       }
     },

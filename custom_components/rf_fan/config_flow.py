@@ -442,29 +442,52 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Reconfigure an existing entry: re-declare + learn the delta."""
+        """Reconfigure an existing entry: pick what is actually being changed.
+
+        Re-capturing one mis-learned button is the common case and has nothing to
+        do with the fan's capabilities, so it gets its own path instead of forcing
+        the whole declaration form to be re-submitted first.
+        """
         entry = self._get_reconfigure_entry()
         data = entry.data
 
+        self._reconfigure = True
+        self._esphome_device = data[CONF_ESPHOME_DEVICE]
+        self._gateway_service = data.get(
+            CONF_GATEWAY_SERVICE, data[CONF_ESPHOME_DEVICE].replace("-", "_")
+        )
+        self._fan_name = data.get(CONF_FAN_NAME, entry.title)
+        self._speed_count = int(data.get(CONF_SPEED_COUNT, DEFAULT_SPEED_COUNT))
+        self._light_control = data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_TOGGLE)
+        self._has_fan_on = bool(data.get(CONF_HAS_FAN_ON, False))
+        self._has_light = self._light_control != LIGHT_CONTROL_NONE
+        self._caps = caps_from_data(data)
+        self._existing_codes = dict(data.get(CONF_CODES, {}))
+        self._repeat_count = int(
+            entry.options.get(
+                CONF_REPEAT_COUNT, data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
+            )
+        )
+        return self.async_show_menu(
+            step_id="reconfigure",
+            menu_options=["reconfigure_codes", "reconfigure_capabilities"],
+        )
+
+    async def async_step_reconfigure_codes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Keep the declared capabilities and go straight to the per-action recap."""
+        return await self.async_step_reconfigure_review()
+
+    async def async_step_reconfigure_capabilities(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Re-declare the fan (name, speeds, capabilities), then learn the delta."""
+        entry = self._get_reconfigure_entry()
+
         if user_input is None:
-            self._reconfigure = True
-            self._esphome_device = data[CONF_ESPHOME_DEVICE]
-            self._gateway_service = data.get(
-                CONF_GATEWAY_SERVICE, data[CONF_ESPHOME_DEVICE].replace("-", "_")
-            )
-            self._fan_name = data.get(CONF_FAN_NAME, entry.title)
-            self._speed_count = int(data.get(CONF_SPEED_COUNT, DEFAULT_SPEED_COUNT))
-            self._light_control = data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_TOGGLE)
-            self._has_fan_on = bool(data.get(CONF_HAS_FAN_ON, False))
-            self._caps = caps_from_data(data)
-            self._existing_codes = dict(data.get(CONF_CODES, {}))
-            self._repeat_count = int(
-                entry.options.get(
-                    CONF_REPEAT_COUNT, data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
-                )
-            )
             return self.async_show_form(
-                step_id="reconfigure",
+                step_id="reconfigure_capabilities",
                 data_schema=self._base_schema(include_device=False),
             )
 
@@ -483,7 +506,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
             self._caps = caps_from_data(user_input)
             return self.async_show_form(
-                step_id="reconfigure",
+                step_id="reconfigure_capabilities",
                 data_schema=self._base_schema(include_device=False),
                 errors={CONF_FAN_NAME: "name_already_used"},
             )

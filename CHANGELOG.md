@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.6.0] - 2026-07-26
 
 Audit pass: every fix below comes with a regression test. The suite goes from 34
-to 67 Python tests, plus 11 new tests for the bundled card.
+to 69 Python tests, plus 11 new tests for the bundled card.
 
 ### Fixed
 
@@ -48,6 +48,11 @@ to 67 Python tests, plus 11 new tests for the bundled card.
 - **Diagnostics now carry the assumed state** (`runtime` section: colour
   position, light, sleep timer, number of armed anti-echo windows). The fan
   reports nothing back, so this was the one thing a bug report could not show.
+- **Relearning a single code no longer means re-declaring the fan.** Reconfigure
+  now opens on a menu: "Relearn RF codes" goes straight to the per-action recap,
+  "Change the fan declaration" keeps the previous path. Re-capturing one
+  mis-learned button went from four screens to two, and no longer rewrites the
+  rest of the entry.
 - **Renaming a fan during a reconfiguration now renames the entry.** Only the
   data field changed: the Integrations page kept showing the old title and the
   entry kept its old unique id, so the renamed fan still answered to its former

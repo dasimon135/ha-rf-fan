@@ -161,11 +161,21 @@ integration logs an error at startup and this manual route works as a fallback.
 To add a capability (or fix a captured code) later, open the integration entry and use
 **⋮ → Reconfigure** (on the *RF Fan* integration card, not the device page):
 
+You land on a menu with two paths:
+
+**Relearn RF codes** — for a button that was mis-captured. Goes straight to the review
+screen: tick the action(s) to re-capture and learn them again. Nothing else is touched.
+
+**Change the fan declaration** — for adding or removing a capability:
+
 1. Re-declare the capabilities (existing values are pre-filled) and enable the new ones.
 2. On the review screen you see what will be **learned** (newly required buttons),
    **kept** (existing codes — tick a box to re-learn one), and **removed**.
 3. Choose learning or manual entry; only the delta is asked for.
-4. The entry reloads in place — your dashboards and automations keep working.
+
+Either way the entry reloads in place — your dashboards and automations keep working.
+Renaming the fan here also renames the entry itself; a name already used by another fan
+on the same gateway is refused.
 
 > A full Home Assistant **restart** is required after updating the integration so the
 > new config-flow steps load.

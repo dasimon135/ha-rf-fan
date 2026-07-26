@@ -68,21 +68,6 @@
           "sound_toggle": "Code for sound toggle"
         }
       },
-      "reconfigure": {
-        "title": "RF Fan - Reconfigure",
-        "description": "Re-declare the fan capabilities. Existing codes are kept; only newly required buttons are learned next.",
-        "data": {
-          "fan_name": "Fan display name",
-          "speed_count": "Number of discrete speeds",
-          "light_control": "Light control",
-          "has_fan_on": "Fan has a dedicated on button",
-          "has_direction": "Reverse direction (reverse button)",
-          "has_natural_preset": "Natural airflow",
-          "has_color_temp": "Color temperature (Kelvin)",
-          "has_timers": "Sleep timers (1h/2h/4h/8h)",
-          "has_sound": "Sound (beep)"
-        }
-      },
       "reconfigure_review": {
         "title": "RF Fan - Review changes",
         "description": "To learn: {to_learn}\nKept (tick to re-learn): {kept}\nRemoved: {forgotten}",
@@ -106,6 +91,28 @@
           "relearn_timer_4h": "Re-learn: 4h timer",
           "relearn_timer_8h": "Re-learn: 8h timer",
           "relearn_sound_toggle": "Re-learn: sound"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure the fan",
+        "menu_options": {
+          "reconfigure_codes": "Relearn RF codes (a button that was mis-captured)",
+          "reconfigure_capabilities": "Change the fan declaration (name, speeds, features)"
+        }
+      },
+      "reconfigure_capabilities": {
+        "title": "RF Fan - Reconfigure",
+        "description": "Re-declare the fan capabilities. Existing codes are kept; only newly required buttons are learned next.",
+        "data": {
+          "fan_name": "Fan display name",
+          "speed_count": "Number of discrete speeds",
+          "light_control": "Light control",
+          "has_fan_on": "Fan has a dedicated on button",
+          "has_direction": "Reverse direction (reverse button)",
+          "has_natural_preset": "Natural airflow",
+          "has_color_temp": "Color temperature (Kelvin)",
+          "has_timers": "Sleep timers (1h/2h/4h/8h)",
+          "has_sound": "Sound (beep)"
         }
       }
     },
