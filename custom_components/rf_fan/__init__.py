@@ -8,9 +8,11 @@ from pathlib import Path
 import homeassistant.helpers.config_validation as cv
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
+from .actions import expected_unique_ids
 from .const import CONF_DISABLE_CARD, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
@@ -72,6 +74,16 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         )
         return
 
+    # `after_dependencies` only ORDERS the setup when the frontend is set up at
+    # all; it does not guarantee it exists. Without it there is no module list to
+    # add the card to — expected on a headless install, not an error.
+    if "frontend" not in hass.config.components:
+        _LOGGER.debug(
+            "Frontend not loaded: the card stays served at %s but is not auto-loaded",
+            CARD_URL,
+        )
+        return
+
     # Cache-bust with the integration version from manifest.json: single
     # source of truth, so the browser refetches the card on every release.
     integration = await async_get_integration(hass, DOMAIN)
@@ -99,9 +111,28 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+@callback
+def _async_remove_stale_entities(hass: HomeAssistant, entry: RfFanConfigEntry) -> None:
+    """Drop registry rows for capabilities that are no longer enabled.
+
+    A reconfiguration that turns a capability off just stops its platform from
+    creating the entity; the registry row would survive as a permanently
+    unavailable entity that the user cannot delete.
+    """
+    registry = er.async_get(hass)
+    expected = expected_unique_ids(entry.entry_id, entry.data)
+    for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registered.unique_id not in expected:
+            _LOGGER.debug(
+                "Removing %s: its capability is no longer enabled", registered.entity_id
+            )
+            registry.async_remove(registered.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:
     """Initialize an RF fan config entry."""
     entry.runtime_data = RfFanRuntimeData()
+    _async_remove_stale_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

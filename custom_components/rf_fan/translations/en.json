@@ -116,7 +116,8 @@
       "required": "This field is required.",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose one.",
       "unknown_esphome_device": "No compatible ESPHome device was found with this name.",
-      "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action."
+      "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action.",
+      "duplicate_code": "This code is already assigned to another action. Two actions sharing one code cannot be told apart when the physical remote is used. Press a different button, or paste a distinct code."
     },
     "abort": {
       "already_configured": "A fan with this name is already configured on this gateway.",

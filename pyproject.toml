@@ -1,7 +1,8 @@
 [tool.ruff]
-target-version = "py313"
+# HA 2026.5 (the hacs.json target) requires Python >= 3.14; CI runs 3.14.
+target-version = "py314"
 line-length = 100
-extend-exclude = [".venv-test"]
+extend-exclude = [".venv", ".venv-test", ".venv314"]
 
 [tool.ruff.lint]
 select = [

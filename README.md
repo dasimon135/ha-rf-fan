@@ -177,13 +177,18 @@ example is in [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml).
 ```text
 custom_components/rf_fan/
   __init__.py        actions.py       config_flow.py   const.py
-  entity.py          fan.py           light.py         select.py
-  button.py          switch.py        manifest.json
+  data.py            diagnostics.py   entity.py        manifest.json
+  fan.py             light.py         select.py        sensor.py
+  button.py          switch.py
   strings.json       translations/{en,fr}.json
   brand/             icon.png  icon@2x.png  logo.png
   frontend/          rf-fan-card.js   (bundled dashboard card)
+blueprints/automation/rf_fan/
+  fan_temperature_control.yaml
 esphome/
   rf_fan_example.yaml
+scripts/
+  Dockerfile.tests   run-tests.ps1    run-tests.sh
 ```
 
 ## Brand icon
@@ -201,17 +206,41 @@ Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
 - No native RF acknowledgement — state is assumed, not confirmed.
 - The protocols that actually work depend on what your ESPHome gateway can sniff and
   replay correctly.
+- **The reference gateway is hard-wired to `rc_switch` protocol 1.** It publishes the
+  sniffed frame but not `x.protocol`, and replays it with `protocol: 1`. Remotes using
+  protocols 2–8 therefore learn fine but do not actuate the fan. If your remote is not
+  protocol 1, adapt `esphome/rf_fan_example.yaml` (the integration itself is unaffected:
+  it treats codes as opaque strings).
+- A physical press of the very button Home Assistant just triggered is ignored for
+  `ECHO_SUPPRESS_SEC` (see `const.py`) — that window is what discards the gateway's echo
+  of our own transmission. Pressing any *other* button is honoured immediately.
 
 ## Development
 
-Pure logic tests run anywhere:
+The pure logic tests (`tests/test_actions.py`) run anywhere:
 
 ```bash
 python -m pytest tests/test_actions.py -q
 ```
 
-The config-flow tests require `pytest-homeassistant-custom-component` (a Home Assistant
-test environment) and skip cleanly when it is unavailable.
+Everything else needs a Home Assistant test environment
+(`pytest-homeassistant-custom-component`). Those modules skip themselves cleanly when it
+is unavailable, so the pure suite never breaks — but they are most of the coverage, so
+run the full suite before pushing. Home Assistant's runner imports the POSIX-only
+`fcntl`, so on Windows it has to go through Docker:
+
+```powershell
+.\scripts\run-tests.ps1            # whole suite, same image as CI
+.\scripts\run-tests.ps1 tests/test_echo_suppression.py -q
+.\scripts\run-tests.ps1 -Rebuild   # after editing requirements-test.txt
+```
+
+```bash
+sh scripts/run-tests.sh            # same thing from a POSIX shell
+```
+
+On Linux/macOS a plain `pip install -r requirements-test.txt && python -m pytest tests/`
+works too.
 
 ## License
 

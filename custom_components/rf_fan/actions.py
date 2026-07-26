@@ -80,11 +80,24 @@ def split_actions(
 
 
 def validate_codes(codes: dict[str, str], required: list[str]) -> dict[str, str]:
-    """Return {field: error_key}; empty dict if everything is valid."""
+    """Return {field: error_key}; empty dict if everything is valid.
+
+    Besides missing codes, a code reused by two actions is rejected: the reverse
+    lookup that maps a received frame back to an action compares codes, so a
+    duplicate makes one of the two actions unreachable from the physical remote.
+    The first action to claim a code keeps it; later ones are flagged.
+    """
     errors: dict[str, str] = {}
+    seen: set[str] = set()
     for action in required:
-        if not codes.get(action):
+        code = codes.get(action)
+        if not code:
             errors[action] = "required"
+            continue
+        if code in seen:
+            errors[action] = "duplicate_code"
+            continue
+        seen.add(code)
     return errors
 
 
@@ -100,6 +113,30 @@ CAPABILITY_FLAGS = (
 def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
     """Extract the capabilities from a config entry dict (default False)."""
     return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
+
+
+def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:
+    """Unique ids of every entity a config entry should own, given its capabilities.
+
+    Single source of truth for the entity-registry cleanup: when a capability is
+    switched off during a reconfiguration its platform simply stops creating the
+    entity, and the registry row would otherwise linger as a permanently
+    unavailable ghost. Must be kept in step with the `async_setup_entry` guards
+    and the `_attr_unique_id` of each platform.
+    """
+    ids = {f"{entry_id}_fan"}
+    # light.py defaults `has_light` to True for entries predating the flag.
+    if data.get("has_light", True):
+        ids.add(f"{entry_id}_light")
+    if data.get("has_color_temp", False):
+        ids.add(f"{entry_id}_color_temp")
+        ids.add(f"{entry_id}_kelvin_calibrate")
+    if data.get("has_sound", False):
+        ids.add(f"{entry_id}_sound")
+    if data.get("has_timers", False):
+        ids.add(f"{entry_id}_sleep_timer")
+        ids.update(f"{entry_id}_{timer_action(hours)}" for hours in TIMER_HOURS)
+    return ids
 
 
 def classify_reconfigure_actions(

@@ -63,7 +63,12 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
             return
         target = COLOR_TEMP_OPTIONS.index(option)
         steps = (target - runtime.kelvin_position) % len(COLOR_TEMP_OPTIONS)
-        await self._async_transmit_times(ACTION_LIGHT_KELVIN, steps, gap=KELVIN_STEP_GAP_SEC)
+        if steps and not await self._async_transmit_times(
+            ACTION_LIGHT_KELVIN, steps, gap=KELVIN_STEP_GAP_SEC
+        ):
+            # Nothing went on the air (unmapped code): the lamp has not moved, so
+            # neither may the assumed position.
+            return
         runtime.kelvin_position = target
         self.async_write_ha_state()
 
@@ -96,7 +101,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Advance the color position when the remote emits the kelvin action."""
-        if self._recently_transmitted():
+        if self._is_echo(event.data):
             return
 
         action = self._event_action(event.data)

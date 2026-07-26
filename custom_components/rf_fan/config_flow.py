@@ -78,7 +78,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._learn_codes: dict[str, str] = {}
         self._learn_action_index: int = 0
         self._learn_task: asyncio.Task[str | None] | None = None
-        self._learn_timeout: bool = False
+        # Error key for the recovery form ("learn_timeout" / "duplicate_code"),
+        # None while the capture loop is running normally.
+        self._learn_error: str | None = None
         self._reconfigure: bool = False
         self._existing_codes: dict[str, str] = {}
         self._pending_actions: list[str] | None = None
@@ -194,7 +196,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 if not self._reconfigure:
                     self._learn_codes = {}
                 self._learn_task = None
-                self._learn_timeout = False
+                self._learn_error = None
                 self._learn_action_index = 0
                 return await self.async_step_learn()
             return await self.async_step_codes()
@@ -304,30 +306,28 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             # Recovery form submission: skip or paste a code.
-            self._learn_timeout = False
+            self._learn_error = None
             if bool(user_input.get("skip")):
                 self._learn_action_index += 1
             else:
                 manual_code = str(user_input.get("code", "")).strip()
                 if manual_code:
-                    self._learn_codes[actions[self._learn_action_index]] = manual_code
-                    self._learn_action_index += 1
+                    self._learn_error = self._store_learned_code(manual_code)
         elif self._learn_task is not None:
-            # A listen has just finished: store the code or flag the timeout.
+            # A listen has just finished: store the code or flag the failure.
             learned_code = self._learn_task.result()
             self._learn_task = None
-            if learned_code is not None:
-                self._learn_codes[actions[self._learn_action_index]] = learned_code
-                self._learn_action_index += 1
+            if learned_code is None:
+                self._learn_error = "learn_timeout"
             else:
-                self._learn_timeout = True
+                self._learn_error = self._store_learned_code(learned_code)
 
         # All actions processed: create the entry.
         if self._learn_action_index >= len(actions):
             return self._finish(self._learn_codes)
 
-        # Timeout on the previous listen: offer manual entry / skip.
-        if self._learn_timeout:
+        # The previous capture failed: offer manual entry / skip.
+        if self._learn_error:
             return self.async_show_form(
                 step_id="learn_resolve",
                 data_schema=vol.Schema(
@@ -340,11 +340,29 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     "action": actions[self._learn_action_index],
                     "timeout": str(LEARN_TIMEOUT_SEC),
                 },
-                errors={"base": "learn_timeout"},
+                errors={"base": self._learn_error},
             )
 
         # Otherwise: listen for the next action.
         return await self.async_step_learn()
+
+    def _store_learned_code(self, code: str) -> str | None:
+        """Assign a captured code to the current action, or return an error key.
+
+        The repeats of a held button keep arriving after the flow has moved on, so
+        the same frame is easily captured twice. Two actions sharing a code make the
+        reverse lookup (received frame -> action) ambiguous, so it is refused.
+        """
+        action = self._actions_to_process()[self._learn_action_index]
+        if any(
+            other_code == code
+            for other_action, other_code in self._learn_codes.items()
+            if other_action != action
+        ):
+            return "duplicate_code"
+        self._learn_codes[action] = code
+        self._learn_action_index += 1
+        return None
 
     async def _async_wait_for_rf_signal(self) -> str | None:
         """Wait for RF events from the gateway and return the most repeated code.

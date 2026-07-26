@@ -112,6 +112,9 @@ class RfFanBaseEntity(Entity):
         # Relative/toggle actions must fire exactly once (the captured code already
         # holds the remote's repeat burst); only absolute actions use repeat_count.
         repeat_count = 1 if action in SINGLE_SHOT_ACTIONS else self._repeat_count()
+        # Arm the anti-echo window BEFORE the call: the gateway can sniff and report
+        # our own frame while we are still awaiting the service call.
+        self._note_transmission(code)
         try:
             await self.hass.services.async_call(
                 "esphome",
@@ -135,16 +138,38 @@ class RfFanBaseEntity(Entity):
                 },
             ) from err
 
-        self._runtime.last_tx = self.hass.loop.time()
+        # Re-arm from the moment the call actually returned.
+        self._note_transmission(code)
         return True
 
     def _gateway_issue_id(self) -> str:
         """Repair-issue id for a missing gateway service, specific to the entry."""
         return f"gateway_service_missing_{self._config_entry.entry_id}"
 
-    def _recently_transmitted(self) -> bool:
-        """True if a transmission occurred very recently (anti-echo window)."""
-        return (self.hass.loop.time() - self._runtime.last_tx) < ECHO_SUPPRESS_SEC
+    def _note_transmission(self, code: str) -> None:
+        """Open the anti-echo window for a code we just put on the air."""
+        now = self.hass.loop.time()
+        echoes = self._runtime.echo_codes
+        # Drop stale entries so the map cannot grow unbounded over time.
+        for stale in [known for known, until in echoes.items() if until <= now]:
+            del echoes[stale]
+        echoes[code] = now + ECHO_SUPPRESS_SEC
+
+    def _is_echo(self, event_data: dict[str, Any]) -> bool:
+        """True if the received frame is our own transmission coming back.
+
+        Matching is per code, so a genuine press of a different remote button just
+        after a Home Assistant command is not discarded. The window is not consumed
+        on the first match: `repeat_count` > 1 produces several echoes, and every
+        platform of the entry listens to the same bus event.
+        """
+        now = self.hass.loop.time()
+        code = event_data.get("code")
+        if isinstance(code, str) and code:
+            return self._runtime.echo_codes.get(code, 0.0) > now
+        # No code reported by the gateway: nothing to match on, so fall back to a
+        # blanket window over all reception.
+        return any(until > now for until in self._runtime.echo_codes.values())
 
     async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
         """Transmit an action's code `times` times (cycle).

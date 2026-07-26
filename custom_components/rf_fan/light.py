@@ -108,7 +108,7 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Update the light state from the received RF actions."""
-        if self._recently_transmitted():
+        if self._is_echo(event.data):
             return
 
         action = self._event_action(event.data)

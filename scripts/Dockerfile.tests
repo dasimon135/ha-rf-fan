@@ -1,0 +1,9 @@
+# Test image for the HA-dependent suite.
+# Home Assistant's runner imports the POSIX-only `fcntl`, so the
+# pytest-homeassistant-custom-component tests cannot run on Windows natively.
+# See scripts/run-tests.ps1 / scripts/run-tests.sh.
+FROM python:3.14-slim
+WORKDIR /app
+COPY requirements-test.txt /tmp/requirements-test.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-test.txt
+CMD ["python", "-m", "pytest", "tests/", "-q"]

@@ -10,9 +10,17 @@
  * calibrate button), showing only the controls that actually exist.
  */
 
-const VERSION = "1.4.1";
+// Keep in step with manifest.json: the integration cache-busts the card with the
+// manifest version, so a mismatch here makes the console banner lie about which
+// build the browser actually loaded — exactly when you are chasing a stale cache.
+const VERSION = "1.6.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
+
+// Everything interpolated into innerHTML goes through this: entity names are
+// user-editable, so an unescaped `<` in a friendly name would break the markup.
+const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ESCAPES[c]);
 
 class RfFanCard extends HTMLElement {
   setConfig(config) {
@@ -150,7 +158,7 @@ class RfFanCard extends HTMLElement {
     const tile = this._config.layout === "tile";
     this._root.classList.toggle("tilecard", tile);
     if (!fan) {
-      this._body.innerHTML = `<div class="warn">Entity ${ent.fan} not found</div>`;
+      this._body.innerHTML = `<div class="warn">Entity ${esc(ent.fan)} not found</div>`;
       return;
     }
 
@@ -178,9 +186,9 @@ class RfFanCard extends HTMLElement {
               <circle class="hub2" cx="50" cy="50" r="3.5"/>
             </svg>
           </button>
-          <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${name}">
-            <span class="tname">${name}</span>
-            <span class="tsub">${sub}</span>
+          <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${esc(name)}">
+            <span class="tname">${esc(name)}</span>
+            <span class="tsub">${esc(sub)}</span>
           </div>
           <div class="tctl">
             <button class="tbtn" data-tspeed="down" aria-label="Lower">−</button>
@@ -222,7 +230,7 @@ class RfFanCard extends HTMLElement {
       const lightOff = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
       const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
       const segsC = opts
-        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${o}" ${lightOff ? "disabled" : ""}>${L.color(o)}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}" ${lightOff ? "disabled" : ""}>${esc(L.color(o))}</button>`)
         .join("");
       colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="${L.recalibrate}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
     }
@@ -247,7 +255,7 @@ class RfFanCard extends HTMLElement {
     let timerRow = "";
     if (ent.timers.length) {
       timerRow = `<div class="timers">` + ent.timers
-        .map((t) => `<button class="chip" data-timer="${t.id}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${t.h}h</span></button>`)
+        .map((t) => `<button class="chip" data-timer="${esc(t.id)}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${esc(t.h)}h</span></button>`)
         .join("") + `</div>`;
     }
 
@@ -256,14 +264,14 @@ class RfFanCard extends HTMLElement {
       const ts = this._hass.states[ent.timerSensor];
       if (ts && ts.state !== "unknown" && ts.state !== "unavailable") {
         const disp = this._hass.formatEntityState ? this._hass.formatEntityState(ts) : ts.state;
-        timerLine = `<div class="timerline"><ha-icon icon="mdi:timer-sand"></ha-icon><span>${disp}</span></div>`;
+        timerLine = `<div class="timerline"><ha-icon icon="mdi:timer-sand"></ha-icon><span>${esc(disp)}</span></div>`;
       }
     }
 
     this._body.innerHTML = `
       <div class="head">
-        <div class="title">${name}</div>
-        <div class="state ${on ? "on" : ""}">${on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off}</div>
+        <div class="title">${esc(name)}</div>
+        <div class="state ${on ? "on" : ""}">${esc(on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off)}</div>
       </div>
       <div class="hero">
         <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">

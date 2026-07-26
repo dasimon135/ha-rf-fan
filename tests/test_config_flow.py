@@ -391,3 +391,38 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
         "timer_8h": "t8",
     }
     assert entry.data["has_timers"] is True
+
+
+async def test_learn_rejects_a_code_already_used_by_another_action(
+    hass: HomeAssistant,
+) -> None:
+    """Re-capturing the same frame for the next action must not be accepted silently.
+
+    The repeats of a held button keep arriving while the flow has already moved on
+    to the next action, so the same code easily gets stored twice. Two actions
+    sharing one code make the reverse lookup ambiguous, so the capture is refused
+    and the recovery form is offered instead.
+    """
+    flow, result = await _start_learn(hass)
+    flow_id = result["flow_id"]
+    assert result["description_placeholders"]["action"] == "fan_off"
+
+    # First action captured normally.
+    hass.bus.async_fire(EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "SAME"})
+    await hass.async_block_till_done()
+    result = await flow.async_configure(flow_id)
+    assert result["description_placeholders"]["action"] == "fan_speed_1"
+
+    # Leftover repeats of the very same frame land on the next action.
+    hass.bus.async_fire(EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "SAME"})
+    await hass.async_block_till_done()
+    result = await flow.async_configure(flow_id)
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {"base": "duplicate_code"}
+    # Still waiting on fan_speed_1: the duplicate was not stored.
+    assert result["description_placeholders"]["action"] == "fan_speed_1"
+
+    # Pasting a distinct code by hand gets the flow moving again.
+    result = await flow.async_configure(flow_id, {"code": "OTHER", "skip": False})
+    assert result["description_placeholders"]["action"] == "fan_speed_2"

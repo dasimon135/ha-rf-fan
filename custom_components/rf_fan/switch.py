@@ -78,7 +78,7 @@ class RfFanSoundSwitch(RfFanBaseEntity, RestoreEntity, SwitchEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Toggle the sound state from the received RF action."""
-        if self._recently_transmitted():
+        if self._is_echo(event.data):
             return
 
         action = self._event_action(event.data)
