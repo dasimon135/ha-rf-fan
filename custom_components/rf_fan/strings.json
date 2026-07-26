@@ -190,6 +190,12 @@
         "toggle": "Single toggle button",
         "on_off": "Two buttons (on/off)"
       }
+    },
+    "learn_method": {
+      "options": {
+        "manual": "Paste the codes manually",
+        "learn": "Learn from the remote (guided)"
+      }
     }
   }
 }

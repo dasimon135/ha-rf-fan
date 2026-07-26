@@ -190,6 +190,12 @@
         "toggle": "Bouton toggle unique",
         "on_off": "Deux boutons (on/off)"
       }
+    },
+    "learn_method": {
+      "options": {
+        "manual": "Coller les codes manuellement",
+        "learn": "Apprendre depuis la télécommande (guidé)"
+      }
     }
   }
 }

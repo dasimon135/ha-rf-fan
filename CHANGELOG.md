@@ -45,6 +45,9 @@ Audit pass: the fixes below all come with regression tests (the suite goes from
   fan actually has a light, and it lights up amber while the light is on.
 - **First tests for the bundled card** (`tests/frontend/`), run by `node --test`
   against a minimal DOM stub — no dependency, no build step, and a new CI job.
+- **Diagnostics now carry the assumed state** (`runtime` section: colour
+  position, light, sleep timer, number of armed anti-echo windows). The fan
+  reports nothing back, so this was the one thing a bug report could not show.
 - **Duplicate captured codes are rejected.** The repeats of a held button kept
   arriving after the learning flow had moved on, so the same frame was easily
   stored for two actions — which makes the received-frame lookup ambiguous and
@@ -60,6 +63,12 @@ Audit pass: the fixes below all come with regression tests (the suite goes from
 
 - `ECHO_SUPPRESS_SEC` 1.0 → 2.0 s. Now that suppression is per code, a wider
   window costs far less and covers a slow or congested gateway.
+- **The card classifies buttons by their registry `translation_key`** instead of
+  guessing from the entity_id. Renaming a timer button's entity_id used to make
+  it masquerade as the colour-calibrate button — and fire the wrong RF code. The
+  id pattern remains as a fallback for registries that do not expose the key.
+- The setup step that picks manual vs guided learning is translated (it showed
+  the raw `manual` / `learn` keys; `vol.In` labels are never translated).
 - Ruff `target-version` py313 → py314, matching CI and the HA 2026.5 target.
 - README: documented the `rc_switch` protocol-1 limitation of the reference
   gateway, the anti-echo trade-off, and the Docker test workflow.

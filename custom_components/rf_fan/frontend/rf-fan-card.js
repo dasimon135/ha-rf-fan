@@ -22,6 +22,13 @@ console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;bo
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ESCAPES[c]);
 
+// "1h", "2 h", "_4h_" — the duration token in a timer button's name or id.
+const HOUR_TOKEN = /(\d+)\s*h(?![a-z])/i;
+
+// FanEntityFeature bits (homeassistant/components/fan/const.py).
+const FEATURE_DIRECTION = 4;
+const FEATURE_PRESET_MODE = 8;
+
 class RfFanCard extends HTMLElement {
   setConfig(config) {
     if (!config || !config.entity || !config.entity.startsWith("fan.")) {
@@ -78,14 +85,32 @@ class RfFanCard extends HTMLElement {
       return siblings.find((e) => e.startsWith(domain + "."));
     };
 
-    // Buttons: timers carry a "<n>h" token; the remaining one is the calibrate button.
-    const isTimer = (e) => /(?:^|[_\s])(\d+)\s*h(?![a-z])/i.test(e);
+    // Buttons: prefer the registry's translation_key, which survives a rename of
+    // the entity_id. Fall back to the "<n>h" token in the id for registries that
+    // do not expose it — that guess breaks on a renamed entity, which would make
+    // a timer masquerade as the calibrate button and fire the wrong RF code.
     const buttons = siblings.filter((e) => e.startsWith("button."));
+    const keyOf = (e) => (reg[e] || {}).translation_key;
+    const keyed = buttons.some(keyOf);
+    const hasHourToken = (s) => HOUR_TOKEN.test(s || "");
+    const isTimer = (e) => (keyed ? keyOf(e) === "timer" : hasHourToken(e));
+    const isCalibrate = (e) =>
+      keyed ? keyOf(e) === "recalibrate_color" : !hasHourToken(e);
+
+    // The hour is not in the translation key (it is a placeholder), so read it
+    // from the friendly name first and only then from the id.
+    const hoursOf = (e) => {
+      const st = hass.states[e];
+      const name = st && st.attributes && st.attributes.friendly_name;
+      const from = (s) => ((s || "").match(HOUR_TOKEN) || [])[1];
+      return from(name) || from(e);
+    };
+
     const timers = buttons
       .filter(isTimer)
-      .map((e) => ({ id: e, h: (e.match(/(\d+)\s*h(?![a-z])/i) || [])[1] }))
+      .map((e) => ({ id: e, h: hoursOf(e) }))
       .sort((a, b) => Number(a.h) - Number(b.h));
-    const calibrate = cfg.calibrate_entity || buttons.find((e) => !isTimer(e));
+    const calibrate = cfg.calibrate_entity || buttons.find(isCalibrate);
 
     return {
       fan: fanId,
@@ -246,14 +271,14 @@ class RfFanCard extends HTMLElement {
 
     const feat = fan.attributes.supported_features || 0;
     const modeChips = [];
-    if (feat & 4) {
+    if (feat & FEATURE_DIRECTION) {
       const dir = fan.attributes.direction;
       modeChips.push(
         `<button class="chip ${dir !== "reverse" ? "active" : ""}" data-dir="forward"><ha-icon icon="mdi:rotate-right"></ha-icon><span>${L.forward}</span></button>`,
         `<button class="chip ${dir === "reverse" ? "active" : ""}" data-dir="reverse"><ha-icon icon="mdi:rotate-left"></ha-icon><span>${L.reverse}</span></button>`
       );
     }
-    if (feat & 8) {
+    if (feat & FEATURE_PRESET_MODE) {
       const preset = fan.attributes.preset_mode;
       modeChips.push(
         `<button class="chip ${preset !== "natural" ? "active" : ""}" data-preset="normal"><ha-icon icon="mdi:fan"></ha-icon><span>${L.normal}</span></button>`,

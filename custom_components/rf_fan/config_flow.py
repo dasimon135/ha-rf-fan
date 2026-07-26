@@ -205,11 +205,12 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="method",
             data_schema=vol.Schema(
                 {
-                    vol.Required("method", default="manual"): vol.In(
-                        {
-                            "manual": "manual",
-                            "learn": "learn",
-                        }
+                    # A selector rather than vol.In: it is the only form that gets
+                    # its labels translated (vol.In shows the raw keys).
+                    vol.Required("method", default="manual"): SelectSelector(
+                        SelectSelectorConfig(
+                            options=["manual", "learn"], translation_key="learn_method"
+                        )
                     )
                 }
             ),
