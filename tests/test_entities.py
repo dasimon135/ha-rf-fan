@@ -8,7 +8,7 @@ it never breaks the pure suite (`test_actions.py`); it runs in CI Linux.
 These tests drive the real platform entities (fan/light/select) end-to-end:
 they register a stub `esphome.<device>_transmit_rf_fan` service that captures
 every transmit call, set up a full-capability config entry, then assert the
-observable entity behaviours (single-shot repeat_count, restore, colour gating,
+observable entity behaviours (toggle repeat_count, restore, colour gating,
 direction/preset).
 """
 
@@ -33,19 +33,29 @@ def _auto_enable_custom_integrations(enable_custom_integrations):
     yield
 
 
-async def test_single_shot_vs_absolute_repeat_count(hass: HomeAssistant) -> None:
-    """Relative actions transmit once; absolute actions use the entry repeat_count.
-
-    Entry repeat_count == 2. Toggling the light is a relative (single-shot) action
-    (`light_toggle`) → repeat_count 1. Setting a fan speed is absolute
-    (`fan_speed_1`) → repeat_count 2.
-    """
-    _entry, calls = await _setup_full(hass, repeat_count=2)
+@pytest.mark.parametrize(
+    ("configured", "expected_toggle"),
+    [
+        # Even counts round DOWN to the nearest odd value: a toggle must end up
+        # actuated an odd number of times whatever the receiver does with a burst.
+        (2, 1),
+        (4, 3),
+        # An odd count is already correct and passes straight through — this is what
+        # lets a receiver that drops a lone frame actually see a light_toggle (#15).
+        (5, 5),
+        (1, 1),
+    ],
+)
+async def test_toggle_vs_absolute_repeat_count(
+    hass: HomeAssistant, configured: int, expected_toggle: int
+) -> None:
+    """Toggles round the entry repeat_count down to odd; absolute actions keep it."""
+    _entry, calls = await _setup_full(hass, repeat_count=configured)
 
     light_id = _one_id(hass, "light")
     fan_id = _one_id(hass, "fan")
 
-    # Relative action: light toggle → repeat_count must be forced to 1.
+    # Toggle action: light toggle → nearest odd value at or below the configured one.
     await hass.services.async_call(
         "light", "turn_on", {"entity_id": light_id}, blocking=True
     )
@@ -53,9 +63,9 @@ async def test_single_shot_vs_absolute_repeat_count(hass: HomeAssistant) -> None
     toggle = _last_call(calls, "light_toggle")
     assert toggle is not None, "light_toggle was never transmitted"
     assert toggle["code"] == "c_lt"
-    assert toggle["repeat_count"] == 1
+    assert toggle["repeat_count"] == expected_toggle
 
-    # Absolute action: fan speed 1 → repeat_count must be the entry value (2).
+    # Absolute action: fan speed 1 → repeat_count must be the entry value, untouched.
     # percentage 33 maps to speed index 1 (step = 100/3).
     await hass.services.async_call(
         "fan", "set_percentage", {"entity_id": fan_id, "percentage": 33}, blocking=True
@@ -64,7 +74,7 @@ async def test_single_shot_vs_absolute_repeat_count(hass: HomeAssistant) -> None
     speed = _last_call(calls, "fan_speed_1")
     assert speed is not None, "fan_speed_1 was never transmitted"
     assert speed["code"] == "c_s1"
-    assert speed["repeat_count"] == 2
+    assert speed["repeat_count"] == configured
 
 
 async def test_fan_restore_state(hass: HomeAssistant) -> None:

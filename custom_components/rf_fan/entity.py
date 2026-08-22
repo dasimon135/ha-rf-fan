@@ -11,6 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
 
+from .actions import transmit_repeat_count
 from .const import (
     COLOR_TEMP_OPTIONS,
     CONF_CODES,
@@ -20,7 +21,6 @@ from .const import (
     CONF_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
-    SINGLE_SHOT_ACTIONS,
 )
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
@@ -109,9 +109,10 @@ class RfFanBaseEntity(Entity):
         # The service is back: clear the repair issue if one was raised.
         ir.async_delete_issue(self.hass, DOMAIN, self._gateway_issue_id())
 
-        # Relative/toggle actions must fire exactly once (the captured code already
-        # holds the remote's repeat burst); only absolute actions use repeat_count.
-        repeat_count = 1 if action in SINGLE_SHOT_ACTIONS else self._repeat_count()
+        # Toggle actions keep repeat_count but rounded down to an odd value, so the
+        # fan ends up flipped exactly once whether or not it debounces the burst;
+        # absolute actions use the configured count as-is (see const.TOGGLE_ACTIONS).
+        repeat_count = transmit_repeat_count(action, self._repeat_count())
         # Arm the anti-echo window BEFORE the call: the gateway can sniff and report
         # our own frame while we are still awaiting the service call.
         self._note_transmission(code)

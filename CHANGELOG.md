@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A toggle action ignored `repeat_count` entirely and always went out once**, so a
+  receiver that needs several identical frames before it accepts anything never saw
+  `light_toggle` — while `fan_on`, sent `repeat_count` times over the same radio with
+  the same code shape, worked. Toggles now honour the configured count, rounded *down
+  to the nearest odd value*: a receiver that debounces the burst registers one press
+  whatever the count, and one that treats every frame as a press registers a net flip
+  only when the count is odd, so an odd count is correct under both. The default
+  (`repeat_count: 2`) still transmits once, so nothing changes for existing setups.
+  `SINGLE_SHOT_ACTIONS` is renamed `TOGGLE_ACTIONS` and the arithmetic lives in
+  `actions.transmit_repeat_count`, next to the rest of the Home-Assistant-free logic.
+  ([#15](https://github.com/dasimon135/ha-rf-fan/issues/15))
 - **The reference ESPHome gateway published codes it could not replay.** The
   `rc_code` lambda returned `x.code`, which `on_rc_switch` hands over as a 64-bit
   integer — so the event carried the code's *decimal* form (`645080348`), while
