@@ -172,4 +172,14 @@ remote_receiver:
                       bits.reserve(nbits);
                       for (int i = nbits - 1; i >= 0; i--)
                         bits += ((x.code >> i) & 1) ? '1' : '0';
+                      // Remote sends N+1 bits but rc_switch only ever reports
+                      // N? The decoder stops at the first pulse pair it cannot
+                      // match, and on some remotes the final bit runs straight
+                      // into the inter-frame gap, so it is dropped. Set
+                      // rc_code_bits to what IS decoded and rebuild the missing
+                      // trailing bit here. Example, for a 30-bit frame whose
+                      // last bit is an even parity over the other 29:
+                      //   int ones = 0;
+                      //   for (char c : bits) ones += (c == '1');
+                      //   bits += (ones & 1) ? '1' : '0';
                       return std::to_string(x.protocol) + ":" + bits;
