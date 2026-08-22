@@ -53,19 +53,25 @@ ACTION_LIGHT_KELVIN: Final = "light_kelvin"
 ACTION_SOUND_TOGGLE: Final = "sound_toggle"
 TIMER_HOURS: Final = (1, 2, 4, 8)
 
-# Relative/toggle actions that must fire EXACTLY once. Each press flips a state
-# (toggle the light or sound, flip direction or the natural preset). The fan debounces
-# a rapid repeat burst into a single actuation, so replaying such a code repeat_count>1
-# times would double-actuate and cancel the toggle back out. These always transmit once,
-# regardless of the configured repeat_count. Absolute actions (speeds, timers, on/off)
-# keep repeat_count for reliability.
+# Toggle actions: each press FLIPS a state (the light, the sound, the direction, the
+# natural preset) instead of setting one. The fan must therefore end up actuated an ODD
+# number of times, which is what `actions.transmit_repeat_count` enforces: it rounds the
+# configured repeat_count down to the nearest odd value for these, and leaves absolute
+# actions (speeds, timers, on/off) alone.
 #
-# NOTE: the colour cycle (ACTION_LIGHT_KELVIN) is deliberately NOT single-shot. The fan
-# debounces a repeat burst into a single colour step (exactly as it does for a speed
-# press), so each step is sent with repeat_count for reliability; distinct steps are
-# separated by KELVIN_STEP_GAP_SEC so the receiver registers them as separate presses
-# (see select.py).
-SINGLE_SHOT_ACTIONS: Final = frozenset(
+# Why odd rather than exactly once, which is what this used to do: the two plausible
+# receiver behaviours disagree about a burst, and odd is correct under both. A receiver
+# that debounces a repeat burst registers a single press whatever the count. One that
+# treats every frame as a separate press registers a net flip only when the count is odd.
+# Forcing 1 was safe under both too, but it left nothing for a noisy link or a receiver
+# that simply ignores a lone frame — see issue #15, where light_toggle never reached the
+# lamp while fan_on did, on the same hardware and the same code shape.
+#
+# NOTE: the colour cycle (ACTION_LIGHT_KELVIN) is deliberately NOT in here. It is a
+# relative action, but the select walks to a target by sending N discrete steps
+# (see select.py), and each of those steps needs the full repeat_count for reliability;
+# distinct steps are separated by KELVIN_STEP_GAP_SEC.
+TOGGLE_ACTIONS: Final = frozenset(
     {
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,

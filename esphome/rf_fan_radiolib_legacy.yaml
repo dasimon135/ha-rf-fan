@@ -1,0 +1,164 @@
+# RF Fan gateway — legacy single-pin configuration (RadioLib CC1101).
+#
+# Kept for setups already wired with GDO0 shared between receive and transmit.
+# For a NEW build, use rf_fan_example.yaml instead: it uses ESPHome's built-in
+# cc1101: component with separate RX/TX pins, which avoids a pin-mode conflict
+# that can leave the receiver permanently deaf on ESP32.
+
+substitutions:
+  device_name: rf-fan-gateway
+  friendly_name: RF fan gateway
+  # RF frequency of the remote (MHz). Start at 433.92 and adjust if
+  # the sniff captures nothing (try 433.42, 434.42...).
+  cc1101_frequency: "433.92"
+
+  # Frame geometry. rc_switch reports a decoded frame as a 64-bit integer and
+  # DISCARDS the bit length, so it has to be declared here — exactly, because
+  # transmit_rc_switch_raw derives the frame length from the string length.
+  # Read both values off the `dump: rc_switch` log line:
+  #   Received RCSwitch Raw: protocol=1 data='000100110101...'
+  rc_protocol: "1"
+  rc_code_bits: "24"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      - lambda: id(mycc1101).recv();
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# RadioLib CC1101 component (required for 8-pin CC1101 modules)
+external_components:
+  - source: github://juanboro/esphome-radiolib-cc1101@main
+    components: [ radiolib_cc1101 ]
+
+logger:
+
+api:
+  encryption:
+    key: !secret rf_fan_api_key
+  services:
+    - service: transmit_rf_fan
+      variables:
+        action: string
+        code: string
+        repeat_count: int
+      then:
+        - remote_transmitter.transmit_rc_switch_raw:
+            transmitter_id: rf_transmitter
+            # Codes are stored as "<protocol>:<bits>"; transmit_rc_switch_raw
+            # wants the bare bit string (every character counts as one bit).
+            code: !lambda |-
+              const std::string raw = code;
+              const size_t sep = raw.find(':');
+              return sep == std::string::npos ? raw : raw.substr(sep + 1);
+            protocol: ${rc_protocol}
+            repeat:
+              times: !lambda "return repeat_count;"
+              wait_time: 10ms
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  fast_connect: true
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret rf_fan_fallback_password
+
+captive_portal:
+
+web_server:
+  port: 80
+
+# Standard ESP32 SPI (VSPI)
+spi:
+  id: spi_bus
+  type: single
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+# CC1101 blue module wiring (standard 8-pin)
+# Pin 1 VCC→3V3 | Pin 2 GND→GND | Pin 3 MOSI→D23 | Pin 4 SCLK→D18
+# Pin 5 MISO→D19 | Pin 6 GDO2→(unused) | Pin 7 GDO0→D4 | Pin 8 CSN→D5
+radiolib_cc1101:
+  id: mycc1101
+  cs_pin: 5
+  rx_pin:
+    number: 4
+    allow_other_uses: true
+  frequency: ${cc1101_frequency}
+  filter: 464kHz
+  bitrate: 5
+
+# RF transmitter on GDO0 (GPIO4) — switches the CC1101 to TX then back to RX
+remote_transmitter:
+  - id: rf_transmitter
+    pin:
+      number: 4
+      allow_other_uses: true
+    carrier_duty_percent: 100%
+    non_blocking: false
+    on_transmit:
+      then:
+        - lambda: id(mycc1101).xmit();
+    on_complete:
+      then:
+        - lambda: id(mycc1101).recv();
+
+# RF receiver on GDO0 (GPIO4) — sniffs and publishes to Home Assistant
+remote_receiver:
+  - id: rf_receiver
+    pin:
+      number: 4
+      allow_other_uses: true
+    tolerance: 50%
+    filter: 100us
+    idle: 4ms
+    # Keep this on until guided learning works: it is the only place that
+    # prints the protocol number and the true bit length. Set it to [] after.
+    dump: rc_switch
+    on_rc_switch:
+      then:
+        - if:
+            condition:
+              api.connected:
+            then:
+              - homeassistant.event:
+                  event: esphome.rf_fan_received
+                  data_template:
+                    device: ${device_name}
+                    action: "sniff"
+                    code: "{{ rc_code }}"
+                  variables:
+                    # Rebuild the bit string over the declared width. Returning
+                    # x.code directly yields its DECIMAL representation, which
+                    # is not a bit string and cannot be replayed.
+                    rc_code: !lambda |-
+                      const int nbits = ${rc_code_bits};
+                      std::string bits;
+                      bits.reserve(nbits);
+                      for (int i = nbits - 1; i >= 0; i--)
+                        bits += ((x.code >> i) & 1) ? '1' : '0';
+                      // Remote sends N+1 bits but rc_switch only ever reports
+                      // N? The decoder stops at the first pulse pair it cannot
+                      // match, and on some remotes the final bit runs straight
+                      // into the inter-frame gap, so it is dropped. Set
+                      // rc_code_bits to what IS decoded and rebuild the missing
+                      // trailing bit here. Example, for a 30-bit frame whose
+                      // last bit is an even parity over the other 29:
+                      //   int ones = 0;
+                      //   for (char c : bits) ones += (c == '1');
+                      //   bits += (ones & 1) ? '1' : '0';
+                      return std::to_string(x.protocol) + ":" + bits;

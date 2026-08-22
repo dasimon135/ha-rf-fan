@@ -22,6 +22,12 @@ class RfFanRuntimeData:
     # discarded. Keyed by code (not a single timestamp) so a remote press of a
     # DIFFERENT button right after a Home Assistant command is still honoured.
     echo_codes: dict[str, float] = field(default_factory=dict)
+    # Last sniffed code that matched none of the learned ones. Following the
+    # physical remote is exact string matching, so a gateway that reports codes
+    # in a different shape than the one they were learned in silently stops
+    # updating anything; without this, that is indistinguishable from the
+    # feature not existing.
+    last_unmatched_code: str | None = None
 
 
 type RfFanConfigEntry = ConfigEntry[RfFanRuntimeData]

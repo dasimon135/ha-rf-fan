@@ -158,28 +158,28 @@ def test_classify_preserves_required_order():
     assert kept == [speed_action(1), ACTION_LIGHT_TOGGLE]
 
 
-def test_single_shot_actions_cover_relative_actions_only():
+def test_toggle_actions_cover_flipping_actions_only():
     from const import (
         ACTION_FAN_NATURAL,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
         ACTION_LIGHT_KELVIN,
         ACTION_SOUND_TOGGLE,
-        SINGLE_SHOT_ACTIONS,
+        TOGGLE_ACTIONS,
     )
 
-    # Relative / toggle actions must fire exactly once (a repeat would cancel the toggle).
-    for relative in (
+    # Actions that FLIP a state: their repeat count has to stay odd.
+    for toggle in (
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
         ACTION_FAN_REVERSE,
         ACTION_FAN_NATURAL,
     ):
-        assert relative in SINGLE_SHOT_ACTIONS
+        assert toggle in TOGGLE_ACTIONS
 
-    # Absolute actions keep repeat_count for reliability → NOT single-shot. The colour
-    # cycle (kelvin) is also NOT single-shot: the fan debounces a repeat burst into one
-    # step, so each step is repeated for reliability and steps are gap-separated.
+    # Absolute actions keep repeat_count untouched. The colour cycle (kelvin) is also
+    # NOT a toggle: the select walks to a target by sending N discrete steps, each of
+    # which is repeated for reliability and gap-separated from the next.
     for absolute in (
         ACTION_FAN_OFF,
         ACTION_FAN_ON,
@@ -187,7 +187,7 @@ def test_single_shot_actions_cover_relative_actions_only():
         timer_action(4),
         ACTION_LIGHT_KELVIN,
     ):
-        assert absolute not in SINGLE_SHOT_ACTIONS
+        assert absolute not in TOGGLE_ACTIONS
 
 
 def test_pick_best_code_none_for_empty():
@@ -275,3 +275,48 @@ def test_validate_codes_accepts_all_distinct_codes():
         {"fan_off": "A", "fan_speed_1": "B"}, ["fan_off", "fan_speed_1"]
     )
     assert errors == {}
+
+
+def test_toggle_repeat_count_rounds_down_to_odd():
+    """A toggle must end up actuated an odd number of times.
+
+    A receiver that debounces a burst registers one press whatever the count; one
+    that treats every frame as a press registers a net flip only for an odd count.
+    Rounding down to the nearest odd value is correct under both.
+    """
+    from actions import transmit_repeat_count
+
+    for toggle in (
+        ACTION_LIGHT_TOGGLE,
+        ACTION_SOUND_TOGGLE,
+        ACTION_FAN_REVERSE,
+        ACTION_FAN_NATURAL,
+    ):
+        assert transmit_repeat_count(toggle, 2) == 1
+        assert transmit_repeat_count(toggle, 4) == 3
+        assert transmit_repeat_count(toggle, 5) == 5
+        assert transmit_repeat_count(toggle, 1) == 1
+
+
+def test_absolute_repeat_count_is_untouched():
+    """Absolute actions keep the configured count: resending lands the same state."""
+    from actions import transmit_repeat_count
+
+    for absolute in (
+        ACTION_FAN_OFF,
+        ACTION_FAN_ON,
+        speed_action(1),
+        timer_action(4),
+        ACTION_LIGHT_KELVIN,
+    ):
+        for configured in (1, 2, 3, 4, 5):
+            assert transmit_repeat_count(absolute, configured) == configured
+
+
+def test_repeat_count_never_below_one():
+    """A nonsensical configured value still puts exactly one frame on the air."""
+    from actions import transmit_repeat_count
+
+    assert transmit_repeat_count(ACTION_LIGHT_TOGGLE, 0) == 1
+    assert transmit_repeat_count(ACTION_LIGHT_TOGGLE, -3) == 1
+    assert transmit_repeat_count(ACTION_FAN_OFF, 0) == 1

@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.6.1";
+const VERSION = "1.7.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -556,7 +556,14 @@ class RfFanCard extends HTMLElement {
   }
 }
 
-customElements.define("rf-fan-card", RfFanCard);
+// Guarded: the module can legitimately be loaded twice under two different
+// URLs — the integration registers it via add_extra_js_url, and a user may
+// also register it as a Lovelace resource (the only mechanism the Android
+// companion app reliably loads). An unguarded define() throws on the second
+// pass and takes the card down everywhere.
+if (!customElements.get("rf-fan-card")) {
+  customElements.define("rf-fan-card", RfFanCard);
+}
 
 /** Visual editor: a native ha-form with a fan entity picker + optional name. */
 class RfFanCardEditor extends HTMLElement {
@@ -619,13 +626,17 @@ class RfFanCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("rf-fan-card-editor", RfFanCardEditor);
+if (!customElements.get("rf-fan-card-editor")) {
+  customElements.define("rf-fan-card-editor", RfFanCardEditor);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "rf-fan-card",
-  name: "RF Fan Card",
-  description: "Animated card for RF Fan devices (speed, light, colour, timers, sound, direction).",
-  preview: true,
-  documentationURL: "https://github.com/dasimon135/ha-rf-fan",
-});
+if (!window.customCards.some((c) => c.type === "rf-fan-card")) {
+  window.customCards.push({
+    type: "rf-fan-card",
+    name: "RF Fan Card",
+    description: "Animated card for RF Fan devices (speed, light, colour, timers, sound, direction).",
+    preview: true,
+    documentationURL: "https://github.com/dasimon135/ha-rf-fan",
+  });
+}

@@ -1,27 +1,52 @@
+# RF Fan gateway — reference configuration.
+#
+# Uses ESPHome's built-in `cc1101:` component with SEPARATE RX and TX pins
+# (GDO2 for receive, GDO0 for transmit). This is the recommended wiring: a
+# single shared GDO0 pin has to be re-moded on every RX/TX switch, and on
+# ESP32 that silently breaks RMT capture — the receiver goes completely deaf,
+# not even background noise.
+#
+# Already wired for a single shared pin? See rf_fan_radiolib_legacy.yaml.
+
 substitutions:
   device_name: rf-fan-gateway
   friendly_name: RF fan gateway
-  # RF frequency of the remote (MHz). Start at 433.92 and adjust if
-  # the sniff captures nothing (try 433.42, 434.42...).
+
+  # RF frequency of the remote (MHz). Start at 433.92 and adjust if the sniff
+  # captures nothing (try 433.42, 434.42...).
   cc1101_frequency: "433.92"
+
+  # ---------------------------------------------------------------------
+  # Frame geometry — READ THIS BEFORE LEARNING ANY CODE.
+  #
+  # rc_switch reports a decoded frame as a 64-bit integer plus a protocol
+  # number, and DISCARDS the bit length. The length cannot be recovered
+  # afterwards (a code starting with zeros is indistinguishable from a
+  # shorter one), so it has to be declared here — and it must be exact,
+  # because transmit_rc_switch_raw derives the frame length from the number
+  # of characters it is given.
+  #
+  # To find your values: keep `dump: rc_switch` below, press a remote button
+  # and read the log line
+  #
+  #     Received RCSwitch Raw: protocol=1 data='000100110101...'
+  #
+  # rc_protocol  = the protocol=N value
+  # rc_code_bits = the number of characters in data='...'
+  #
+  # 24 is the classic rc_switch width; ceiling-fan remotes are often 24 or 32.
+  # ---------------------------------------------------------------------
+  rc_protocol: "1"
+  rc_code_bits: "24"
 
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  on_boot:
-    priority: -100
-    then:
-      - lambda: id(mycc1101).recv();
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
-
-# RadioLib CC1101 component (required for 8-pin CC1101 modules)
-external_components:
-  - source: github://juanboro/esphome-radiolib-cc1101@main
-    components: [ radiolib_cc1101 ]
 
 logger:
 
@@ -37,8 +62,15 @@ api:
       then:
         - remote_transmitter.transmit_rc_switch_raw:
             transmitter_id: rf_transmitter
-            code: !lambda "return code;"
-            protocol: 1
+            # Codes are stored as "<protocol>:<bits>" (the same shape the
+            # rc_switch dumper prints). transmit_rc_switch_raw wants the bare
+            # bit string: it treats every character as one bit, so leaving the
+            # prefix in would both lengthen the frame and inject '1' bits.
+            code: !lambda |-
+              const std::string raw = code;
+              const size_t sep = raw.find(':');
+              return sep == std::string::npos ? raw : raw.substr(sep + 1);
+            protocol: ${rc_protocol}
             repeat:
               times: !lambda "return repeat_count;"
               wait_time: 10ms
@@ -46,6 +78,11 @@ api:
 ota:
   - platform: esphome
     password: !secret ota_password
+    # Park the radio during an update: SPI traffic and an active RF front-end
+    # do not mix well with a flash write.
+    on_begin:
+      then:
+        - cc1101.set_idle
 
 wifi:
   ssid: !secret wifi_ssid
@@ -69,44 +106,50 @@ spi:
   mosi_pin: GPIO23
   miso_pin: GPIO19
 
-# CC1101 blue module wiring (standard 8-pin)
-# Pin 1 VCC→3V3 | Pin 2 GND→GND | Pin 3 MOSI→D23 | Pin 4 SCLK→D18
-# Pin 5 MISO→D19 | Pin 6 GDO2→(unused) | Pin 7 GDO0→D4 | Pin 8 CSN→D5
-radiolib_cc1101:
+# CC1101 wiring (8-pin module), dual-pin scheme
+# Pin 1 VCC  -> 3V3        | Pin 2 GND  -> GND
+# Pin 3 GDO0 -> GPIO4      (TX data — the CC1101 only accepts TX input here)
+# Pin 4 CSN  -> GPIO5      | Pin 5 SCLK -> GPIO18
+# Pin 6 MOSI -> GPIO23     | Pin 7 MISO -> GPIO19
+# Pin 8 GDO2 -> GPIO13     (RX data)
+#
+# The CC1101 is 3.3 V only. Keep the wires short (< 10-15 cm) — long SPI
+# jumpers are a common cause of "chip not found" at boot.
+#
+# On other boards, remap freely: only SCLK/MOSI/MISO are fixed by the chip,
+# CS and the GDO pins can be any free GPIO. On an ESP32-C3 SuperMini, avoid
+# the strapping pins (GPIO2, GPIO8, GPIO9).
+cc1101:
   id: mycc1101
-  cs_pin: 5
-  rx_pin:
-    number: 4
-    allow_other_uses: true
-  frequency: ${cc1101_frequency}
-  filter: 464kHz
-  bitrate: 5
+  cs_pin: GPIO5
+  frequency: ${cc1101_frequency}MHz
+  # Widen this (e.g. 464kHz) if the remote is slightly off-frequency.
+  filter_bandwidth: 203kHz
 
-# RF transmitter on GDO0 (GPIO4) — switches the CC1101 to TX then back to RX
+# RF transmitter on GDO0 — the radio has to be strobed into TX and back to RX
+# around every frame; it comes up in RX on its own at boot.
 remote_transmitter:
   - id: rf_transmitter
-    pin:
-      number: 4
-      allow_other_uses: true
+    pin: GPIO4
     carrier_duty_percent: 100%
-    non_blocking: false
     on_transmit:
       then:
-        - lambda: id(mycc1101).xmit();
+        - cc1101.begin_tx
     on_complete:
       then:
-        - lambda: id(mycc1101).recv();
+        - cc1101.begin_rx
 
-# RF receiver on GDO0 (GPIO4) — sniffs and publishes to Home Assistant
+# RF receiver on GDO2 — sniffs and publishes to Home Assistant
 remote_receiver:
   - id: rf_receiver
-    pin:
-      number: 4
-      allow_other_uses: true
+    pin: GPIO13
     tolerance: 50%
     filter: 100us
     idle: 4ms
-    dump: []
+    # Keep this on until guided learning works: it is the only place that
+    # prints the protocol number and the true bit length. Set it to [] once
+    # rc_protocol / rc_code_bits above are correct, to quieten the log.
+    dump: rc_switch
     on_rc_switch:
       then:
         - if:
@@ -120,4 +163,23 @@ remote_receiver:
                     action: "sniff"
                     code: "{{ rc_code }}"
                   variables:
-                    rc_code: !lambda "return x.code;"
+                    # Rebuild the bit string over the declared width. Returning
+                    # x.code directly yields its DECIMAL representation, which
+                    # is not a bit string at all and cannot be replayed.
+                    rc_code: !lambda |-
+                      const int nbits = ${rc_code_bits};
+                      std::string bits;
+                      bits.reserve(nbits);
+                      for (int i = nbits - 1; i >= 0; i--)
+                        bits += ((x.code >> i) & 1) ? '1' : '0';
+                      // Remote sends N+1 bits but rc_switch only ever reports
+                      // N? The decoder stops at the first pulse pair it cannot
+                      // match, and on some remotes the final bit runs straight
+                      // into the inter-frame gap, so it is dropped. Set
+                      // rc_code_bits to what IS decoded and rebuild the missing
+                      // trailing bit here. Example, for a 30-bit frame whose
+                      // last bit is an even parity over the other 29:
+                      //   int ones = 0;
+                      //   for (char c : bits) ones += (c == '1');
+                      //   bits += (ones & 1) ? '1' : '0';
+                      return std::to_string(x.protocol) + ":" + bits;

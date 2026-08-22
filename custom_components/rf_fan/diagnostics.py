@@ -53,5 +53,10 @@ async def async_get_config_entry_diagnostics(
             "armed_echo_codes": sum(
                 1 for until in runtime.echo_codes.values() if until > now
             ),
+            # The single most useful field when "following the physical remote"
+            # appears dead: compare it to the learned codes above. A mismatch in
+            # shape (decimal vs "<protocol>:<bits>", or a different bit width)
+            # means the gateway YAML changed since the codes were learned.
+            "last_unmatched_code": runtime.last_unmatched_code,
         },
     }

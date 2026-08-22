@@ -16,6 +16,7 @@ try:  # Home Assistant runtime: relative import within the package
         LIGHT_CONTROL_ON_OFF,
         LIGHT_CONTROL_TOGGLE,
         TIMER_HOURS,
+        TOGGLE_ACTIONS,
         speed_action,
         timer_action,
     )
@@ -33,6 +34,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         LIGHT_CONTROL_ON_OFF,
         LIGHT_CONTROL_TOGGLE,
         TIMER_HOURS,
+        TOGGLE_ACTIONS,
         speed_action,
         timer_action,
     )
@@ -77,6 +79,29 @@ def split_actions(
     if has_sound:
         required.append(ACTION_SOUND_TOGGLE)
     return required, []
+
+
+def transmit_repeat_count(action: str, configured: int) -> int:
+    """Number of RF repeats to put on the air for an action.
+
+    Absolute actions (speeds, on/off, timers, one colour step) use the configured
+    count as-is: resending the same frame lands the fan in the same state, so more
+    repeats only buy reliability.
+
+    Toggle actions flip a state, so the fan has to end up actuated an ODD number of
+    times. The two plausible receiver behaviours disagree about what a burst means,
+    and an odd count is correct under both: a receiver that debounces the burst
+    registers one press whatever the count, and one that treats every frame as a
+    press registers a net flip only when the count is odd. So the configured value is
+    rounded DOWN to the nearest odd number rather than forced to 1 — a lone frame is
+    what some receivers drop outright (issue #15).
+
+    Never returns less than 1: a nonsensical configured value still transmits once.
+    """
+    count = max(1, int(configured))
+    if action in TOGGLE_ACTIONS and count % 2 == 0:
+        count -= 1
+    return max(1, count)
 
 
 def validate_codes(codes: dict[str, str], required: list[str]) -> dict[str, str]:

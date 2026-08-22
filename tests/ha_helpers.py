@@ -20,7 +20,7 @@ TRANSMIT_SERVICE = "esp32_test_transmit_rf_fan"
 
 # Codes for every action. light_on/light_off/fan_on are deliberately left out so
 # the light falls back to `light_toggle` and the fan turns on via a speed action —
-# this is what lets us assert the single-shot vs absolute repeat_count.
+# this is what lets us assert the toggle vs absolute repeat_count.
 CODES = {
     "fan_off": "c_off",
     "fan_speed_1": "c_s1",

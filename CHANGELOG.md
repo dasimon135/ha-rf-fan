@@ -5,6 +5,65 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-08-23
+
+### Fixed
+
+- **The dashboard card broke when the module was loaded twice.** The integration
+  registers it through `add_extra_js_url`, and a user may also add it as a Lovelace
+  resource — which is the only mechanism the Android companion app loads reliably. The
+  second pass hit an unguarded `customElements.define()`, which throws, and the card
+  then failed everywhere rather than just once. Both registrations and the
+  `window.customCards` entry are now guarded.
+- **A toggle action ignored `repeat_count` entirely and always went out once**, so a
+  receiver that needs several identical frames before it accepts anything never saw
+  `light_toggle` — while `fan_on`, sent `repeat_count` times over the same radio with
+  the same code shape, worked. Toggles now honour the configured count, rounded *down
+  to the nearest odd value*: a receiver that debounces the burst registers one press
+  whatever the count, and one that treats every frame as a press registers a net flip
+  only when the count is odd, so an odd count is correct under both. The default
+  (`repeat_count: 2`) still transmits once, so nothing changes for existing setups.
+  `SINGLE_SHOT_ACTIONS` is renamed `TOGGLE_ACTIONS` and the arithmetic lives in
+  `actions.transmit_repeat_count`, next to the rest of the Home-Assistant-free logic.
+  ([#15](https://github.com/dasimon135/ha-rf-fan/issues/15))
+- **The reference ESPHome gateway published codes it could not replay.** The
+  `rc_code` lambda returned `x.code`, which `on_rc_switch` hands over as a 64-bit
+  integer — so the event carried the code's *decimal* form (`645080348`), while
+  `transmit_rc_switch_raw` reads its input as a bit string, one bit per character.
+  Every learned code was therefore replayed as a handful of nonsense bits. The
+  gateway now rebuilds the bit string explicitly and emits `<protocol>:<bits>`,
+  the shape the README documented all along and the shape the rc_switch dumper
+  prints. ([#16](https://github.com/dasimon135/ha-rf-fan/issues/16))
+- The frame's bit **length** is dropped by `RCSwitchData` and cannot be recovered
+  from the integer, so a code with leading zeros was unrecoverable. It is now
+  declared explicitly through the `rc_code_bits` substitution, and the rc_switch
+  dumper is left enabled so the value can be read straight off the log.
+
+### Added
+
+- `last_unmatched_code` in the diagnostics, plus a debug log line listing it next
+  to every learned code. Following the physical remote is exact string matching;
+  when the gateway's code shape changes it stops matching anything and used to do
+  so in complete silence, which is indistinguishable from the feature not
+  existing. ([#16](https://github.com/dasimon135/ha-rf-fan/issues/16))
+- `esphome/rf_fan_example.yaml` now uses ESPHome's built-in `cc1101:` component
+  with **separate RX (GDO2) and TX (GDO0) pins**. Sharing one GDO0 pin makes the
+  pin mode fight between `remote_receiver`, `remote_transmitter` and the radio
+  driver, and on ESP32 that can leave RMT capture permanently deaf — reported
+  independently by several users as "the log shows nothing at all, not even
+  noise".
+- `esphome/rf_fan_radiolib_legacy.yaml` keeps the previous RadioLib single-pin
+  configuration for gateways already wired that way (with the same code-shape fix).
+- Troubleshooting sections for a remote that updates nothing, and for a code that
+  is learned correctly but does not actuate the fan (measuring the real timings
+  with `rtl_433 -A` instead of assuming rc_switch protocol 1).
+
+> **Upgrading:** changing the code shape a gateway emits invalidates codes learned
+> under the old one — matching is exact string equality. After flashing the updated
+> YAML, relearn via **⋮ → Reconfigure → Relearn RF codes**.
+
+Thanks to @elmr91, @Relutzzzu and @Ltek, who diagnosed most of this on the forum.
+
 ## [1.6.1] - 2026-07-26
 
 Documentation only; no code change.
