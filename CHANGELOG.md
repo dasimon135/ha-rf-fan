@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The dashboard card broke when the module was loaded twice.** The integration
+  registers it through `add_extra_js_url`, and a user may also add it as a Lovelace
+  resource — which is the only mechanism the Android companion app loads reliably. The
+  second pass hit an unguarded `customElements.define()`, which throws, and the card
+  then failed everywhere rather than just once. Both registrations and the
+  `window.customCards` entry are now guarded.
 - **A toggle action ignored `repeat_count` entirely and always went out once**, so a
   receiver that needs several identical frames before it accepts anything never saw
   `light_toggle` — while `fan_on`, sent `repeat_count` times over the same radio with

@@ -52,7 +52,13 @@ class StubHTMLElement extends StubElement {
 export async function loadCard() {
   const defined = {};
   globalThis.HTMLElement = StubHTMLElement;
-  globalThis.customElements = { define: (name, cls) => (defined[name] = cls) };
+  // `get` matters as much as `define` here: the card guards both of its
+  // registrations on it, so that loading the module twice (integration
+  // `add_extra_js_url` + a manual Lovelace resource) does not throw.
+  globalThis.customElements = {
+    define: (name, cls) => (defined[name] = cls),
+    get: (name) => defined[name],
+  };
   globalThis.document = {
     createElement: (tag) => new StubElement(tag),
     querySelectorAll: () => [],
