@@ -87,12 +87,17 @@ setup used to build and test the integration.
 | MOSI (SI) | GPIO23 |
 | MISO (SO) | GPIO19 |
 | CSN (CS) | GPIO5 |
-| GDO0 | GPIO4 — data (RX **and** TX) |
-| GDO2 | unused |
+| GDO0 | GPIO4 — transmit data |
+| GDO2 | GPIO13 — receive data |
 
-The radio is driven by the
-[`esphome-radiolib-cc1101`](https://github.com/juanboro/esphome-radiolib-cc1101)
-external component at 433.92 MHz; GDO0 (GPIO4) carries both transmit and receive data.
+The radio is driven by ESPHome's built-in
+[`cc1101`](https://esphome.io/components/cc1101.html) component at 433.92 MHz, with
+**separate RX and TX pins**. Wiring both onto GDO0 also works, but that single pin has
+to be re-moded on every RX/TX switch, and on ESP32 that can leave `remote_receiver`
+permanently deaf — no decoded frames, not even background noise. If your gateway hears
+nothing at all, this is the first thing to rule out; a config for that older single-pin
+scheme is kept in
+[esphome/rf_fan_radiolib_legacy.yaml](esphome/rf_fan_radiolib_legacy.yaml).
 A 433 MHz antenna is required — it connects to the **CC1101 module** (the ESP32 has no
 radio): solder a ~17.3 cm wire (quarter-wave for 433.92 MHz) to the **ANT** pad, unless
 your module already has a spring antenna or an SMA connector. A full working config is in
@@ -194,6 +199,41 @@ For guided learning and physical-remote sync, the node should also fire the
 `esphome.rf_fan_received` event with `device` and `code` fields. A complete, working
 example is in [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml).
 
+### Code shape (rc_switch gateways)
+
+The integration never parses a code — it stores what the gateway reported and hands the
+same string back. So the *only* hard requirement is that the two directions agree, and
+that whatever the gateway emits is something `transmit_rc_switch_raw` can replay.
+
+That rules out the obvious shortcut. `on_rc_switch` hands the lambda `x.code` as a
+64-bit **integer**, so returning it directly yields its decimal representation
+(`645080348`); `transmit_rc_switch_raw` reads its input as a *bit string*, one bit per
+character, and would send nine bits of nonsense. The example YAML therefore rebuilds the
+bit string explicitly and prefixes the protocol number:
+
+```text
+1:000100110101000110100011
+^ protocol
+  ^ bits, most significant first
+```
+
+`RCSwitchData` also drops the frame's bit **length**, and it cannot be recovered from the
+integer (leading zeros are lost). It has to be declared in the YAML, via the
+`rc_code_bits` substitution, and it has to be exact — `transmit_rc_switch_raw` takes the
+frame length from the number of characters you give it, so a code padded to 32 bits is
+transmitted as a 32-bit frame and the fan ignores it.
+
+Both values are printed by the rc_switch dumper, which the example YAML leaves enabled:
+
+```text
+Received RCSwitch Raw: protocol=1 data='000100110101000110100011'
+                                ^ rc_protocol   ^ 24 characters = rc_code_bits
+```
+
+> Changing the shape a gateway emits **invalidates every code already learned**: matching
+> is exact string equality. Relearn them (**⋮ → Reconfigure → Relearn RF codes**) after
+> touching `rc_code_bits`, `rc_protocol`, or the `rc_code` lambda.
+
 ## Project structure
 
 ```text
@@ -208,7 +248,8 @@ custom_components/rf_fan/
 blueprints/automation/rf_fan/
   fan_temperature_control.yaml
 esphome/
-  rf_fan_example.yaml
+  rf_fan_example.yaml          native cc1101:, separate RX/TX pins (recommended)
+  rf_fan_radiolib_legacy.yaml  RadioLib external component, single shared GDO0
 scripts/
   Dockerfile.tests   run-tests.ps1    run-tests.sh
 tests/
@@ -233,11 +274,16 @@ Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
 - No native RF acknowledgement — state is assumed, not confirmed.
 - The protocols that actually work depend on what your ESPHome gateway can sniff and
   replay correctly.
-- **The reference gateway is hard-wired to `rc_switch` protocol 1.** It publishes the
-  sniffed frame but not `x.protocol`, and replays it with `protocol: 1`. Remotes using
-  protocols 2–8 therefore learn fine but do not actuate the fan. If your remote is not
-  protocol 1, adapt `esphome/rf_fan_example.yaml` (the integration itself is unaffected:
-  it treats codes as opaque strings).
+- **The reference gateway replays on one fixed rc_switch protocol and bit width.** Both
+  are substitutions (`rc_protocol`, `rc_code_bits`) rather than a per-code property, so a
+  single gateway cannot serve two remotes of different geometry. Fans whose timings match
+  none of the eight built-in rc_switch protocols need an inline `protocol:` block with
+  measured `pulse_length` / `sync` / `zero` / `one` values — see
+  [Troubleshooting](#troubleshooting). The integration itself is unaffected either way:
+  it treats codes as opaque strings.
+- **No rolling or incrementing codes.** One action maps to exactly one code, and two
+  actions may not share one. A remote whose frame changes on every press (a counter, or
+  a rotating suffix) cannot be learned.
 - A physical press of the very button Home Assistant just triggered is ignored for
   `ECHO_SUPPRESS_SEC` (see `const.py`) — that window is what discards the gateway's echo
   of our own transmission. Pressing any *other* button is honoured immediately.
@@ -254,6 +300,43 @@ diagnostics** dumps what the integration currently believes, under `runtime`:
 | `light_on` | assumed light state (`null` until a command or a sniffed frame settles it) |
 | `timer_ends_at` | assumed switch-off time, or `null` |
 | `armed_echo_codes` | codes whose echo window is still open — a remote press of one of those is being discarded on purpose |
+| `last_unmatched_code` | the last sniffed frame that matched no learned code — see below |
+
+### The physical remote does not update anything
+
+Following the remote is exact string matching between the sniffed code and the learned
+ones, so it fails silently and completely when the two are shaped differently. Compare
+`last_unmatched_code` in the diagnostics against the `codes` listed above it:
+
+- **`null` while pressing the remote** — nothing is reaching Home Assistant. Confirm the
+  `esphome.rf_fan_received` event actually fires (Developer Tools → Events), then that
+  its `device` field matches the gateway this entry was set up against.
+- **A code that looks nothing like the learned ones** (decimal vs `1:0011…`, or a
+  different number of bits) — the gateway YAML changed since those codes were learned.
+  Relearn them.
+- **A code that differs from a learned one by one bit or a leading zero** — `rc_code_bits`
+  is wrong. Read the true width off the `dump: rc_switch` log line and relearn.
+
+Enabling debug logging for `custom_components.rf_fan` prints the same comparison
+(unmatched code plus every learned code) on each newly unrecognised frame.
+
+### The fan ignores a code that was learned correctly
+
+The frame is being replayed with the wrong *timings*, not the wrong bits. The default
+`protocol: 1` (650 µs pulses) does not fit every remote. Capture the original with
+`rtl_433 -A`, which prints the pulse/gap breakdown and a suggested decoder, then replace
+the protocol number in the YAML with the measured values:
+
+```yaml
+protocol:
+  pulse_length: 400   # rtl_433's short_width
+  sync: [1, 18]
+  zero: [1, 3]
+  one: [3, 1]
+```
+
+Repeat count and inter-frame gap matter too: some receivers ignore a frame that is
+bit-perfect but sent fewer times than the original remote sends it.
 
 A drifted colour position is resynced with the **calibrate** button (it emits nothing, it
 just resets the assumption to Warm). A button that was mis-captured is fixed with

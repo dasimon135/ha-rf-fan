@@ -230,4 +230,19 @@ class RfFanBaseEntity(Entity):
         for mapped_action, mapped_code in self._codes.items():
             if mapped_code == code:
                 return mapped_action
+
+        # Nothing matched. Record it so the diagnostics can show it, and log it
+        # once: every platform of the entry listens to the same bus event, so
+        # guarding on the stored value keeps this to one line per new code.
+        runtime = self._runtime
+        if runtime.last_unmatched_code != code:
+            runtime.last_unmatched_code = code
+            _LOGGER.debug(
+                "Received RF code %s matches no learned action for %s. Learned "
+                "codes: %s. A code learned through a different gateway "
+                "configuration will not match — relearn it",
+                code,
+                self._fan_name,
+                sorted(self._codes.values()),
+            )
         return None

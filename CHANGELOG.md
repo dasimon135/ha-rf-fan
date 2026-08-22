@@ -5,6 +5,48 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The reference ESPHome gateway published codes it could not replay.** The
+  `rc_code` lambda returned `x.code`, which `on_rc_switch` hands over as a 64-bit
+  integer — so the event carried the code's *decimal* form (`645080348`), while
+  `transmit_rc_switch_raw` reads its input as a bit string, one bit per character.
+  Every learned code was therefore replayed as a handful of nonsense bits. The
+  gateway now rebuilds the bit string explicitly and emits `<protocol>:<bits>`,
+  the shape the README documented all along and the shape the rc_switch dumper
+  prints. ([#16](https://github.com/dasimon135/ha-rf-fan/issues/16))
+- The frame's bit **length** is dropped by `RCSwitchData` and cannot be recovered
+  from the integer, so a code with leading zeros was unrecoverable. It is now
+  declared explicitly through the `rc_code_bits` substitution, and the rc_switch
+  dumper is left enabled so the value can be read straight off the log.
+
+### Added
+
+- `last_unmatched_code` in the diagnostics, plus a debug log line listing it next
+  to every learned code. Following the physical remote is exact string matching;
+  when the gateway's code shape changes it stops matching anything and used to do
+  so in complete silence, which is indistinguishable from the feature not
+  existing. ([#16](https://github.com/dasimon135/ha-rf-fan/issues/16))
+- `esphome/rf_fan_example.yaml` now uses ESPHome's built-in `cc1101:` component
+  with **separate RX (GDO2) and TX (GDO0) pins**. Sharing one GDO0 pin makes the
+  pin mode fight between `remote_receiver`, `remote_transmitter` and the radio
+  driver, and on ESP32 that can leave RMT capture permanently deaf — reported
+  independently by several users as "the log shows nothing at all, not even
+  noise".
+- `esphome/rf_fan_radiolib_legacy.yaml` keeps the previous RadioLib single-pin
+  configuration for gateways already wired that way (with the same code-shape fix).
+- Troubleshooting sections for a remote that updates nothing, and for a code that
+  is learned correctly but does not actuate the fan (measuring the real timings
+  with `rtl_433 -A` instead of assuming rc_switch protocol 1).
+
+> **Upgrading:** changing the code shape a gateway emits invalidates codes learned
+> under the old one — matching is exact string equality. After flashing the updated
+> YAML, relearn via **⋮ → Reconfigure → Relearn RF codes**.
+
+Thanks to @elmr91, @Relutzzzu and @Ltek, who diagnosed most of this on the forum.
+
 ## [1.6.1] - 2026-07-26
 
 Documentation only; no code change.
