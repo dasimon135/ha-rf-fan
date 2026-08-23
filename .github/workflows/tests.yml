@@ -27,6 +27,47 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ -q
 
+  esphome:
+    name: esphome (gateway configs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Deliberately unpinned: these are example configs users are told to flash,
+      # so they have to keep validating against whatever ESPHome ships today. If a
+      # release breaks one of them, going red here is the point — users would hit
+      # the same wall.
+      #
+      # What this catches: schema errors, unknown component options, a trigger that
+      # no longer exists, a substitution that does not resolve. What it does NOT
+      # catch: a lambda that compiles but is wrong — `return x.code;` was valid C++
+      # and still shipped the bug behind issue #16. Compiling every config would
+      # narrow that a little, at several minutes per file; validating is the cheap
+      # 90%.
+      - name: Validate every gateway config
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp esphome/*.yaml "$work/"
+          # esphome resolves !secret against a secrets.yaml next to the config, and
+          # rejects an API key that is not valid base64 — hence a real-looking stub.
+          cat > "$work/secrets.yaml" <<'EOF'
+          wifi_ssid: "ci-stub"
+          wifi_password: "ci-stub-password"
+          rf_fan_api_key: "aHVudGVyMmh1bnRlcjJodW50ZXIyaHVudGVyMmh1bnQ="
+          ota_password: "ci-stub-password"
+          rf_fan_fallback_password: "ci-stub-password"
+          EOF
+          status=0
+          for path in "$work"/*.yaml; do
+            name="$(basename "$path")"
+            [ "$name" = "secrets.yaml" ] && continue
+            echo "::group::$name"
+            docker run --rm -v "$work:/config" -w /config \
+              ghcr.io/esphome/esphome:latest config "$name" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
   card:
     name: card (node)
     runs-on: ubuntu-latest
