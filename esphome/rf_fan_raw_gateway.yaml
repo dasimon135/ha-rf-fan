@@ -1,0 +1,239 @@
+# RF Fan gateway — RAW TIMINGS variant.
+#
+# Use this one ONLY when rc_switch cannot decode your remote.
+#
+# How to tell: flash the standard gateway (rf_fan_example.yaml), press a button,
+# and look at the log. If you get a line like
+#
+#     Received RCSwitch Raw: protocol=1 data='000100110101000110100011'
+#
+# then rc_switch decodes your remote — use rf_fan_example.yaml, it is the better
+# choice for the reason below. If all you ever get is `remote.raw` timing dumps and
+# never an `RCSwitch Raw` line, the decoder does not know your modulation
+# (Manchester/biphase and several manufacturer schemes are not rc_switch protocols)
+# and no protocol number will fix it. This file is for that case.
+#
+# ---------------------------------------------------------------------------
+# WHAT YOU GIVE UP
+#
+# Raw frames jitter by a few microseconds from one press to the next, and the
+# integration matches a sniffed frame against a learned code by EXACT string
+# equality. So with raw codes:
+#
+#   - transmitting works (the receiver tolerates the jitter);
+#   - "follow the physical remote" does NOT work, and never will. Pressing a
+#     button on the physical remote will not update the Home Assistant entities.
+#
+# That is a property of raw capture, not a bug to be fixed. If rc_switch decodes
+# your remote, prefer rf_fan_example.yaml.
+# ---------------------------------------------------------------------------
+#
+# Wiring is identical to rf_fan_example.yaml: separate RX and TX pins.
+
+substitutions:
+  device_name: rf-fan-raw-gateway
+  friendly_name: RF fan raw gateway
+
+  # RF frequency of the remote (MHz). Start at 433.92 and adjust if the sniff
+  # captures nothing (try 433.42, 434.42...).
+  cc1101_frequency: "433.92"
+
+  # Shortest burst, in transitions, that is published as a code. Ambient 433 MHz
+  # noise arrives as a handful of transitions; a real remote frame is dozens.
+  # Lower it if your remote is short and nothing is ever captured; raise it if
+  # learning keeps picking up junk.
+  min_transitions: "40"
+
+  # Minimum gap between two published receptions, in milliseconds. A remote
+  # repeats its frame for as long as the button is held, and every repeat would
+  # otherwise be one Home Assistant API call — enough to fill the API queue and
+  # get "Action request dropped, TCP buffer full" in the log. Guided learning
+  # only needs one frame.
+  rx_min_interval_ms: "400"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+globals:
+  # Timestamp of the last published reception, for the rate limit above.
+  - id: last_rx_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+api:
+  encryption:
+    key: !secret rf_fan_api_key
+  services:
+    - service: transmit_rf_fan
+      variables:
+        action: string
+        code: string
+        repeat_count: int
+      then:
+        - lambda: |-
+            // Codes arrive as "raw:<t1>,<t2>,…" — signed microsecond timings,
+            // positive for a mark, negative for a space, exactly as the receiver
+            // published them. Anything else is not ours to send.
+            const std::string payload = code;
+            if (payload.rfind("raw:", 0) != 0) {
+              ESP_LOGW("rf_fan_tx", "Ignoring non-raw code for action %s", action.c_str());
+              return;
+            }
+
+            // Build the frame through the remote_transmitter API rather than
+            // toggling the pin by hand: it drives the ESP32's RMT peripheral, so
+            // the timings hold under WiFi load, and the on_transmit / on_complete
+            // hooks below strobe the radio into TX and back into RX around it.
+            auto call = id(rf_transmitter).transmit();
+            auto *data = call.get_data();
+            data->set_carrier_frequency(0);
+
+            int32_t value = 0;
+            bool negative = false;
+            bool have_digit = false;
+            size_t count = 0;
+
+            // Manual parse: no sscanf, no allocation, and a stray character
+            // truncates the frame instead of corrupting it.
+            for (size_t i = 4; i <= payload.size(); i++) {
+              const char c = (i < payload.size()) ? payload[i] : ',';
+              if (c == '-') {
+                negative = true;
+              } else if (c >= '0' && c <= '9') {
+                value = value * 10 + (c - '0');
+                have_digit = true;
+              } else if (c == ',') {
+                if (have_digit && value > 0) {
+                  if (negative) {
+                    data->space(static_cast<uint32_t>(value));
+                  } else {
+                    data->mark(static_cast<uint32_t>(value));
+                  }
+                  count++;
+                }
+                value = 0;
+                negative = false;
+                have_digit = false;
+              }
+              // Spaces, newlines and anything else are skipped.
+            }
+
+            if (count == 0) {
+              ESP_LOGW("rf_fan_tx", "Empty raw frame for action %s", action.c_str());
+              return;
+            }
+
+            ESP_LOGD("rf_fan_tx", "action=%s, %u transitions, %d repeats",
+                     action.c_str(), (unsigned) count, repeat_count);
+
+            call.set_send_times(repeat_count < 1 ? 1 : repeat_count);
+            call.set_send_wait(10000);  // 10 ms between repeats
+            call.perform();
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+    # Park the radio during an update: SPI traffic and an active RF front-end
+    # do not mix well with a flash write.
+    on_begin:
+      then:
+        - cc1101.set_idle
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  fast_connect: true
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret rf_fan_fallback_password
+
+captive_portal:
+
+web_server:
+  port: 80
+
+# Standard ESP32 SPI (VSPI)
+spi:
+  id: spi_bus
+  type: single
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+# CC1101 wiring (8-pin module), dual-pin scheme — same as rf_fan_example.yaml.
+# Pin 1 VCC  -> 3V3        | Pin 2 GND  -> GND
+# Pin 3 GDO0 -> GPIO4      (TX data — the CC1101 only accepts TX input here)
+# Pin 4 CSN  -> GPIO5      | Pin 5 SCLK -> GPIO18
+# Pin 6 MOSI -> GPIO23     | Pin 7 MISO -> GPIO19
+# Pin 8 GDO2 -> GPIO13     (RX data)
+cc1101:
+  id: mycc1101
+  cs_pin: GPIO5
+  frequency: ${cc1101_frequency}MHz
+  # Widen this (e.g. 464kHz) if the remote is slightly off-frequency. Raw capture
+  # is less forgiving than rc_switch decoding: a clipped edge changes the timings.
+  filter_bandwidth: 203kHz
+
+remote_transmitter:
+  - id: rf_transmitter
+    pin: GPIO4
+    carrier_duty_percent: 100%
+    on_transmit:
+      then:
+        - cc1101.begin_tx
+    on_complete:
+      then:
+        - cc1101.begin_rx
+
+remote_receiver:
+  - id: rf_receiver
+    pin: GPIO13
+    tolerance: 50%
+    filter: 100us
+    # Longer than the rc_switch example: a raw frame has to be captured whole, and
+    # some remotes leave gaps of several milliseconds between repeats within one
+    # press. Too short and each frame arrives cut into pieces.
+    idle: 12ms
+    # `raw` prints every captured frame. Useful while you are finding your
+    # min_transitions value, noisy afterwards — set it to [] once learning works.
+    dump: raw
+    on_raw:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (x.size() < ${min_transitions}) return false;
+                const uint32_t now = millis();
+                if (now - id(last_rx_ms) < ${rx_min_interval_ms}) return false;
+                id(last_rx_ms) = now;
+                return true;
+            then:
+              - if:
+                  condition:
+                    api.connected:
+                  then:
+                    - homeassistant.event:
+                        event: esphome.rf_fan_received
+                        data_template:
+                          device: ${device_name}
+                          action: "sniff"
+                          code: "raw:{{ raw_code }}"
+                        variables:
+                          raw_code: !lambda |-
+                            std::string out;
+                            out.reserve(x.size() * 7);
+                            for (size_t i = 0; i < x.size(); i++) {
+                              if (i > 0) out.push_back(',');
+                              out += to_string(x[i]);
+                            }
+                            return out;

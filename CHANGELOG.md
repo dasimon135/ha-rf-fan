@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`esphome/rf_fan_raw_gateway.yaml`** — a protocol-agnostic gateway for remotes
+  rc_switch cannot decode. It captures the frame's raw transitions through `on_raw`
+  and replays them verbatim as `raw:<t1>,<t2>,…`, which the ESPHome contract already
+  accepted but no shipped example produced. Reported by @Ltek on the forum, whose
+  9-speed remote never fires `on_rc_switch` at all: the log shows raw timing dumps
+  and no `Received RCSwitch Raw:` line, so Home Assistant was never told about the
+  frame. Transmission goes through the `remote_transmitter` API (RMT-timed, and the
+  existing hooks strobe the radio into TX and back) rather than toggling the pin by
+  hand. Documented limitation: raw frames jitter between presses and code matching is
+  exact string equality, so transmitting works while following the physical remote
+  cannot. The gateway also rate-limits published receptions and drops bursts shorter
+  than a threshold — a held button otherwise fills the ESPHome API queue.
+
 ## [1.7.0] - 2026-08-23
 
 ### Fixed

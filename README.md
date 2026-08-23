@@ -234,6 +234,33 @@ Received RCSwitch Raw: protocol=1 data='000100110101000110100011'
 > is exact string equality. Relearn them (**⋮ → Reconfigure → Relearn RF codes**) after
 > touching `rc_code_bits`, `rc_protocol`, or the `rc_code` lambda.
 
+### Raw-timings gateways (remotes rc_switch cannot decode)
+
+rc_switch only understands fixed-sync PWM protocols. A remote using another
+modulation — Manchester/biphase, and several manufacturer schemes — produces no
+`on_rc_switch` event at all: the log shows `remote.raw` timing dumps and never a
+`Received RCSwitch Raw:` line, so Home Assistant is never told about the frame.
+
+For those, [esphome/rf_fan_raw_gateway.yaml](esphome/rf_fan_raw_gateway.yaml) captures
+the frame's raw transitions and replays them verbatim:
+
+```text
+raw:150,-5839,1144,-370,1148,-367,…
+```
+
+signed microseconds, positive for a mark, negative for a space. The integration is
+unaffected — a code is an opaque string either way.
+
+> **Following the physical remote does not work with raw codes, and cannot.** Raw
+> frames jitter by a few microseconds between presses, and matching a sniffed frame
+> against a learned one is exact string equality. Transmit works; passive state
+> tracking does not. If rc_switch decodes your remote, prefer the standard gateway.
+
+The raw gateway also rate-limits what it publishes (`rx_min_interval_ms`) and ignores
+bursts shorter than `min_transitions`. A remote repeats its frame for as long as the
+button is held, and one API call per repeat is enough to fill the ESPHome queue —
+`Action request dropped, TCP buffer full` in the log is that, not a crash.
+
 ## Project structure
 
 ```text
@@ -279,8 +306,10 @@ Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
   single gateway cannot serve two remotes of different geometry. Fans whose timings match
   none of the eight built-in rc_switch protocols need an inline `protocol:` block with
   measured `pulse_length` / `sync` / `zero` / `one` values — see
-  [Troubleshooting](#troubleshooting). The integration itself is unaffected either way:
-  it treats codes as opaque strings.
+  [Troubleshooting](#troubleshooting). A remote rc_switch cannot decode at all is served
+  by the [raw-timings gateway](#raw-timings-gateways-remotes-rc_switch-cannot-decode),
+  at the cost of physical-remote tracking. The integration itself is unaffected either
+  way: it treats codes as opaque strings.
 - **No rolling or incrementing codes.** One action maps to exactly one code, and two
   actions may not share one. A remote whose frame changes on every press (a counter, or
   a rotating suffix) cannot be learned.
