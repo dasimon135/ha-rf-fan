@@ -73,6 +73,10 @@ forward plus `fan_speed_N_reverse`. Worth the extra learning steps because it ma
 direction **absolute** — `async_set_direction` today carries a comment admitting it
 cannot guarantee an absolute target from an unknown state. Here it can.
 
+> `per_speed` requires `speed_control: discrete`, and the config flow refuses the
+> other combination. A per-direction pair of ± keys is a shape nobody has reported,
+> and guessing at it would double the action set for a remote that may not exist.
+
 ### New actions
 
 ```
