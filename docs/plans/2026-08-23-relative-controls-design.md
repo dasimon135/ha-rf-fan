@@ -243,25 +243,40 @@ Repo rule, unchanged: any behaviour change ships with a test that failed before 
 
 ## 7. Delivery
 
-**v1.8.0** — `power_control`, `speed_control: relative`, speed cap to 12, the walk
-mechanism, the lock, the CONFIG entities. Unblocks @Ltek entirely; he is the one
-waiting.
+> **Reordered 2026-08-23**, after @elmr91 measured his remote: the light half now
+> leads, because it is the half whose data is confirmed. Original order below the
+> line.
 
-**v1.9.0** — `light_level`, `color_control: relative`, `direction_control:
-per_speed`. Closes #18 for @elmr91.
+**v1.8.0** — the walk mechanism (`walk_steps`, `_async_walk`, the restart lock, the
+CONFIG resync entities) plus `light_level` and `color_control: relative`. Every code
+this needs has been verified fixed on real hardware. Closes #18's light half.
+
+**v1.9.0** — `power_control`, `speed_control: relative`, speed cap to 12,
+`direction_control: per_speed`. Unblocks @Ltek, who is the more badly stuck of the
+two but whose ± codes are still unmeasured. The mechanism already exists by then, so
+this is a small increment rather than a second build.
 
 **v1.10.0** — `extra_buttons` and their card support.
 
-The mechanism lands in 1.8.0; 1.9.0 only rewires it onto the light and the direction.
+Original order was speed first, on the grounds that @Ltek cannot use the integration
+at all while @elmr91's fan works minus two capabilities. User pain still says Ltek
+first; buildability says otherwise, and buildability wins — you cannot write code
+against codes nobody has read.
 
 ---
 
 ## 8. Open risks
 
-- **@Ltek's ± keys may not send two fixed codes.** If the frame changes as the range
-  is walked, the whole relative-speed half collapses into the rolling-code case,
-  which is explicitly out of scope. Asked on the forum; unanswered at the time of
-  writing. **Do not start v1.8.0 before that answer.**
+- ~~**Stepped keys may not send fixed codes at all.**~~ **Resolved for the light
+  half, 2026-08-23.** @elmr91 measured his Inspire Aruba Plus: colour ± and
+  brightness ± each send the same code on every press
+  ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18)). The dead-reckoning
+  mechanism is therefore sound on real hardware.
+- **@Ltek's speed ± keys are still unmeasured.** If his frame changes as the range is
+  walked, that is the rolling-code case, explicitly out of scope, and relative
+  *speed* dies with it — the mechanism itself survives, since the light half no
+  longer depends on it. Asked on the forum, unanswered. **Do not start the speed
+  half before that answer**; the light half is free to proceed.
 - **Slider behaviour during a drag** (see §3) — decides the lock semantics.
 - **Entity count.** Twelve entities on a fully-loaded fan today, up to sixteen after
   1.9.0. `EntityCategory.CONFIG` keeps them off dashboards, but the device page is
