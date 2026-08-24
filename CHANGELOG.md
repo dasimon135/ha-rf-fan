@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Stepped controls, for remotes whose buttons MOVE a value instead of setting
+  one.** Three new capability shapes, all reported on
+  [#18](https://github.com/dasimon135/ha-rf-fan/issues/18) by @elmr91 for an Inspire
+  Aruba Plus, and all measured on real hardware before being built:
+  - `light_level: relative` — two dedicated brightness keys. The light entity gains
+    `ColorMode.BRIGHTNESS`, dead-reckoned over ten modelled steps. Declared only
+    when the remote actually has the keys: a slider that cannot move anything is
+    worse than no slider.
+  - `color_control: relative` — two dedicated colour keys instead of one cycling
+    key, so the walk takes whichever way round is shorter, and a press on the
+    physical remote is tracked in both directions rather than only forwards.
+  - `direction_control: per_speed` — for a remote with **no** reverse key at all,
+    which stores the winter/summer mode itself and emits a different speed code per
+    direction. The direction becomes *absolute* rather than dead-reckoned: setting
+    it re-sends the current speed from the other code set, and one sniffed frame
+    carries the speed and the direction together.
+- **A brightness resynchronisation button and an assumed-position select** (both
+  `EntityCategory.CONFIG`). Dead reckoning has no way back once it drifts, and these
+  are the two ways back: the button walks the lamp into its bottom stop, which is
+  audible and slow but physically true; the select simply declares the position,
+  which is silent and instant but only as good as what you tell it.
+- **Speed counts from 2 to 12** (was a fixed choice of 3–6). The old cap had no
+  technical reason behind it; 9-speed remotes exist.
 - **`esphome/rf_fan_raw_gateway.yaml`** — a protocol-agnostic gateway for remotes
   rc_switch cannot decode. It captures the frame's raw transitions through `on_raw`
   and replays them verbatim as `raw:<t1>,<t2>,…`, which the ESPHome contract already
@@ -21,6 +44,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exact string equality, so transmitting works while following the physical remote
   cannot. The gateway also rate-limits published receptions and drops bursts shorter
   than a threshold — a held button otherwise fills the ESPHome API queue.
+
+### Changed
+
+- **Three capability checkboxes became selectors**, because the remote can express
+  each of them in more than one shape: `has_direction` → `direction_control`,
+  `has_color_temp` → `color_control`, plus the new `light_level`. Config entries
+  migrate automatically (version 3). **No learned code is invalidated** — every
+  existing action key keeps its exact name, so nothing has to be relearned.
+
+### Fixed
+
+- **The bundled card could drive the wrong sibling entity** once an entry owned two
+  selects or two buttons. It picked "the first select" and "the button that is not a
+  timer", so a fan with relative brightness could have its colour row wired to the
+  assumed-position select (which emits nothing, so the row looked dead) and its
+  "recalibrate colour" button wired to the brightness resync (which walks the lamp
+  all the way down). Both are now matched on the registry translation key.
+- **Two overlapping walks left the assumed position wrong.** Moving a stepped
+  control while a previous move was still emitting interleaved the two, and the
+  position ended up describing neither. A second move now cancels the first and
+  plans from the frames that actually went on the air. Present since the colour
+  cycle was introduced — rare with three colours, routine with ten brightness steps.
 
 ## [1.7.0] - 2026-08-23
 

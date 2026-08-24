@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.7.0";
+const VERSION = "1.8.0";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -85,17 +85,26 @@ class RfFanCard extends HTMLElement {
       return siblings.find((e) => e.startsWith(domain + "."));
     };
 
+    const keyOf = (e) => (reg[e] || {}).translation_key;
+
     // Buttons: prefer the registry's translation_key, which survives a rename of
     // the entity_id. Fall back to the "<n>h" token in the id for registries that
     // do not expose it — that guess breaks on a renamed entity, which would make
     // a timer masquerade as the calibrate button and fire the wrong RF code.
     const buttons = siblings.filter((e) => e.startsWith("button."));
-    const keyOf = (e) => (reg[e] || {}).translation_key;
     const keyed = buttons.some(keyOf);
     const hasHourToken = (s) => HOUR_TOKEN.test(s || "");
     const isTimer = (e) => (keyed ? keyOf(e) === "timer" : hasHourToken(e));
+    // The brightness resynchronisation button is neither a timer nor the colour
+    // calibrate button, and it is NOT harmless to confuse with it: pressing it
+    // walks the lamp all the way down. Excluded by key; where no key is exposed
+    // the "resync" token in the id is the only thing left to go on.
+    const isBrightnessResync = (e) =>
+      keyed ? keyOf(e) === "resync_brightness" : /resync|brightness|luminosit/i.test(e);
     const isCalibrate = (e) =>
-      keyed ? keyOf(e) === "recalibrate_color" : !hasHourToken(e);
+      keyed
+        ? keyOf(e) === "recalibrate_color"
+        : !hasHourToken(e) && !isBrightnessResync(e);
 
     // The hour is not in the translation key (it is a placeholder), so read it
     // from the friendly name first and only then from the id.
@@ -112,10 +121,21 @@ class RfFanCard extends HTMLElement {
       .sort((a, b) => Number(a.h) - Number(b.h));
     const calibrate = cfg.calibrate_entity || buttons.find(isCalibrate);
 
+    // Selects: the entry can own two of them (colour temperature, and the assumed
+    // brightness position). Taking whichever comes first would drive the colour row
+    // straight into the brightness position — a control that emits nothing, so the
+    // row would look dead rather than wrong. Match on the key, and only fall back
+    // to "the first select" for a registry that exposes none.
+    const selects = siblings.filter((e) => e.startsWith("select."));
+    const colorSelect =
+      cfg.color_entity ||
+      selects.find((e) => keyOf(e) === "color_temperature") ||
+      (selects.some(keyOf) ? undefined : selects[0]);
+
     return {
       fan: fanId,
       light: firstOf("light", cfg.light_entity),
-      color: firstOf("select", cfg.color_entity),
+      color: colorSelect,
       sound: firstOf("switch", cfg.sound_entity),
       timers,
       calibrate,

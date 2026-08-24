@@ -4,17 +4,24 @@ from actions import (
     expected_unique_ids,
     split_actions,
     validate_codes,
+    walk_steps,
 )
 from const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_OFF,
     ACTION_FAN_ON,
     ACTION_FAN_REVERSE,
+    ACTION_LIGHT_BRIGHT_DOWN,
+    ACTION_LIGHT_BRIGHT_UP,
     ACTION_LIGHT_KELVIN,
+    ACTION_LIGHT_KELVIN_DOWN,
+    ACTION_LIGHT_KELVIN_UP,
     ACTION_LIGHT_OFF,
     ACTION_LIGHT_ON,
     ACTION_LIGHT_TOGGLE,
     ACTION_SOUND_TOGGLE,
+    STEP_DOWN,
+    STEP_UP,
     speed_action,
     timer_action,
 )
@@ -84,14 +91,14 @@ def test_split_actions_capabilities_off_by_default():
 
 
 def test_split_actions_direction_and_preset_required_when_enabled():
-    required, _ = split_actions(6, light_control="none", has_direction=True,
+    required, _ = split_actions(6, light_control="none", direction_control="toggle",
                                 has_natural_preset=True)
     assert ACTION_FAN_REVERSE in required
     assert ACTION_FAN_NATURAL in required
 
 
 def test_split_actions_color_temp_and_sound_required_when_enabled():
-    required, _ = split_actions(6, light_control="toggle", has_color_temp=True,
+    required, _ = split_actions(6, light_control="toggle", color_control="cycle",
                                 has_sound=True)
     assert ACTION_LIGHT_KELVIN in required
     assert ACTION_SOUND_TOGGLE in required
@@ -103,15 +110,42 @@ def test_split_actions_timers_add_four_actions():
         assert timer_action(hours) in required
 
 
-def test_caps_from_data_defaults_false():
+def test_caps_from_data_defaults_off():
     assert caps_from_data({}) == {
-        "has_direction": False, "has_natural_preset": False,
-        "has_color_temp": False, "has_timers": False, "has_sound": False,
+        "has_natural_preset": False, "has_timers": False, "has_sound": False,
+        "direction_control": "none", "color_control": "none", "light_level": "none",
     }
 
 
 def test_caps_from_data_reads_true():
-    assert caps_from_data({"has_direction": True})["has_direction"] is True
+    assert caps_from_data({"has_natural_preset": True})["has_natural_preset"] is True
+
+
+def test_caps_from_data_reads_the_selectors():
+    caps = caps_from_data(
+        {"direction_control": "per_speed", "color_control": "relative",
+         "light_level": "relative"}
+    )
+    assert caps["direction_control"] == "per_speed"
+    assert caps["color_control"] == "relative"
+    assert caps["light_level"] == "relative"
+
+
+def test_caps_from_data_falls_back_to_the_legacy_booleans():
+    """An entry that has not been through the v3 migration still resolves.
+
+    The migration rewrites the booleans into selectors, but `caps_from_data` is
+    also handed raw dicts (diagnostics, tests, a half-migrated entry), so the
+    fallback is the guard rather than the migration being the only one.
+    """
+    caps = caps_from_data({"has_direction": True, "has_color_temp": True})
+    assert caps["direction_control"] == "toggle"
+    assert caps["color_control"] == "cycle"
+
+
+def test_caps_from_data_selector_wins_over_the_legacy_boolean():
+    caps = caps_from_data({"has_direction": True, "direction_control": "per_speed"})
+    assert caps["direction_control"] == "per_speed"
 
 
 
@@ -320,3 +354,154 @@ def test_repeat_count_never_below_one():
     assert transmit_repeat_count(ACTION_LIGHT_TOGGLE, 0) == 1
     assert transmit_repeat_count(ACTION_LIGHT_TOGGLE, -3) == 1
     assert transmit_repeat_count(ACTION_FAN_OFF, 0) == 1
+
+
+# --- Relative controls (v1.9.0) ------------------------------------------------
+
+
+def test_speed_action_reverse_keys_are_distinct():
+    """`per_speed` learns a second code set; the forward names must not change.
+
+    The forward keys are what every existing entry already stores, so renaming
+    them would invalidate every learned code (see the migration note in §5 of the
+    design doc).
+    """
+    assert speed_action(3) == "fan_speed_3"
+    assert speed_action(3, reverse=True) == "fan_speed_3_reverse"
+
+
+def test_split_actions_per_speed_learns_both_code_sets():
+    required, _ = split_actions(6, light_control="none", direction_control="per_speed")
+    for index in range(1, 7):
+        assert speed_action(index) in required
+        assert speed_action(index, reverse=True) in required
+    # No direction key at all: the remote stores the mode itself.
+    assert ACTION_FAN_REVERSE not in required
+
+
+def test_split_actions_per_speed_does_not_ask_for_a_reverse_key():
+    """`toggle` and `per_speed` are alternatives, never both."""
+    toggled, _ = split_actions(3, light_control="none", direction_control="toggle")
+    assert ACTION_FAN_REVERSE in toggled
+    assert speed_action(1, reverse=True) not in toggled
+
+
+def test_split_actions_direction_none_learns_only_forward_speeds():
+    required, _ = split_actions(3, light_control="none", direction_control="none")
+    assert required == [ACTION_FAN_OFF, *(speed_action(i) for i in range(1, 4))]
+
+
+def test_split_actions_color_relative_takes_a_key_pair():
+    required, _ = split_actions(3, light_control="toggle", color_control="relative")
+    assert ACTION_LIGHT_KELVIN_UP in required
+    assert ACTION_LIGHT_KELVIN_DOWN in required
+    # The single cycling key belongs to the other shape, not to this one.
+    assert ACTION_LIGHT_KELVIN not in required
+
+
+def test_split_actions_brightness_relative_takes_a_key_pair():
+    required, _ = split_actions(3, light_control="toggle", light_level="relative")
+    assert ACTION_LIGHT_BRIGHT_UP in required
+    assert ACTION_LIGHT_BRIGHT_DOWN in required
+
+
+def test_split_actions_brightness_absent_by_default():
+    required, _ = split_actions(3, light_control="toggle")
+    assert ACTION_LIGHT_BRIGHT_UP not in required
+    assert ACTION_LIGHT_BRIGHT_DOWN not in required
+
+
+def test_split_actions_inspire_aruba_plus_full_shape():
+    """The remote from issue #18, end to end.
+
+    6 speeds with a second reverse set behind the remote's internal switch, a
+    toggling light, and ± pairs for colour and brightness: 12 + 1 + 1 + 2 + 2 = 18.
+    """
+    required, _ = split_actions(
+        6,
+        light_control="toggle",
+        direction_control="per_speed",
+        color_control="relative",
+        light_level="relative",
+    )
+    assert len(required) == 18
+    assert len(set(required)) == 18
+
+
+def test_expected_unique_ids_brightness_adds_position_and_calibrate():
+    ids = expected_unique_ids("e1", {"light_level": "relative"})
+    assert ids == {
+        "e1_fan",
+        "e1_light",
+        "e1_brightness_position",
+        "e1_brightness_calibrate",
+    }
+
+
+def test_expected_unique_ids_color_relative_owns_the_same_entities_as_cycle():
+    """The colour select and its calibrate button exist in both shapes.
+
+    Only the codes behind them differ, so switching a fan from `cycle` to
+    `relative` must not orphan a registry row (the 1.6.0 ghost-entity bug).
+    """
+    cycle = expected_unique_ids("e1", {"has_light": False, "color_control": "cycle"})
+    relative = expected_unique_ids("e1", {"has_light": False, "color_control": "relative"})
+    assert cycle == relative == {"e1_fan", "e1_color_temp", "e1_kelvin_calibrate"}
+
+
+def test_expected_unique_ids_drops_brightness_when_switched_off():
+    assert "e1_brightness_position" not in expected_unique_ids("e1", {"light_level": "none"})
+
+
+def test_walk_clamped_range_goes_up_by_the_delta():
+    assert walk_steps(2, 7, 10, wrap=False) == (STEP_UP, 5)
+
+
+def test_walk_clamped_range_goes_down_by_the_delta():
+    assert walk_steps(7, 2, 10, wrap=False) == (STEP_DOWN, 5)
+
+
+def test_walk_clamped_range_emits_nothing_when_already_there():
+    assert walk_steps(4, 4, 10, wrap=False) == (STEP_UP, 0)
+
+
+def test_walk_clamps_a_target_past_the_end():
+    """The caller maps 0-255 onto positions, so a rounding overshoot is expected."""
+    assert walk_steps(0, 99, 10, wrap=False) == (STEP_UP, 9)
+
+
+def test_walk_clamps_a_negative_target():
+    assert walk_steps(5, -3, 10, wrap=False) == (STEP_DOWN, 5)
+
+
+def test_walk_cycle_takes_the_short_way_round():
+    """Three colours: 0 -> 2 is one step DOWN, not two up."""
+    assert walk_steps(0, 2, 3, wrap=True) == (STEP_DOWN, 1)
+
+
+def test_walk_cycle_goes_up_when_that_is_shorter():
+    assert walk_steps(0, 1, 3, wrap=True) == (STEP_UP, 1)
+
+
+def test_walk_cycle_wraps_past_the_end():
+    assert walk_steps(2, 0, 3, wrap=True) == (STEP_UP, 1)
+
+
+def test_walk_cycle_breaks_an_exact_tie_upwards():
+    """Four positions, half a turn away: both directions cost 2. Ties go up."""
+    assert walk_steps(0, 2, 4, wrap=True) == (STEP_UP, 2)
+
+
+def test_walk_unknown_position_is_treated_as_the_bottom():
+    """A brand-new entity has no restored position but must still move.
+
+    Dead-reckoning from a guess is what the resynchronise button exists to fix;
+    refusing to move would make the control look broken instead of assumed.
+    """
+    assert walk_steps(None, 3, 10, wrap=False) == (STEP_UP, 3)
+    assert walk_steps(None, 2, 3, wrap=True) == (STEP_DOWN, 1)
+
+
+def test_walk_single_position_never_emits():
+    assert walk_steps(0, 0, 1, wrap=False) == (STEP_UP, 0)
+    assert walk_steps(None, 5, 1, wrap=True) == (STEP_UP, 0)

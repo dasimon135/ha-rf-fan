@@ -29,11 +29,17 @@ Cecotec fan is used as the reference example, but any RF fan works.
   from remote button presses (via ESPHome events).
 - **Declarative capabilities** — you only get asked for the buttons your fan actually
   has:
-  - Discrete fan speeds (3–6).
+  - Discrete fan speeds (2–12).
   - Optional light: none / single toggle / separate on & off buttons.
   - Optional dedicated fan "on" button.
-  - Optional **reverse direction**, **natural-airflow preset**, **color temperature
-    (Kelvin)**, **sleep timers** (1/2/4/8 h), and **sound** toggle.
+  - **Rotation direction**: none / one reverse button / *a separate speed code per
+    direction* (for remotes that store winter/summer themselves and emit no
+    direction code at all).
+  - **Color temperature**: none / one cycling button / *two buttons* (warmer and
+    cooler).
+  - **Light brightness**: none / *two buttons* (brighter and dimmer).
+  - Optional **natural-airflow preset**, **sleep timers** (1/2/4/8 h), and **sound**
+    toggle.
 - **Reconfigure in place** — either relearn a single mis-captured button, or add and
   change capabilities and learn only the new ones, keeping the codes you already
   captured (see below).
@@ -48,21 +54,64 @@ Depending on the declared capabilities, a device exposes:
 | Entity | When | Notes |
 | --- | --- | --- |
 | `fan` | always | discrete speeds; gains `direction` and a `natural` preset when enabled |
-| `light` | light ≠ none | on/off; toggle- or on/off-driven |
-| `select` "color temperature" | color temp enabled | cycles Warm → Neutral → Cold |
-| `button` calibrate | color temp enabled | resyncs the assumed color position — **emits nothing** |
+| `light` | light ≠ none | on/off; gains a dead-reckoned `brightness` when the remote has ± keys |
+| `select` "color temperature" | color ≠ none | Warm → Neutral → Cold |
+| `button` calibrate | color ≠ none | resyncs the assumed color position — **emits nothing** |
+| `select` "assumed brightness position" | brightness = relative | declares where the lamp is — **emits nothing** |
+| `button` resync brightness | brightness = relative | walks the lamp down to its lowest step — **does emit** |
 | `button` timer ×4 | timers enabled | 1 h / 2 h / 4 h / 8 h |
 | `sensor` sleep timer | timers enabled | assumed switch-off time set by the timer buttons (clears itself when it elapses, or when the fan is turned off) |
 | `switch` sound | sound enabled | beep on/off |
 
 ### Color temperature (Kelvin)
 
-The remote's Kelvin button *cycles* the color, so the integration tracks an **assumed
-position** (dead-reckoning). To change the color, use the **"color temperature"
-dropdown** and pick a value *different* from the one shown — picking the current value
-sends nothing. The **calibrate button never emits RF**: it only tells Home Assistant
-"the lamp is now on Warm", to re-align the dropdown if it drifts (set the lamp to Warm
-physically, then press it). The color only changes visibly when the light is on.
+The integration tracks an **assumed position** (dead-reckoning) whichever shape your
+remote has, because the lamp never reports back. To change the color, use the
+**"color temperature" dropdown** and pick a value *different* from the one shown —
+picking the current value sends nothing. The color only changes visibly when the
+light is on.
+
+The two shapes differ in what they can do:
+
+- **One cycling button** — the only direction available is forward, so going from
+  Cold back to Warm sends however many presses it takes to come round.
+- **Two buttons (warmer / cooler)** — the walk takes whichever way round is shorter,
+  and a press on the *physical* remote is followed in both directions.
+
+The **calibrate button never emits RF**: it only tells Home Assistant "the lamp is
+now on Warm", to re-align the dropdown if it drifts (set the lamp to Warm physically,
+then press it).
+
+### Brightness (remotes with ± keys)
+
+If you declare `light_level: relative`, the light entity gains a real brightness
+slider. There is nothing clever behind it: a position is **how many presses up from
+the lowest step**, modelled over ten steps, and the integration counts them. Ten is a
+starting figure, not a measurement — if the top of your slider never reaches full
+brightness, your lamp has more steps than that; if the last presses do nothing, it
+has fewer (harmless).
+
+Dead reckoning drifts — someone uses the physical remote out of range of the gateway,
+or the lamp was already dimmed before Home Assistant ever saw it. Two ways back, and
+they are deliberately different:
+
+| | What it does | Cost |
+| --- | --- | --- |
+| **"Assumed brightness position"** select | Declares where the lamp is. Emits nothing. | Silent and instant, but only as good as what you tell it. |
+| **"Resynchronise brightness"** button | Walks the lamp into its bottom stop (N−1 presses). | Physically true, but audible and slow — and on many remotes stepping below the lowest level switches the lamp off. |
+
+### Direction without a reverse button
+
+Some remotes have no direction code at all: an internal switch selects winter or
+summer and the remote then emits a *different set of speed codes* for each. Declare
+`direction_control: per_speed` and you will be asked to learn both sets
+(`fan_speed_N` and `fan_speed_N_reverse`) — twice the buttons to teach.
+
+What you get for it is a direction that is **absolute** rather than guessed. With a
+single reverse button, the integration can only flip and hope, because it has no way
+to know which way the fan was turning to begin with. Here the code itself carries the
+direction: setting it re-sends the current speed from the other set, and one frame
+sniffed from the physical remote reports the speed and the direction together.
 
 ## Requirements
 

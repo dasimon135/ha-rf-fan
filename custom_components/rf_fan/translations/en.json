@@ -10,9 +10,10 @@
           "speed_count": "Number of discrete speeds",
           "light_control": "Light control",
           "has_fan_on": "Fan has a dedicated on button",
-          "has_direction": "Reverse direction (reverse button)",
+          "direction_control": "Rotation direction",
           "has_natural_preset": "Natural airflow",
-          "has_color_temp": "Color temperature (Kelvin)",
+          "color_control": "Colour temperature",
+          "light_level": "Light brightness",
           "has_timers": "Sleep timers (1h/2h/4h/8h)",
           "has_sound": "Sound (beep)"
         }
@@ -108,9 +109,10 @@
           "speed_count": "Number of discrete speeds",
           "light_control": "Light control",
           "has_fan_on": "Fan has a dedicated on button",
-          "has_direction": "Reverse direction (reverse button)",
+          "direction_control": "Rotation direction",
           "has_natural_preset": "Natural airflow",
-          "has_color_temp": "Color temperature (Kelvin)",
+          "color_control": "Colour temperature",
+          "light_level": "Light brightness",
           "has_timers": "Sleep timers (1h/2h/4h/8h)",
           "has_sound": "Sound (beep)"
         }
@@ -168,6 +170,9 @@
       },
       "recalibrate_color": {
         "name": "Recalibrate colour (to Warm)"
+      },
+      "resync_brightness": {
+        "name": "Resynchronise brightness (to the lowest step)"
       }
     },
     "light": {
@@ -178,6 +183,9 @@
     "select": {
       "color_temperature": {
         "name": "Colour temperature"
+      },
+      "brightness_position": {
+        "name": "Assumed brightness position"
       }
     },
     "switch": {
@@ -203,6 +211,26 @@
       "options": {
         "manual": "Paste the codes manually",
         "learn": "Learn from the remote (guided)"
+      }
+    },
+    "direction_control": {
+      "options": {
+        "none": "None",
+        "toggle": "One reverse button",
+        "per_speed": "A separate speed code per direction (no reverse button)"
+      }
+    },
+    "color_control": {
+      "options": {
+        "none": "None",
+        "cycle": "One button that cycles the colours",
+        "relative": "Two buttons (warmer / cooler)"
+      }
+    },
+    "light_level": {
+      "options": {
+        "none": "None (on/off only)",
+        "relative": "Two buttons (brighter / dimmer)"
       }
     }
   }

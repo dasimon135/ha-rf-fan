@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
-from asyncio import sleep
+from asyncio import CancelledError, sleep
+from collections.abc import Callable
+from contextlib import suppress
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -11,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
 
-from .actions import transmit_repeat_count
+from .actions import transmit_repeat_count, walk_steps
 from .const import (
     COLOR_TEMP_OPTIONS,
     CONF_CODES,
@@ -21,6 +23,8 @@ from .const import (
     CONF_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
+    STEP_GAP_SEC,
+    STEP_UP,
 )
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
@@ -172,6 +176,99 @@ class RfFanBaseEntity(Entity):
         # blanket window over all reception.
         return any(until > now for until in self._runtime.echo_codes.values())
 
+    async def _async_walk(
+        self,
+        axis: str,
+        *,
+        up_action: str,
+        down_action: str | None,
+        target: int,
+        size: int,
+        wrap: bool,
+        get_position: Callable[[], int | None],
+        set_position: Callable[[int], None],
+    ) -> int | None:
+        """Step a dead-reckoned position to `target`, one key press at a time.
+
+        The transport half of the walk; the arithmetic lives in
+        `actions.walk_steps`. Steps are separated by STEP_GAP_SEC so a debouncing
+        receiver counts them individually, and each keeps the full `repeat_count`:
+        a step is absolute (one notch in a known direction), not a flip.
+
+        `down_action` is None for a remote whose colour key only cycles forward. There
+        is then only one direction available, so the walk always goes up and `wrap`
+        must be True — the position comes back round.
+
+        Restart semantics: a walk already running on the same `axis` is cancelled
+        first, and this one starts from where that one actually stopped. `set_position`
+        is called after every frame that goes on the air, never once at the end, so
+        the position a cancellation leaves behind is the truth about the hardware
+        rather than an intention. Returns the position actually reached.
+        """
+        running = self._runtime.walks.pop(axis, None)
+        if running is not None and not running.done():
+            running.cancel()
+            with suppress(CancelledError):
+                await running
+
+        task = self.hass.async_create_task(
+            self._async_walk_body(
+                up_action=up_action,
+                down_action=down_action,
+                target=target,
+                size=size,
+                wrap=wrap,
+                get_position=get_position,
+                set_position=set_position,
+            )
+        )
+        self._runtime.walks[axis] = task
+        try:
+            await task
+        except CancelledError:
+            # Superseded by a newer walk on the same axis: expected, not an error.
+            # Our own cancellation still propagates — the entry it left in the map
+            # is the newer walk's, so `is not task` distinguishes the two cases.
+            if self._runtime.walks.get(axis) is task:
+                raise
+        finally:
+            if self._runtime.walks.get(axis) is task:
+                del self._runtime.walks[axis]
+        return get_position()
+
+    async def _async_walk_body(
+        self,
+        *,
+        up_action: str,
+        down_action: str | None,
+        target: int,
+        size: int,
+        wrap: bool,
+        get_position: Callable[[], int | None],
+        set_position: Callable[[int], None],
+    ) -> None:
+        """Emit the individual steps of a walk (see `_async_walk`)."""
+        position = get_position()
+        if down_action is None:
+            # Forward-only cycling key: the shortest path may point backwards, but
+            # there is nothing to press to go that way.
+            direction, steps = STEP_UP, (target - (position or 0)) % size
+        else:
+            direction, steps = walk_steps(position, target, size, wrap=wrap)
+
+        action = up_action if direction == STEP_UP else down_action
+        delta = 1 if direction == STEP_UP else -1
+        for index in range(steps):
+            if not await self._async_transmit_action(action):
+                # Nothing went on the air (unmapped code): the hardware has not
+                # moved, so the assumed position may not either.
+                return
+            current = get_position()
+            moved = (0 if current is None else current) + delta
+            set_position(moved % size if wrap else max(0, min(size - 1, moved)))
+            if index < steps - 1:
+                await sleep(STEP_GAP_SEC)
+
     async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
         """Transmit an action's code `times` times (cycle).
 
@@ -201,10 +298,18 @@ class RfFanBaseEntity(Entity):
         """Dispatcher signal name for the sleep timer, specific to the entry."""
         return f"{DOMAIN}_{self._config_entry.entry_id}_timer"
 
-    def _advance_kelvin_position(self) -> int:
-        """Advance the color position by one step (mod N) and return it."""
+    def _level_signal(self) -> str:
+        """Dispatcher signal name for the brightness position, specific to the entry."""
+        return f"{DOMAIN}_{self._config_entry.entry_id}_level"
+
+    def _advance_kelvin_position(self, delta: int = 1) -> int:
+        """Move the color position by `delta` steps (mod N) and return it.
+
+        The cycle wraps in both directions: a remote with a dedicated "warmer" key
+        can walk back past the first position, and the hardware comes round.
+        """
         runtime = self._runtime
-        runtime.kelvin_position = (runtime.kelvin_position + 1) % len(COLOR_TEMP_OPTIONS)
+        runtime.kelvin_position = (runtime.kelvin_position + delta) % len(COLOR_TEMP_OPTIONS)
         return runtime.kelvin_position
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:

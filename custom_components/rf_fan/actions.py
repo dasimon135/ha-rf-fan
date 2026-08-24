@@ -8,13 +8,27 @@ try:  # Home Assistant runtime: relative import within the package
         ACTION_FAN_OFF,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
+        ACTION_LIGHT_BRIGHT_DOWN,
+        ACTION_LIGHT_BRIGHT_UP,
         ACTION_LIGHT_KELVIN,
+        ACTION_LIGHT_KELVIN_DOWN,
+        ACTION_LIGHT_KELVIN_UP,
         ACTION_LIGHT_OFF,
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
+        COLOR_CONTROL_CYCLE,
+        COLOR_CONTROL_NONE,
+        COLOR_CONTROL_RELATIVE,
+        DIRECTION_CONTROL_NONE,
+        DIRECTION_CONTROL_PER_SPEED,
+        DIRECTION_CONTROL_TOGGLE,
         LIGHT_CONTROL_ON_OFF,
         LIGHT_CONTROL_TOGGLE,
+        LIGHT_LEVEL_NONE,
+        LIGHT_LEVEL_RELATIVE,
+        STEP_DOWN,
+        STEP_UP,
         TIMER_HOURS,
         TOGGLE_ACTIONS,
         speed_action,
@@ -26,13 +40,27 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         ACTION_FAN_OFF,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
+        ACTION_LIGHT_BRIGHT_DOWN,
+        ACTION_LIGHT_BRIGHT_UP,
         ACTION_LIGHT_KELVIN,
+        ACTION_LIGHT_KELVIN_DOWN,
+        ACTION_LIGHT_KELVIN_UP,
         ACTION_LIGHT_OFF,
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
+        COLOR_CONTROL_CYCLE,
+        COLOR_CONTROL_NONE,
+        COLOR_CONTROL_RELATIVE,
+        DIRECTION_CONTROL_NONE,
+        DIRECTION_CONTROL_PER_SPEED,
+        DIRECTION_CONTROL_TOGGLE,
         LIGHT_CONTROL_ON_OFF,
         LIGHT_CONTROL_TOGGLE,
+        LIGHT_LEVEL_NONE,
+        LIGHT_LEVEL_RELATIVE,
+        STEP_DOWN,
+        STEP_UP,
         TIMER_HOURS,
         TOGGLE_ACTIONS,
         speed_action,
@@ -45,9 +73,10 @@ def split_actions(
     light_control: str = "none",
     *,
     has_fan_on: bool = False,
-    has_direction: bool = False,
+    direction_control: str = DIRECTION_CONTROL_NONE,
     has_natural_preset: bool = False,
-    has_color_temp: bool = False,
+    color_control: str = COLOR_CONTROL_NONE,
+    light_level: str = LIGHT_LEVEL_NONE,
     has_timers: bool = False,
     has_sound: bool = False,
 ) -> tuple[list[str], list[str]]:
@@ -57,23 +86,42 @@ def split_actions(
     declared capabilities: `fan_on` if `has_fan_on`, the light action(s)
     depending on `light_control` (`toggle` -> `light_toggle`; `on_off` -> `light_on`
     and `light_off`; `none` -> none), then the actions for the enabled capabilities
-    (reverse, natural airflow, kelvin color, timers, sound).
+    (direction, natural airflow, colour, brightness, timers, sound).
     No optional action: the returned list is always empty.
+
+    Three capabilities are selectors rather than booleans, because the remote can
+    express them in more than one shape:
+
+    - `direction_control: per_speed` has NO direction key at all. The remote stores
+      the mode itself and emits a different speed code per direction, so the reverse
+      set is learned alongside the forward one (`fan_speed_N_reverse`).
+    - `color_control: relative` and `light_level: relative` have two dedicated keys
+      instead of one cycling key, so they take an up/down pair.
     """
     required = [ACTION_FAN_OFF]
     required.extend(speed_action(index) for index in range(1, speed_count + 1))
+    # Kept adjacent to the forward speeds: learning goes key by key down the remote,
+    # and the reverse set is the same keys pressed with the internal switch flipped.
+    if direction_control == DIRECTION_CONTROL_PER_SPEED:
+        required.extend(
+            speed_action(index, reverse=True) for index in range(1, speed_count + 1)
+        )
     if has_fan_on:
         required.append(ACTION_FAN_ON)
     if light_control == LIGHT_CONTROL_TOGGLE:
         required.append(ACTION_LIGHT_TOGGLE)
     elif light_control == LIGHT_CONTROL_ON_OFF:
         required.extend([ACTION_LIGHT_ON, ACTION_LIGHT_OFF])
-    if has_direction:
+    if direction_control == DIRECTION_CONTROL_TOGGLE:
         required.append(ACTION_FAN_REVERSE)
     if has_natural_preset:
         required.append(ACTION_FAN_NATURAL)
-    if has_color_temp:
+    if color_control == COLOR_CONTROL_CYCLE:
         required.append(ACTION_LIGHT_KELVIN)
+    elif color_control == COLOR_CONTROL_RELATIVE:
+        required.extend([ACTION_LIGHT_KELVIN_UP, ACTION_LIGHT_KELVIN_DOWN])
+    if light_level == LIGHT_LEVEL_RELATIVE:
+        required.extend([ACTION_LIGHT_BRIGHT_UP, ACTION_LIGHT_BRIGHT_DOWN])
     if has_timers:
         required.extend(timer_action(hours) for hours in TIMER_HOURS)
     if has_sound:
@@ -126,18 +174,79 @@ def validate_codes(codes: dict[str, str], required: list[str]) -> dict[str, str]
     return errors
 
 
+def walk_steps(
+    current: int | None, target: int, size: int, *, wrap: bool
+) -> tuple[str, int]:
+    """Plan a walk from `current` to `target` over `size` positions.
+
+    Returns `(direction, steps)` where direction is STEP_UP or STEP_DOWN. Pure
+    arithmetic, so the whole stepping mechanism is testable without Home Assistant.
+
+    `wrap` is what separates a cycle from a range:
+
+    - `wrap=True` (a colour cycle) has no end stop, so the shortest path wins in
+      either direction. A tie goes up, arbitrarily but consistently.
+    - `wrap=False` (a brightness or speed range) clamps at both ends, so the
+      direction simply follows the sign of the delta.
+
+    `current is None` means the position was never established — a brand-new entity
+    that has not yet restored a state. It is treated as 0 rather than refusing to
+    move: a relative control with an unknown position is still usable, it is just
+    dead-reckoning from a guess, and the resynchronise button exists to fix it. Every
+    entity here already carries `assumed_state`.
+    """
+    if size <= 1:
+        return STEP_UP, 0
+    target = max(0, min(size - 1, int(target)))
+    position = 0 if current is None else max(0, min(size - 1, int(current)))
+
+    if not wrap:
+        delta = target - position
+        return (STEP_UP, delta) if delta >= 0 else (STEP_DOWN, -delta)
+
+    forward = (target - position) % size
+    backward = size - forward
+    if forward and backward < forward:
+        return STEP_DOWN, backward
+    return STEP_UP, forward
+
+
 CAPABILITY_FLAGS = (
-    "has_direction",
     "has_natural_preset",
-    "has_color_temp",
     "has_timers",
     "has_sound",
 )
 
+# Capabilities the remote can express in more than one shape, so they are selectors
+# rather than booleans. Mapped here with the legacy boolean they replaced, so a dict
+# that predates the version-3 migration still resolves to the right value.
+CAPABILITY_SELECTORS = (
+    ("direction_control", DIRECTION_CONTROL_NONE, "has_direction", DIRECTION_CONTROL_TOGGLE),
+    ("color_control", COLOR_CONTROL_NONE, "has_color_temp", COLOR_CONTROL_CYCLE),
+    ("light_level", LIGHT_LEVEL_NONE, None, None),
+)
 
-def caps_from_data(data: dict[str, object]) -> dict[str, bool]:
-    """Extract the capabilities from a config entry dict (default False)."""
-    return {flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS}
+
+def caps_from_data(data: dict[str, object]) -> dict[str, object]:
+    """Extract the capabilities from a config entry dict.
+
+    Booleans default to False and selectors to their "none" value. A selector that
+    is absent falls back to the legacy boolean it replaced, so this is correct for
+    an entry that has not been through the version-3 migration as well as for one
+    that has — the migration is then belt and braces rather than the only guard.
+    """
+    caps: dict[str, object] = {
+        flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS
+    }
+    for name, default, legacy_flag, legacy_value in CAPABILITY_SELECTORS:
+        value = data.get(name)
+        if isinstance(value, str) and value:
+            caps[name] = value
+        elif legacy_flag is not None and bool(data.get(legacy_flag, False)):
+            caps[name] = legacy_value
+        else:
+            caps[name] = default
+    return caps
 
 
 def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:
@@ -149,13 +258,17 @@ def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:
     unavailable ghost. Must be kept in step with the `async_setup_entry` guards
     and the `_attr_unique_id` of each platform.
     """
+    caps = caps_from_data(data)
     ids = {f"{entry_id}_fan"}
     # light.py defaults `has_light` to True for entries predating the flag.
     if data.get("has_light", True):
         ids.add(f"{entry_id}_light")
-    if data.get("has_color_temp", False):
+    if caps["color_control"] != COLOR_CONTROL_NONE:
         ids.add(f"{entry_id}_color_temp")
         ids.add(f"{entry_id}_kelvin_calibrate")
+    if caps["light_level"] == LIGHT_LEVEL_RELATIVE:
+        ids.add(f"{entry_id}_brightness_position")
+        ids.add(f"{entry_id}_brightness_calibrate")
     if data.get("has_sound", False):
         ids.add(f"{entry_id}_sound")
     if data.get("has_timers", False):

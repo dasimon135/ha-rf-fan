@@ -16,14 +16,16 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
+from .actions import caps_from_data
 from .const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_OFF,
     ACTION_FAN_ON,
     ACTION_FAN_REVERSE,
-    CONF_HAS_DIRECTION,
     CONF_HAS_NATURAL_PRESET,
     CONF_SPEED_COUNT,
+    DIRECTION_CONTROL_NONE,
+    DIRECTION_CONTROL_PER_SPEED,
     EVENT_RF_FAN_RECEIVED,
     PRESET_NATURAL,
     PRESET_NORMAL,
@@ -57,7 +59,13 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         self._event_unsub = None
 
         # Optional capabilities (config flow)
-        self._has_direction: bool = config_entry.data.get(CONF_HAS_DIRECTION, False)
+        self._direction_control: str = caps_from_data(dict(config_entry.data))[
+            "direction_control"
+        ]
+        self._has_direction: bool = self._direction_control != DIRECTION_CONTROL_NONE
+        self._per_speed_direction: bool = (
+            self._direction_control == DIRECTION_CONTROL_PER_SPEED
+        )
         self._has_preset: bool = config_entry.data.get(CONF_HAS_NATURAL_PRESET, False)
 
         # Supported features computed per instance based on the capabilities
@@ -146,7 +154,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         else:
             sent = await self._async_transmit_action(ACTION_FAN_ON)
             if not sent:
-                sent = await self._async_transmit_action(speed_action(1))
+                sent = await self._async_transmit_action(self._speed_action_for(1))
 
             if sent:
                 self._is_on = True
@@ -168,26 +176,70 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             self._clear_timer()
             self.async_write_ha_state()
 
+    def _speed_index(self, percentage: int) -> int:
+        """Map a percentage onto a 1-based speed index."""
+        step = 100 / self._speed_count
+        return max(1, min(self._speed_count, round(percentage / step)))
+
+    def _speed_action_for(self, index: int) -> str:
+        """Speed action key for an index, in the current direction.
+
+        With `direction_control: per_speed` the direction is not an action but a
+        dimension of the speed code set, so it is resolved here. An unknown
+        direction sends the forward set, which is also what makes the direction
+        known from then on.
+        """
+        reverse = self._per_speed_direction and self._direction == DIRECTION_REVERSE
+        return speed_action(index, reverse=reverse)
+
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the speed via a fan_speed_X action."""
         if percentage <= 0:
             await self.async_turn_off()
             return
 
-        step = 100 / self._speed_count
-        speed_index = max(1, min(self._speed_count, round(percentage / step)))
-        sent = await self._async_transmit_action(speed_action(speed_index))
+        speed_index = self._speed_index(percentage)
+        sent = await self._async_transmit_action(self._speed_action_for(speed_index))
         if sent:
             self._is_on = True
-            self._percentage = round(speed_index * step)
+            self._percentage = round(speed_index * (100 / self._speed_count))
+            if self._per_speed_direction and self._direction is None:
+                # The forward set is what just went on the air, so the direction is
+                # no longer a guess.
+                self._direction = DIRECTION_FORWARD
             self.async_write_ha_state()
 
     async def async_set_direction(self, direction: str) -> None:
-        """Toggle the rotation direction (single-toggle remote)."""
+        """Set the rotation direction.
+
+        Two remote shapes, and they differ in how much they can promise:
+
+        - `toggle`: one key that flips the direction. From an unknown direction a
+          single toggle cannot guarantee the absolute target — inherent to assumed
+          state, and the reason the mode below exists.
+        - `per_speed`: no direction key at all. The remote stores the mode and emits
+          a different speed code per direction, so setting the direction means
+          re-sending the current speed from the other code set. The result is
+          absolute: the direction is known, not dead-reckoned.
+        """
         if self._direction == direction:
             return
-        # Assumed state: from an unknown direction (None), a single toggle cannot
-        # guarantee the absolute target (inherent limitation of assumed_state).
+
+        if self._per_speed_direction:
+            previous = self._direction
+            self._direction = direction
+            if self._is_on and self._percentage:
+                index = self._speed_index(self._percentage)
+                if not await self._async_transmit_action(self._speed_action_for(index)):
+                    # Nothing went on the air: the fan has not changed direction,
+                    # so neither may the assumed state.
+                    self._direction = previous
+                    return
+            # Fan off: nothing to re-send, and the direction applies to the next
+            # speed code sent. Recording it now is what makes that code the right one.
+            self.async_write_ha_state()
+            return
+
         sent = await self._async_transmit_action(ACTION_FAN_REVERSE)
         if sent:
             self._direction = direction
@@ -242,9 +294,23 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             self.async_write_ha_state()
             return
 
+        # A reverse speed code identifies the speed AND the direction at once, which
+        # is why `per_speed` tracks the physical remote better than a toggle can: a
+        # toggle press tells you the direction changed, this tells you what it is.
+        if self._per_speed_direction:
+            for index in range(1, self._speed_count + 1):
+                if action == speed_action(index, reverse=True):
+                    self._is_on = True
+                    self._percentage = round(index * (100 / self._speed_count))
+                    self._direction = DIRECTION_REVERSE
+                    self.async_write_ha_state()
+                    return
+
         for idx in range(1, self._speed_count + 1):
             if action == speed_action(idx):
                 self._is_on = True
                 self._percentage = round(idx * (100 / self._speed_count))
+                if self._per_speed_direction:
+                    self._direction = DIRECTION_FORWARD
                 self.async_write_ha_state()
                 return

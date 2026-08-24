@@ -14,7 +14,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from tests.ha_helpers import setup_full
+from tests.ha_helpers import setup_full, setup_relative
 
 
 @pytest.fixture(autouse=True)
@@ -59,4 +59,52 @@ async def test_enabled_capabilities_survive_a_reload(hass: HomeAssistant) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
 
+    assert _unique_ids(hass, entry.entry_id) == before
+
+
+async def test_disabling_brightness_removes_its_two_entities(hass: HomeAssistant) -> None:
+    """Brightness owns a select and a button; both must go when it is turned off.
+
+    `expected_unique_ids` is the single source of truth for this cleanup, so a new
+    capability that forgets to declare its entities leaves exactly the permanently
+    unavailable ghosts that were fixed in 1.6.0.
+    """
+    entry, _calls = await setup_relative(hass)
+    before = _unique_ids(hass, entry.entry_id)
+    assert f"{entry.entry_id}_brightness_position" in before
+    assert f"{entry.entry_id}_brightness_calibrate" in before
+
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "light_level": "none"}
+    )
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    after = _unique_ids(hass, entry.entry_id)
+    assert not any("brightness" in unique_id for unique_id in after)
+    # The colour side is a separate capability and must not be collateral damage.
+    assert f"{entry.entry_id}_color_temp" in after
+    assert f"{entry.entry_id}_light" in after
+
+
+async def test_switching_colour_between_its_two_shapes_keeps_the_entities(
+    hass: HomeAssistant,
+) -> None:
+    """`cycle` and `relative` are the same entities behind different codes.
+
+    Only the learned codes differ, so a user changing their answer must not find the
+    colour select recreated from scratch (losing its id, its customisations and its
+    place on every dashboard).
+    """
+    entry, _calls = await setup_relative(hass)
+    before = _unique_ids(hass, entry.entry_id)
+
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "color_control": "cycle"}
+    )
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert f"{entry.entry_id}_color_temp" in _unique_ids(hass, entry.entry_id)
+    assert f"{entry.entry_id}_kelvin_calibrate" in _unique_ids(hass, entry.entry_id)
     assert _unique_ids(hass, entry.entry_id) == before

@@ -49,9 +49,10 @@ def full_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
             "speed_count": 3,
             "light_control": "toggle",
             "has_fan_on": False,
-            "has_direction": True,
+            "direction_control": "toggle",
             "has_natural_preset": True,
-            "has_color_temp": True,
+            "color_control": "cycle",
+            "light_level": "none",
             "has_timers": True,
             "has_sound": True,
             "has_light": True,
@@ -111,3 +112,77 @@ async def fire_rf(hass: HomeAssistant, code: str, device: str = DEVICE) -> None:
         EVENT_RF_FAN_RECEIVED, {"device": device, "action": "sniff", "code": code}
     )
     await hass.async_block_till_done()
+
+
+# Codes for a remote whose buttons MOVE a value instead of setting one, plus a
+# direction that lives in the speed code set rather than in a key of its own.
+# Modelled on the Inspire Aruba Plus of issue #18, scaled down to 3 speeds.
+RELATIVE_CODES = {
+    "fan_off": "r_off",
+    "fan_speed_1": "r_s1",
+    "fan_speed_2": "r_s2",
+    "fan_speed_3": "r_s3",
+    "fan_speed_1_reverse": "r_s1r",
+    "fan_speed_2_reverse": "r_s2r",
+    "fan_speed_3_reverse": "r_s3r",
+    "light_toggle": "r_lt",
+    "light_kelvin_up": "r_ku",
+    "light_kelvin_down": "r_kd",
+    "light_bright_up": "r_bu",
+    "light_bright_down": "r_bd",
+}
+
+
+def relative_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
+    """Create an entry whose remote steps its values (issue #18 shape)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Relative",
+        data={
+            "esphome_device": DEVICE,
+            "fan_name": "Relative",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_fan_on": False,
+            "direction_control": "per_speed",
+            "has_natural_preset": False,
+            "color_control": "relative",
+            "light_level": "relative",
+            "has_timers": False,
+            "has_sound": False,
+            "has_light": True,
+            "repeat_count": repeat_count,
+            "codes": dict(RELATIVE_CODES),
+        },
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def setup_relative(hass: HomeAssistant, repeat_count: int = 2):
+    """Register the stub, set up a stepped-control entry, and return (entry, calls)."""
+    calls = register_stub(hass)
+    entry = relative_entry(hass, repeat_count=repeat_count)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry, calls
+
+
+def id_by_unique_suffix(hass: HomeAssistant, entry, domain: str, suffix: str) -> str:
+    """Entity id for one of an entry's entities, picked by unique-id suffix.
+
+    `one_id` cannot be used once a platform owns more than one entity for the same
+    entry — the colour select and the brightness position select are both `select`.
+    """
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if registered.domain == domain and registered.unique_id.endswith(suffix):
+            return registered.entity_id
+    raise AssertionError(f"no {domain} entity ending in {suffix!r} was created")
+
+
+def actions_sent(calls: list[dict[str, Any]]) -> list[str]:
+    """The action names transmitted so far, in order."""
+    return [data.get("action") for data in calls]

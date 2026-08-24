@@ -247,14 +247,23 @@ Repo rule, unchanged: any behaviour change ships with a test that failed before 
 > leads, because it is the half whose data is confirmed. Original order below the
 > line.
 
-**v1.8.0** — the walk mechanism (`walk_steps`, `_async_walk`, the restart lock, the
-CONFIG resync entities) plus `light_level` and `color_control: relative`. Every code
-this needs has been verified fixed on real hardware. Closes #18's light half.
+**v1.8.0 (shipped 2026-08-24)** — the walk mechanism (`walk_steps`, `_async_walk`,
+the restart lock, the CONFIG resync entities) plus `light_level` and
+`color_control: relative`. Every code this needs has been verified fixed on real
+hardware. Closes #18's light half.
 
-**v1.9.0** — `power_control`, `speed_control: relative`, speed cap to 12,
-`direction_control: per_speed`. Unblocks @Ltek, who is the more badly stuck of the
-two but whose ± codes are still unmeasured. The mechanism already exists by then, so
-this is a small increment rather than a second build.
+Two items moved up into it while it was being built, both because they turned out to
+cost nothing and to be blocked by nothing:
+
+- `direction_control: per_speed`. It was slotted with @Ltek's half for being a fan
+  capability, but it depends on no ± key at all — it is discrete speed codes, and
+  @elmr91 has already described both sets. Grouping it by subject rather than by
+  what gates it was the mis-slice.
+- The speed cap to 12. One line, and no argument against it.
+
+**v1.9.0** — `power_control` and `speed_control: relative`. Unblocks @Ltek, who is
+the more badly stuck of the two but whose ± codes are still unmeasured. The mechanism
+already exists by then, so this is a small increment rather than a second build.
 
 **v1.10.0** — `extra_buttons` and their card support.
 
@@ -277,6 +286,10 @@ against codes nobody has read.
   *speed* dies with it — the mechanism itself survives, since the light half no
   longer depends on it. Asked on the forum, unanswered. **Do not start the speed
   half before that answer**; the light half is free to proceed.
+- **Ten brightness steps is a guess, not a measurement** (`LIGHT_LEVEL_STEPS`, added
+  1.8.0). Too few and the top of the slider never reaches full brightness; too many
+  and the last presses do nothing, which is harmless. It wants confirming against
+  real hardware before it becomes a config field — @elmr91 is the one to ask.
 - **Slider behaviour during a drag** (see §3) — decides the lock semantics.
 - **Entity count.** Twelve entities on a fully-loaded fan today, up to sixteen after
   1.9.0. `EntityCategory.CONFIG` keeps them off dashboards, but the device page is

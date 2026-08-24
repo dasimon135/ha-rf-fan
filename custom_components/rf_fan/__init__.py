@@ -13,7 +13,22 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
 from .actions import expected_unique_ids
-from .const import CONF_DISABLE_CARD, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE, DOMAIN
+from .const import (
+    COLOR_CONTROL_CYCLE,
+    COLOR_CONTROL_NONE,
+    CONF_COLOR_CONTROL,
+    CONF_DIRECTION_CONTROL,
+    CONF_DISABLE_CARD,
+    CONF_ESPHOME_DEVICE,
+    CONF_GATEWAY_SERVICE,
+    CONF_HAS_COLOR_TEMP,
+    CONF_HAS_DIRECTION,
+    CONF_LIGHT_LEVEL,
+    DIRECTION_CONTROL_NONE,
+    DIRECTION_CONTROL_TOGGLE,
+    DOMAIN,
+    LIGHT_LEVEL_NONE,
+)
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,12 +108,21 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate old config entries.
 
+    Written as cumulative steps, so an entry several versions behind is brought
+    forward one step at a time.
+
     v1 -> v2: store the raw ESPHome service prefix (gateway_service). New
     entries capture it from the live service registry at flow time; for
     migrated entries the historical dash->underscore derivation is used, which
     matches the exact behavior these entries relied on so far.
+
+    v2 -> v3: two capabilities become selectors, because the remote can express
+    them in more than one shape (see const.CONF_DIRECTION_CONTROL /
+    CONF_COLOR_CONTROL), and brightness appears as a third. NO LEARNED CODE IS
+    INVALIDATED: every existing action key keeps its exact name, so nobody has to
+    relearn a button they already taught.
     """
-    if entry.version > 2:
+    if entry.version > 3:
         # Entry created by a newer version of the integration: cannot downgrade.
         return False
     if entry.version < 2:
@@ -108,6 +132,32 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         hass.config_entries.async_update_entry(entry, data=data, version=2)
         _LOGGER.debug("Migrated config entry %s to version 2", entry.entry_id)
+    if entry.version < 3:
+        data = dict(entry.data)
+        # `setdefault`, not assignment: a selector that is already present was set
+        # deliberately and outranks the boolean it replaced. Deriving over the top
+        # of it would silently undo the user's answer.
+        data.setdefault(
+            CONF_DIRECTION_CONTROL,
+            DIRECTION_CONTROL_TOGGLE
+            if data.get(CONF_HAS_DIRECTION, False)
+            else DIRECTION_CONTROL_NONE,
+        )
+        data.setdefault(
+            CONF_COLOR_CONTROL,
+            COLOR_CONTROL_CYCLE
+            if data.get(CONF_HAS_COLOR_TEMP, False)
+            else COLOR_CONTROL_NONE,
+        )
+        # New capability, so nothing to carry over: an existing entry has never
+        # been asked whether its remote has brightness keys.
+        data.setdefault(CONF_LIGHT_LEVEL, LIGHT_LEVEL_NONE)
+        # The booleans they replace are dropped rather than left behind, so there
+        # is only one answer to "does this fan reverse?" in the stored data.
+        data.pop(CONF_HAS_DIRECTION, None)
+        data.pop(CONF_HAS_COLOR_TEMP, None)
+        hass.config_entries.async_update_entry(entry, data=data, version=3)
+        _LOGGER.debug("Migrated config entry %s to version 3", entry.entry_id)
     return True
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -14,6 +15,16 @@ class RfFanRuntimeData:
 
     # Dead-reckoned position in COLOR_TEMP_OPTIONS.
     kelvin_position: int = 0
+    # Dead-reckoned brightness position in 0..LIGHT_LEVEL_STEPS-1, for a light whose
+    # remote has +/- keys instead of a level to set. None until it is established.
+    level_position: int | None = None
+    # Walks in flight, keyed by axis ("color", "level"). A walk emits one key press
+    # per step with a pause between them, so a nine-step move takes several seconds;
+    # moving the control again during it would interleave two walks and leave the
+    # assumed position wrong. The rule is *restart*: the running walk is cancelled
+    # and the new one starts from where the old one actually stopped. One entry per
+    # axis, so a brightness move and a colour move never cancel each other.
+    walks: dict[str, asyncio.Task[None]] = field(default_factory=dict)
     # Assumed light state (None until known); gates the colour select.
     light_on: bool | None = None
     # Assumed switch-off time recorded by the sleep-timer buttons.
