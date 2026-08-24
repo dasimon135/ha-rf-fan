@@ -10,9 +10,10 @@
           "speed_count": "Nombre de vitesses distinctes",
           "light_control": "Commande de la lumière",
           "has_fan_on": "Le ventilateur a un bouton marche dédié",
-          "has_direction": "Sens inverse (bouton reverse)",
+          "direction_control": "Sens de rotation",
           "has_natural_preset": "Flux d'air naturel",
-          "has_color_temp": "Température de couleur (Kelvin)",
+          "color_control": "Température de couleur",
+          "light_level": "Luminosité de la lampe",
           "has_timers": "Minuteries (1h/2h/4h/8h)",
           "has_sound": "Son (bip)"
         }
@@ -108,9 +109,10 @@
           "speed_count": "Nombre de vitesses distinctes",
           "light_control": "Commande de la lumière",
           "has_fan_on": "Le ventilateur a un bouton marche dédié",
-          "has_direction": "Sens inverse (bouton reverse)",
+          "direction_control": "Sens de rotation",
           "has_natural_preset": "Flux d'air naturel",
-          "has_color_temp": "Température de couleur (Kelvin)",
+          "color_control": "Température de couleur",
+          "light_level": "Luminosité de la lampe",
           "has_timers": "Minuteries (1h/2h/4h/8h)",
           "has_sound": "Son (bip)"
         }
@@ -168,6 +170,9 @@
       },
       "recalibrate_color": {
         "name": "Recaler la couleur (sur Chaud)"
+      },
+      "resync_brightness": {
+        "name": "Resynchroniser la luminosité (au niveau le plus bas)"
       }
     },
     "light": {
@@ -178,6 +183,9 @@
     "select": {
       "color_temperature": {
         "name": "Température couleur"
+      },
+      "brightness_position": {
+        "name": "Position de luminosité supposée"
       }
     },
     "switch": {
@@ -203,6 +211,26 @@
       "options": {
         "manual": "Coller les codes manuellement",
         "learn": "Apprendre depuis la télécommande (guidé)"
+      }
+    },
+    "direction_control": {
+      "options": {
+        "none": "Aucun",
+        "toggle": "Un bouton d'inversion",
+        "per_speed": "Un code de vitesse distinct par sens (pas de bouton d'inversion)"
+      }
+    },
+    "color_control": {
+      "options": {
+        "none": "Aucune",
+        "cycle": "Un bouton qui fait défiler les couleurs",
+        "relative": "Deux boutons (plus chaud / plus froid)"
+      }
+    },
+    "light_level": {
+      "options": {
+        "none": "Aucune (allumé/éteint seulement)",
+        "relative": "Deux boutons (plus clair / plus sombre)"
       }
     }
   }

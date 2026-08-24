@@ -124,9 +124,10 @@ async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
             "speed_count": 3,
             "light_control": "toggle",
             "has_fan_on": False,
-            "has_direction": True,
+            "direction_control": "toggle",
             "has_natural_preset": True,
-            "has_color_temp": True,
+            "color_control": "cycle",
+            "light_level": "none",
             "has_timers": True,
             "has_sound": True,
         },
@@ -149,7 +150,9 @@ async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
     result = await flow.async_configure(result["flow_id"], codes_input)
     assert result["type"] == FlowResultType.CREATE_ENTRY
     data = result["data"]
-    assert data["has_direction"] and data["has_color_temp"] and data["has_sound"]
+    assert data["direction_control"] == "toggle"
+    assert data["color_control"] == "cycle"
+    assert data["has_sound"]
     codes = data["codes"]
     assert codes["fan_reverse"] == "C_rev"
     assert codes["light_kelvin"] == "C_kel"
@@ -168,9 +171,10 @@ def _basic_entry(hass: HomeAssistant) -> MockConfigEntry:
             "speed_count": 3,
             "light_control": "toggle",
             "has_fan_on": False,
-            "has_direction": False,
+            "direction_control": "none",
             "has_natural_preset": False,
-            "has_color_temp": False,
+            "color_control": "none",
+            "light_level": "none",
             "has_timers": False,
             "has_sound": False,
             "has_light": True,
@@ -216,9 +220,10 @@ async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
                 "speed_count": 3,
                 "light_control": "toggle",
                 "has_fan_on": False,
-                "has_direction": False,
+                "direction_control": "none",
                 "has_natural_preset": False,
-                "has_color_temp": False,
+                "color_control": "none",
+            "light_level": "none",
                 "has_timers": True,
                 "has_sound": False,
             },
@@ -284,9 +289,10 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
                 "speed_count": 3,
                 "light_control": "toggle",
                 "has_fan_on": False,
-                "has_direction": False,
+                "direction_control": "none",
                 "has_natural_preset": False,
-                "has_color_temp": True,
+                "color_control": "cycle",
+            "light_level": "none",
                 "has_timers": False,
                 "has_sound": False,
             },
@@ -318,7 +324,7 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
     assert codes["light_kelvin"] == "c_kel"  # new capability
     assert codes["fan_off"] == "c_off"  # basics kept
     assert codes["fan_speed_3"] == "c3"
-    assert entry.data["has_color_temp"] is True
+    assert entry.data["color_control"] == "cycle"
 
 
 async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
@@ -358,9 +364,10 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
                 "speed_count": 3,
                 "light_control": "toggle",
                 "has_fan_on": False,
-                "has_direction": False,
+                "direction_control": "none",
                 "has_natural_preset": False,
-                "has_color_temp": False,
+                "color_control": "none",
+            "light_level": "none",
                 "has_timers": True,
                 "has_sound": False,
             },
@@ -469,9 +476,10 @@ async def test_reconfigure_rename_updates_the_title_and_unique_id(
                 "speed_count": 3,
                 "light_control": "toggle",
                 "has_fan_on": False,
-                "has_direction": False,
+                "direction_control": "none",
                 "has_natural_preset": False,
-                "has_color_temp": False,
+                "color_control": "none",
+            "light_level": "none",
                 "has_timers": False,
                 "has_sound": False,
             },
@@ -517,9 +525,10 @@ async def test_reconfigure_refuses_a_name_already_used_on_the_same_gateway(
             "speed_count": 3,
             "light_control": "toggle",
             "has_fan_on": False,
-            "has_direction": False,
+            "direction_control": "none",
             "has_natural_preset": False,
-            "has_color_temp": False,
+            "color_control": "none",
+            "light_level": "none",
             "has_timers": False,
             "has_sound": False,
         },

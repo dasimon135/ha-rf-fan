@@ -24,28 +24,34 @@ from .actions import (
     validate_codes,
 )
 from .const import (
+    COLOR_CONTROL_OPTIONS,
     CONF_CODES,
+    CONF_COLOR_CONTROL,
+    CONF_DIRECTION_CONTROL,
     CONF_DISABLE_CARD,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
     CONF_GATEWAY_SERVICE,
-    CONF_HAS_COLOR_TEMP,
-    CONF_HAS_DIRECTION,
     CONF_HAS_FAN_ON,
     CONF_HAS_LIGHT,
     CONF_HAS_NATURAL_PRESET,
     CONF_HAS_SOUND,
     CONF_HAS_TIMERS,
     CONF_LIGHT_CONTROL,
+    CONF_LIGHT_LEVEL,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
     DEFAULT_REPEAT_COUNT,
     DEFAULT_SPEED_COUNT,
+    DIRECTION_CONTROL_OPTIONS,
     DOMAIN,
     EVENT_RF_FAN_RECEIVED,
     LIGHT_CONTROL_NONE,
     LIGHT_CONTROL_OPTIONS,
     LIGHT_CONTROL_TOGGLE,
+    LIGHT_LEVEL_OPTIONS,
+    MAX_SPEED_COUNT,
+    MIN_SPEED_COUNT,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -57,7 +63,7 @@ LEARN_COLLECT_SEC = 1.2
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
-    VERSION = 2
+    VERSION = 3
 
     @staticmethod
     @callback
@@ -74,7 +80,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._light_control: str = LIGHT_CONTROL_TOGGLE
         self._has_fan_on: bool = False
         self._has_light: bool = True
-        self._caps: dict[str, bool] = {}
+        self._caps: dict[str, object] = {}
         self._learn_codes: dict[str, str] = {}
         self._learn_action_index: int = 0
         self._learn_task: asyncio.Task[str | None] | None = None
@@ -136,19 +142,34 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 fields[vol.Optional(CONF_ESPHOME_DEVICE, default=default_device)] = str
         fields[vol.Required(CONF_FAN_NAME, default=self._fan_name)] = str
-        fields[vol.Required(CONF_SPEED_COUNT, default=self._speed_count)] = vol.In([3, 4, 5, 6])
+        # A dropdown rather than a free number: the count decides how many codes have
+        # to be learned, so an accidental 40 is an expensive typo. The old cap of 6
+        # had no technical reason behind it and is gone (9-speed remotes exist).
+        fields[vol.Required(CONF_SPEED_COUNT, default=self._speed_count)] = vol.In(
+            list(range(MIN_SPEED_COUNT, MAX_SPEED_COUNT + 1))
+        )
         fields[vol.Required(CONF_LIGHT_CONTROL, default=self._light_control)] = SelectSelector(
             SelectSelectorConfig(options=LIGHT_CONTROL_OPTIONS, translation_key="light_control")
         )
         fields[vol.Required(CONF_HAS_FAN_ON, default=self._has_fan_on)] = bool
+        # Selectors, not checkboxes: each of these capabilities exists in more than
+        # one remote shape, and the shape decides which codes get learned.
+        for capability, options in (
+            (CONF_DIRECTION_CONTROL, DIRECTION_CONTROL_OPTIONS),
+            (CONF_COLOR_CONTROL, COLOR_CONTROL_OPTIONS),
+            (CONF_LIGHT_LEVEL, LIGHT_LEVEL_OPTIONS),
+        ):
+            fields[
+                vol.Required(capability, default=self._caps.get(capability, options[0]))
+            ] = SelectSelector(
+                SelectSelectorConfig(options=options, translation_key=capability)
+            )
         for capability in (
-            CONF_HAS_DIRECTION,
             CONF_HAS_NATURAL_PRESET,
-            CONF_HAS_COLOR_TEMP,
             CONF_HAS_TIMERS,
             CONF_HAS_SOUND,
         ):
-            fields[vol.Required(capability, default=self._caps.get(capability, False))] = bool
+            fields[vol.Required(capability, default=bool(self._caps.get(capability, False)))] = bool
         return vol.Schema(fields)
 
     async def async_step_user(

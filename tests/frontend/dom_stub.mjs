@@ -73,8 +73,9 @@ export async function loadCard() {
 /**
  * A hass double with one rf_fan device: a fan, plus whatever extras are asked for.
  *
- * `buttons` entries are `{id, translation_key, name}` — pass `translation_key:
- * null` to emulate a registry that does not expose it (older Home Assistant).
+ * `buttons` and `selects` entries are `{id, translation_key, name}` — pass
+ * `translation_key: null` to emulate a registry that does not expose it (older
+ * Home Assistant).
  */
 export function makeHass({
   fanState = "on",
@@ -82,6 +83,7 @@ export function makeHass({
   language = "en",
   supportedFeatures = 61,
   buttons = [],
+  selects = [],
 } = {}) {
   const states = {
     "fan.x": {
@@ -105,6 +107,15 @@ export function makeHass({
     states[b.id] = { state: "unknown", attributes: { friendly_name: b.name } };
     entities[b.id] = { device_id: "d1", platform: "rf_fan" };
     if (b.translation_key) entities[b.id].translation_key = b.translation_key;
+  }
+
+  for (const sel of selects) {
+    states[sel.id] = {
+      state: sel.state || "unknown",
+      attributes: { friendly_name: sel.name, options: sel.options || [] },
+    };
+    entities[sel.id] = { device_id: "d1", platform: "rf_fan" };
+    if (sel.translation_key) entities[sel.id].translation_key = sel.translation_key;
   }
 
   const calls = [];
