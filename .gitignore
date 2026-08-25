@@ -5,8 +5,8 @@ __pycache__/
 .venv-test/
 .venv314/
 
-# Local agent configuration (machine-specific, not part of the integration)
-.claude/
+# Personal Claude Code permissions, never shared
+.claude/settings.local.json
 
 # Local-only captured RF codes (device-specific, not for publication)
 docs/*-codes-manual.md
