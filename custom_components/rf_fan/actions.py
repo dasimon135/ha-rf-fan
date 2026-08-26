@@ -20,6 +20,11 @@ try:  # Home Assistant runtime: relative import within the package
         COLOR_CONTROL_CYCLE,
         COLOR_CONTROL_NONE,
         COLOR_CONTROL_RELATIVE,
+        COLOR_TEMP_NAMED,
+        CONF_COLOR_TEMP_STEPS,
+        CONF_LIGHT_LEVEL_STEPS,
+        DEFAULT_COLOR_TEMP_STEPS,
+        DEFAULT_LIGHT_LEVEL_STEPS,
         DIRECTION_CONTROL_NONE,
         DIRECTION_CONTROL_PER_SPEED,
         DIRECTION_CONTROL_TOGGLE,
@@ -27,6 +32,8 @@ try:  # Home Assistant runtime: relative import within the package
         LIGHT_CONTROL_TOGGLE,
         LIGHT_LEVEL_NONE,
         LIGHT_LEVEL_RELATIVE,
+        MAX_STEP_COUNT,
+        MIN_STEP_COUNT,
         STEP_DOWN,
         STEP_UP,
         TIMER_HOURS,
@@ -52,6 +59,11 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         COLOR_CONTROL_CYCLE,
         COLOR_CONTROL_NONE,
         COLOR_CONTROL_RELATIVE,
+        COLOR_TEMP_NAMED,
+        CONF_COLOR_TEMP_STEPS,
+        CONF_LIGHT_LEVEL_STEPS,
+        DEFAULT_COLOR_TEMP_STEPS,
+        DEFAULT_LIGHT_LEVEL_STEPS,
         DIRECTION_CONTROL_NONE,
         DIRECTION_CONTROL_PER_SPEED,
         DIRECTION_CONTROL_TOGGLE,
@@ -59,6 +71,8 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         LIGHT_CONTROL_TOGGLE,
         LIGHT_LEVEL_NONE,
         LIGHT_LEVEL_RELATIVE,
+        MAX_STEP_COUNT,
+        MIN_STEP_COUNT,
         STEP_DOWN,
         STEP_UP,
         TIMER_HOURS,
@@ -247,6 +261,46 @@ def caps_from_data(data: dict[str, object]) -> dict[str, object]:
         else:
             caps[name] = default
     return caps
+
+
+def _step_count(data: dict[str, object], key: str, default: int) -> int:
+    """Read one declared step count, clamped into the supported range.
+
+    Clamped rather than trusted: the count reaches here from stored entry data,
+    which outlives the form that validated it, and every consumer uses it as a
+    modulus or a press count. A zero would divide by zero in the brightness
+    mapping; a negative would make `walk_steps` plan a walk that never terminates.
+    """
+    value = data.get(key, default)
+    try:
+        count = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return max(MIN_STEP_COUNT, min(MAX_STEP_COUNT, count))
+
+
+def light_level_steps(data: dict[str, object]) -> int:
+    """Number of assumed brightness positions declared for this fan."""
+    return _step_count(data, CONF_LIGHT_LEVEL_STEPS, DEFAULT_LIGHT_LEVEL_STEPS)
+
+
+def color_temp_steps(data: dict[str, object]) -> int:
+    """Number of assumed colour positions declared for this fan."""
+    return _step_count(data, CONF_COLOR_TEMP_STEPS, DEFAULT_COLOR_TEMP_STEPS)
+
+
+def color_temp_options(steps: int) -> list[str]:
+    """Labels for the colour select's positions.
+
+    Three positions keep the historical names, because those strings are the
+    entity's state and renaming them would break automations and history alike.
+    Any other count is labelled 1..N: "Warm / Neutral / Cold" describes a three-way
+    switch, and a remote with eight positions does not have one — the honest label
+    for position five of eight is "5".
+    """
+    if steps == len(COLOR_TEMP_NAMED):
+        return list(COLOR_TEMP_NAMED)
+    return [str(position) for position in range(1, steps + 1)]
 
 
 def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:

@@ -19,6 +19,8 @@ from homeassistant.util import slugify
 from .actions import (
     caps_from_data,
     classify_reconfigure_actions,
+    color_temp_steps,
+    light_level_steps,
     pick_best_code,
     split_actions,
     validate_codes,
@@ -27,6 +29,7 @@ from .const import (
     COLOR_CONTROL_OPTIONS,
     CONF_CODES,
     CONF_COLOR_CONTROL,
+    CONF_COLOR_TEMP_STEPS,
     CONF_DIRECTION_CONTROL,
     CONF_DISABLE_CARD,
     CONF_ESPHOME_DEVICE,
@@ -39,8 +42,11 @@ from .const import (
     CONF_HAS_TIMERS,
     CONF_LIGHT_CONTROL,
     CONF_LIGHT_LEVEL,
+    CONF_LIGHT_LEVEL_STEPS,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
+    DEFAULT_COLOR_TEMP_STEPS,
+    DEFAULT_LIGHT_LEVEL_STEPS,
     DEFAULT_REPEAT_COUNT,
     DEFAULT_SPEED_COUNT,
     DIRECTION_CONTROL_OPTIONS,
@@ -51,7 +57,9 @@ from .const import (
     LIGHT_CONTROL_TOGGLE,
     LIGHT_LEVEL_OPTIONS,
     MAX_SPEED_COUNT,
+    MAX_STEP_COUNT,
     MIN_SPEED_COUNT,
+    MIN_STEP_COUNT,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -81,6 +89,12 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._has_fan_on: bool = False
         self._has_light: bool = True
         self._caps: dict[str, object] = {}
+        # How many positions the stepped controls model. Kept beside the
+        # capabilities rather than inside them: `caps_from_data` feeds
+        # `split_actions`, which decides which codes to learn, and neither count
+        # changes that — an eight-step lamp is learned with the same two keys as
+        # a ten-step one.
+        self._steps: dict[str, int] = {}
         self._learn_codes: dict[str, str] = {}
         self._learn_action_index: int = 0
         self._learn_task: asyncio.Task[str | None] | None = None
@@ -154,16 +168,34 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         fields[vol.Required(CONF_HAS_FAN_ON, default=self._has_fan_on)] = bool
         # Selectors, not checkboxes: each of these capabilities exists in more than
         # one remote shape, and the shape decides which codes get learned.
-        for capability, options in (
-            (CONF_DIRECTION_CONTROL, DIRECTION_CONTROL_OPTIONS),
-            (CONF_COLOR_CONTROL, COLOR_CONTROL_OPTIONS),
-            (CONF_LIGHT_LEVEL, LIGHT_LEVEL_OPTIONS),
+        # Each stepped capability is followed by the number of positions it models.
+        # Asked for unconditionally rather than only when the capability is enabled:
+        # this is a single form, so a count that appeared and disappeared with the
+        # selector above it would need a second step to be filled in at all.
+        for capability, options, step_key, step_default in (
+            (CONF_DIRECTION_CONTROL, DIRECTION_CONTROL_OPTIONS, None, 0),
+            (
+                CONF_COLOR_CONTROL,
+                COLOR_CONTROL_OPTIONS,
+                CONF_COLOR_TEMP_STEPS,
+                DEFAULT_COLOR_TEMP_STEPS,
+            ),
+            (
+                CONF_LIGHT_LEVEL,
+                LIGHT_LEVEL_OPTIONS,
+                CONF_LIGHT_LEVEL_STEPS,
+                DEFAULT_LIGHT_LEVEL_STEPS,
+            ),
         ):
             fields[
                 vol.Required(capability, default=self._caps.get(capability, options[0]))
             ] = SelectSelector(
                 SelectSelectorConfig(options=options, translation_key=capability)
             )
+            if step_key is not None:
+                fields[
+                    vol.Required(step_key, default=self._steps.get(step_key, step_default))
+                ] = vol.In(list(range(MIN_STEP_COUNT, MAX_STEP_COUNT + 1)))
         for capability in (
             CONF_HAS_NATURAL_PRESET,
             CONF_HAS_TIMERS,
@@ -204,6 +236,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
                 self._has_light = self._light_control != LIGHT_CONTROL_NONE
                 self._caps = caps_from_data(user_input)
+                self._steps = {
+                    CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
+                    CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
+                }
                 return await self.async_step_method()
 
         return self.async_show_form(
@@ -445,6 +481,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_HAS_FAN_ON: self._has_fan_on,
             CONF_HAS_LIGHT: self._has_light,
             **self._caps,
+            **self._steps,
             CONF_REPEAT_COUNT: self._repeat_count,
             CONF_CODES: codes,
         }
@@ -483,6 +520,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._has_fan_on = bool(data.get(CONF_HAS_FAN_ON, False))
         self._has_light = self._light_control != LIGHT_CONTROL_NONE
         self._caps = caps_from_data(data)
+        self._steps = {
+            CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(data)),
+            CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(data)),
+        }
         self._existing_codes = dict(data.get(CONF_CODES, {}))
         self._repeat_count = int(
             entry.options.get(
@@ -526,6 +567,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             self._light_control = user_input[CONF_LIGHT_CONTROL]
             self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
             self._caps = caps_from_data(user_input)
+            self._steps = {
+                CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
+                CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
+            }
             return self.async_show_form(
                 step_id="reconfigure_capabilities",
                 data_schema=self._base_schema(include_device=False),
@@ -538,6 +583,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
         self._has_light = self._light_control != LIGHT_CONTROL_NONE
         self._caps = caps_from_data(user_input)
+        self._steps = {
+            CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
+            CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
+        }
         return await self.async_step_reconfigure_review()
 
     async def async_step_reconfigure_review(

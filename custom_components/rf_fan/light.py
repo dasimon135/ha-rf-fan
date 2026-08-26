@@ -21,14 +21,14 @@ from .const import (
     AXIS_LEVEL,
     COLOR_CONTROL_NONE,
     CONF_HAS_LIGHT,
+    DEFAULT_LIGHT_LEVEL_STEPS,
     EVENT_RF_FAN_RECEIVED,
     LIGHT_LEVEL_RELATIVE,
-    LIGHT_LEVEL_STEPS,
 )
 from .entity import RfFanBaseEntity
 
 
-def brightness_to_position(brightness: int, steps: int = LIGHT_LEVEL_STEPS) -> int:
+def brightness_to_position(brightness: int, steps: int = DEFAULT_LIGHT_LEVEL_STEPS) -> int:
     """Map Home Assistant's 1-255 brightness onto a 0-based step position.
 
     Position p means "p presses up from the bottom", so position 0 is the dimmest
@@ -39,7 +39,7 @@ def brightness_to_position(brightness: int, steps: int = LIGHT_LEVEL_STEPS) -> i
     return max(0, min(steps - 1, position))
 
 
-def position_to_brightness(position: int, steps: int = LIGHT_LEVEL_STEPS) -> int:
+def position_to_brightness(position: int, steps: int = DEFAULT_LIGHT_LEVEL_STEPS) -> int:
     """Map a step position back onto 1-255, so the top position reads as full."""
     return max(1, min(255, round(255 * (position + 1) / steps)))
 
@@ -97,7 +97,11 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         if not self._has_level:
             return None
         position = self._runtime.level_position
-        return None if position is None else position_to_brightness(position)
+        return (
+            None
+            if position is None
+            else position_to_brightness(position, self._light_level_steps)
+        )
 
     async def async_added_to_hass(self) -> None:
         """Restore the assumed state (without a color bump), then subscribe to RF events."""
@@ -109,7 +113,9 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
             if self._has_level and self._runtime.level_position is None:
                 restored = last_state.attributes.get(ATTR_BRIGHTNESS)
                 if isinstance(restored, (int, float)) and restored > 0:
-                    self._runtime.level_position = brightness_to_position(int(restored))
+                    self._runtime.level_position = brightness_to_position(
+                        int(restored), self._light_level_steps
+                    )
             async_dispatcher_send(self.hass, self._kelvin_signal())
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
         if self._has_level:
@@ -156,8 +162,8 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
             AXIS_LEVEL,
             up_action=ACTION_LIGHT_BRIGHT_UP,
             down_action=ACTION_LIGHT_BRIGHT_DOWN,
-            target=brightness_to_position(brightness),
-            size=LIGHT_LEVEL_STEPS,
+            target=brightness_to_position(brightness, self._light_level_steps),
+            size=self._light_level_steps,
             # A brightness range has two end stops; it does not come round.
             wrap=False,
             get_position=lambda: self._runtime.level_position,
@@ -197,14 +203,16 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         """Move the assumed brightness one notch, clamping at both ends."""
         current = self._runtime.level_position
         moved = (0 if current is None else current) + delta
-        self._runtime.level_position = max(0, min(LIGHT_LEVEL_STEPS - 1, moved))
+        self._runtime.level_position = max(0, min(self._light_level_steps - 1, moved))
         async_dispatcher_send(self.hass, self._level_signal())
         self.async_write_ha_state()
 
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Update the light state from the received RF actions."""
-        if self._is_echo(event.data):
+        # Short-circuit order matters: an echo of our own transmission is not a
+        # remote press at all, so it must never be recorded as the start of a burst.
+        if self._is_echo(event.data) or self._is_repeat(event):
             return
 
         action = self._event_action(event.data)

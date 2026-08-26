@@ -13,7 +13,9 @@
           "direction_control": "Sens de rotation",
           "has_natural_preset": "Flux d'air naturel",
           "color_control": "Température de couleur",
+          "color_temp_steps": "Nombre de positions de couleur",
           "light_level": "Luminosité de la lampe",
+          "light_level_steps": "Nombre de niveaux de luminosité",
           "has_timers": "Minuteries (1h/2h/4h/8h)",
           "has_sound": "Son (bip)"
         }
@@ -56,6 +58,24 @@
           "fan_speed_4": "Code vitesse 4",
           "fan_speed_5": "Code vitesse 5",
           "fan_speed_6": "Code vitesse 6",
+          "fan_speed_7": "Code vitesse 7",
+          "fan_speed_8": "Code vitesse 8",
+          "fan_speed_9": "Code vitesse 9",
+          "fan_speed_10": "Code vitesse 10",
+          "fan_speed_11": "Code vitesse 11",
+          "fan_speed_12": "Code vitesse 12",
+          "fan_speed_1_reverse": "Code vitesse 1 (sens inverse)",
+          "fan_speed_2_reverse": "Code vitesse 2 (sens inverse)",
+          "fan_speed_3_reverse": "Code vitesse 3 (sens inverse)",
+          "fan_speed_4_reverse": "Code vitesse 4 (sens inverse)",
+          "fan_speed_5_reverse": "Code vitesse 5 (sens inverse)",
+          "fan_speed_6_reverse": "Code vitesse 6 (sens inverse)",
+          "fan_speed_7_reverse": "Code vitesse 7 (sens inverse)",
+          "fan_speed_8_reverse": "Code vitesse 8 (sens inverse)",
+          "fan_speed_9_reverse": "Code vitesse 9 (sens inverse)",
+          "fan_speed_10_reverse": "Code vitesse 10 (sens inverse)",
+          "fan_speed_11_reverse": "Code vitesse 11 (sens inverse)",
+          "fan_speed_12_reverse": "Code vitesse 12 (sens inverse)",
           "light_on": "Code lumière ON",
           "light_off": "Code lumière OFF",
           "light_toggle": "Code bascule lumière",
@@ -81,6 +101,24 @@
           "relearn_fan_speed_4": "Ré-apprendre : vitesse 4",
           "relearn_fan_speed_5": "Ré-apprendre : vitesse 5",
           "relearn_fan_speed_6": "Ré-apprendre : vitesse 6",
+          "relearn_fan_speed_7": "Ré-apprendre : vitesse 7",
+          "relearn_fan_speed_8": "Ré-apprendre : vitesse 8",
+          "relearn_fan_speed_9": "Ré-apprendre : vitesse 9",
+          "relearn_fan_speed_10": "Ré-apprendre : vitesse 10",
+          "relearn_fan_speed_11": "Ré-apprendre : vitesse 11",
+          "relearn_fan_speed_12": "Ré-apprendre : vitesse 12",
+          "relearn_fan_speed_1_reverse": "Ré-apprendre : vitesse 1 (sens inverse)",
+          "relearn_fan_speed_2_reverse": "Ré-apprendre : vitesse 2 (sens inverse)",
+          "relearn_fan_speed_3_reverse": "Ré-apprendre : vitesse 3 (sens inverse)",
+          "relearn_fan_speed_4_reverse": "Ré-apprendre : vitesse 4 (sens inverse)",
+          "relearn_fan_speed_5_reverse": "Ré-apprendre : vitesse 5 (sens inverse)",
+          "relearn_fan_speed_6_reverse": "Ré-apprendre : vitesse 6 (sens inverse)",
+          "relearn_fan_speed_7_reverse": "Ré-apprendre : vitesse 7 (sens inverse)",
+          "relearn_fan_speed_8_reverse": "Ré-apprendre : vitesse 8 (sens inverse)",
+          "relearn_fan_speed_9_reverse": "Ré-apprendre : vitesse 9 (sens inverse)",
+          "relearn_fan_speed_10_reverse": "Ré-apprendre : vitesse 10 (sens inverse)",
+          "relearn_fan_speed_11_reverse": "Ré-apprendre : vitesse 11 (sens inverse)",
+          "relearn_fan_speed_12_reverse": "Ré-apprendre : vitesse 12 (sens inverse)",
           "relearn_light_toggle": "Ré-apprendre : bascule lumière",
           "relearn_light_on": "Ré-apprendre : lumière ON",
           "relearn_light_off": "Ré-apprendre : lumière OFF",
@@ -112,7 +150,9 @@
           "direction_control": "Sens de rotation",
           "has_natural_preset": "Flux d'air naturel",
           "color_control": "Température de couleur",
+          "color_temp_steps": "Nombre de positions de couleur",
           "light_level": "Luminosité de la lampe",
+          "light_level_steps": "Nombre de niveaux de luminosité",
           "has_timers": "Minuteries (1h/2h/4h/8h)",
           "has_sound": "Son (bip)"
         }
@@ -169,7 +209,7 @@
         "name": "Minuterie {hours}h"
       },
       "recalibrate_color": {
-        "name": "Recaler la couleur (sur Chaud)"
+        "name": "Recaler la couleur (sur la première position)"
       },
       "resync_brightness": {
         "name": "Resynchroniser la luminosité (au niveau le plus bas)"

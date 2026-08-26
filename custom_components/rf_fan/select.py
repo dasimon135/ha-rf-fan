@@ -20,10 +20,8 @@ from .const import (
     AXIS_COLOR,
     COLOR_CONTROL_NONE,
     COLOR_CONTROL_RELATIVE,
-    COLOR_TEMP_OPTIONS,
     EVENT_RF_FAN_RECEIVED,
     LIGHT_LEVEL_RELATIVE,
-    LIGHT_LEVEL_STEPS,
 )
 from .entity import RfFanBaseEntity
 
@@ -62,7 +60,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_color_temp"
         self._attr_translation_key = "color_temperature"
-        self._attr_options = COLOR_TEMP_OPTIONS
+        self._attr_options = self._color_temp_options
         self._color_control: str = caps_from_data(dict(config_entry.data))["color_control"]
         self._event_unsub = None
         self._signal_unsub = None
@@ -70,7 +68,10 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         """Return the assumed color position."""
-        return COLOR_TEMP_OPTIONS[self._runtime.kelvin_position]
+        # Clamped: a reconfiguration can shrink the declared count under a position
+        # restored from before it, and an out-of-range state is worse than a stale one.
+        position = min(self._runtime.kelvin_position, self._color_temp_steps - 1)
+        return self._color_temp_options[position]
 
     @property
     def available(self) -> bool:
@@ -93,8 +94,8 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
             up_action=ACTION_LIGHT_KELVIN_UP if relative else ACTION_LIGHT_KELVIN,
             # A cycling remote has no second key: forward-only, wrapping round.
             down_action=ACTION_LIGHT_KELVIN_DOWN if relative else None,
-            target=COLOR_TEMP_OPTIONS.index(option),
-            size=len(COLOR_TEMP_OPTIONS),
+            target=self._color_temp_options.index(option),
+            size=self._color_temp_steps,
             wrap=True,
             get_position=lambda: self._runtime.kelvin_position,
             set_position=self._set_kelvin_position,
@@ -104,8 +105,8 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
     async def async_added_to_hass(self) -> None:
         """Restore the color position, then subscribe to RF events and the kelvin signal."""
         last_state = await self.async_get_last_state()
-        if last_state is not None and last_state.state in COLOR_TEMP_OPTIONS:
-            self._runtime.kelvin_position = COLOR_TEMP_OPTIONS.index(last_state.state)
+        if last_state is not None and last_state.state in self._color_temp_options:
+            self._runtime.kelvin_position = self._color_temp_options.index(last_state.state)
 
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
         self._signal_unsub = async_dispatcher_connect(
@@ -135,7 +136,9 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         delta, so the assumed position tracks the hardware in both directions
         instead of only forwards.
         """
-        if self._is_echo(event.data):
+        # Short-circuit order matters: an echo of our own transmission is not a
+        # remote press at all, so it must never be recorded as the start of a burst.
+        if self._is_echo(event.data) or self._is_repeat(event):
             return
 
         action = self._event_action(event.data)
@@ -166,7 +169,9 @@ class RfFanBrightnessPositionSelect(RfFanBaseEntity, RestoreEntity, SelectEntity
         super().__init__(hass, config_entry)
         self._attr_unique_id = f"{config_entry.entry_id}_brightness_position"
         self._attr_translation_key = "brightness_position"
-        self._attr_options = [str(step) for step in range(1, LIGHT_LEVEL_STEPS + 1)]
+        self._attr_options = [
+            str(step) for step in range(1, self._light_level_steps + 1)
+        ]
         self._signal_unsub = None
 
     @property

@@ -13,7 +13,9 @@
           "direction_control": "Rotation direction",
           "has_natural_preset": "Natural airflow",
           "color_control": "Colour temperature",
+          "color_temp_steps": "Number of colour positions",
           "light_level": "Light brightness",
+          "light_level_steps": "Number of brightness steps",
           "has_timers": "Sleep timers (1h/2h/4h/8h)",
           "has_sound": "Sound (beep)"
         }
@@ -56,6 +58,24 @@
           "fan_speed_4": "Code for speed 4",
           "fan_speed_5": "Code for speed 5",
           "fan_speed_6": "Code for speed 6",
+          "fan_speed_7": "Code for speed 7",
+          "fan_speed_8": "Code for speed 8",
+          "fan_speed_9": "Code for speed 9",
+          "fan_speed_10": "Code for speed 10",
+          "fan_speed_11": "Code for speed 11",
+          "fan_speed_12": "Code for speed 12",
+          "fan_speed_1_reverse": "Code for speed 1 (reverse)",
+          "fan_speed_2_reverse": "Code for speed 2 (reverse)",
+          "fan_speed_3_reverse": "Code for speed 3 (reverse)",
+          "fan_speed_4_reverse": "Code for speed 4 (reverse)",
+          "fan_speed_5_reverse": "Code for speed 5 (reverse)",
+          "fan_speed_6_reverse": "Code for speed 6 (reverse)",
+          "fan_speed_7_reverse": "Code for speed 7 (reverse)",
+          "fan_speed_8_reverse": "Code for speed 8 (reverse)",
+          "fan_speed_9_reverse": "Code for speed 9 (reverse)",
+          "fan_speed_10_reverse": "Code for speed 10 (reverse)",
+          "fan_speed_11_reverse": "Code for speed 11 (reverse)",
+          "fan_speed_12_reverse": "Code for speed 12 (reverse)",
           "light_on": "Code for light on",
           "light_off": "Code for light off",
           "light_toggle": "Code for light toggle",
@@ -81,6 +101,24 @@
           "relearn_fan_speed_4": "Re-learn: speed 4",
           "relearn_fan_speed_5": "Re-learn: speed 5",
           "relearn_fan_speed_6": "Re-learn: speed 6",
+          "relearn_fan_speed_7": "Re-learn: speed 7",
+          "relearn_fan_speed_8": "Re-learn: speed 8",
+          "relearn_fan_speed_9": "Re-learn: speed 9",
+          "relearn_fan_speed_10": "Re-learn: speed 10",
+          "relearn_fan_speed_11": "Re-learn: speed 11",
+          "relearn_fan_speed_12": "Re-learn: speed 12",
+          "relearn_fan_speed_1_reverse": "Re-learn: speed 1 (reverse)",
+          "relearn_fan_speed_2_reverse": "Re-learn: speed 2 (reverse)",
+          "relearn_fan_speed_3_reverse": "Re-learn: speed 3 (reverse)",
+          "relearn_fan_speed_4_reverse": "Re-learn: speed 4 (reverse)",
+          "relearn_fan_speed_5_reverse": "Re-learn: speed 5 (reverse)",
+          "relearn_fan_speed_6_reverse": "Re-learn: speed 6 (reverse)",
+          "relearn_fan_speed_7_reverse": "Re-learn: speed 7 (reverse)",
+          "relearn_fan_speed_8_reverse": "Re-learn: speed 8 (reverse)",
+          "relearn_fan_speed_9_reverse": "Re-learn: speed 9 (reverse)",
+          "relearn_fan_speed_10_reverse": "Re-learn: speed 10 (reverse)",
+          "relearn_fan_speed_11_reverse": "Re-learn: speed 11 (reverse)",
+          "relearn_fan_speed_12_reverse": "Re-learn: speed 12 (reverse)",
           "relearn_light_toggle": "Re-learn: light toggle",
           "relearn_light_on": "Re-learn: light on",
           "relearn_light_off": "Re-learn: light off",
@@ -112,7 +150,9 @@
           "direction_control": "Rotation direction",
           "has_natural_preset": "Natural airflow",
           "color_control": "Colour temperature",
+          "color_temp_steps": "Number of colour positions",
           "light_level": "Light brightness",
+          "light_level_steps": "Number of brightness steps",
           "has_timers": "Sleep timers (1h/2h/4h/8h)",
           "has_sound": "Sound (beep)"
         }
@@ -169,7 +209,7 @@
         "name": "{hours}h timer"
       },
       "recalibrate_color": {
-        "name": "Recalibrate colour (to Warm)"
+        "name": "Recalibrate colour (to the first position)"
       },
       "resync_brightness": {
         "name": "Resynchronise brightness (to the lowest step)"
