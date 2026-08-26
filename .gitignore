@@ -10,3 +10,11 @@ __pycache__/
 
 # Local-only captured RF codes (device-specific, not for publication)
 docs/*-codes-manual.md
+
+# Outbound reply drafts. A reply already posted lives in its thread, along with
+# what it was answering — a copy here is a fork that drifts in silence. Worse,
+# .claude/commands/support-issue.md reads docs/ as reference material, so a stale
+# draft becomes input to a future triage. Draft in a scratch directory instead;
+# `gh issue comment --body-file -` takes the text on stdin and needs no file.
+docs/reply-*.md
+docs/post-*.md
