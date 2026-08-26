@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import Event
 
 
 @dataclass
@@ -33,6 +34,17 @@ class RfFanRuntimeData:
     # discarded. Keyed by code (not a single timestamp) so a remote press of a
     # DIFFERENT button right after a Home Assistant command is still honoured.
     echo_codes: dict[str, float] = field(default_factory=dict)
+    # Codes received from a remote -> hass.loop.time() of the last frame carrying
+    # them. A press puts the same frame on the air several times; this is what tells
+    # the repeats apart from a second press (issue #24).
+    receive_seen: dict[str, float] = field(default_factory=dict)
+    # (frame, verdict) for the last frame judged by `_is_repeat`. Every platform of
+    # the entry listens to the same bus event, so the verdict is computed once and
+    # reused: recomputing it per listener would let the first entity slide the window
+    # forward and leave all the others concluding the frame was a repeat. The event
+    # object itself is held rather than its id, so nothing can be identified with a
+    # frame that has since been collected.
+    receive_verdict: tuple[Event, bool] | None = None
     # Last sniffed code that matched none of the learned ones. Following the
     # physical remote is exact string matching, so a gateway that reports codes
     # in a different shape than the one they were learned in silently stops

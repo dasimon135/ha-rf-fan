@@ -95,16 +95,31 @@ LIGHT_LEVEL_NONE: Final = "none"
 LIGHT_LEVEL_RELATIVE: Final = "relative"
 LIGHT_LEVEL_OPTIONS: Final = [LIGHT_LEVEL_NONE, LIGHT_LEVEL_RELATIVE]
 
-# Number of assumed brightness positions modelled for `light_level: relative`.
+# How many positions the stepped controls model, declared per fan.
 #
-# The remote's ± keys walk an unknown number of hardware levels and the lamp never
-# reports back, so the count is ours to pick: a position is simply "how many presses
-# up from the bottom". Ten gives a slider that feels continuous while keeping a full
-# resynchronisation to nine presses. Picking fewer than the hardware has means the
-# top of the slider never reaches full brightness; picking more means the last few
-# presses do nothing (harmless — the lamp clamps). Ten is a starting point to be
-# confirmed against real hardware, not a measured value.
-LIGHT_LEVEL_STEPS: Final = 10
+# Neither count can be discovered: the ± keys walk an unknown number of hardware
+# levels and neither the lamp nor the fan ever reports back, so a position is only
+# ever "how many presses up from the bottom". The count therefore belongs to the
+# hardware, and the only way to know it is to count the presses from one end stop to
+# the other on the physical remote.
+#
+# Both used to be constants — ten brightness steps and the three named colour
+# positions below. @elmr91 measured his Inspire Aruba Plus at eight of each
+# (issue #18), which is what moved them into the config flow: getting the count
+# wrong is not harmless. Too few and the top of the slider never reaches the
+# hardware's maximum; too many and the last presses of the range do nothing.
+CONF_LIGHT_LEVEL_STEPS: Final = "light_level_steps"
+CONF_COLOR_TEMP_STEPS: Final = "color_temp_steps"
+DEFAULT_LIGHT_LEVEL_STEPS: Final = 10
+DEFAULT_COLOR_TEMP_STEPS: Final = 3
+# Historical name, kept so an external reference to it does not break.
+LIGHT_LEVEL_STEPS: Final = DEFAULT_LIGHT_LEVEL_STEPS
+
+# Bounds for both counts. Two is the least that can be called a range; twenty is far
+# past any remote reported so far, and the upper bound exists only to keep a typo
+# from producing a resynchronisation that presses a key a hundred times.
+MIN_STEP_COUNT: Final = 2
+MAX_STEP_COUNT: Final = 20
 
 # New actions
 ACTION_FAN_REVERSE: Final = "fan_reverse"
@@ -161,8 +176,17 @@ TOGGLE_ACTIONS: Final = frozenset(
 PRESET_NORMAL: Final = "normal"
 PRESET_NATURAL: Final = "natural"
 
-# Color positions (kelvin select): hardware cycle order
-COLOR_TEMP_OPTIONS: Final = ["Chaud", "Neutre", "Froid"]
+# Colour positions (kelvin select): hardware cycle order.
+#
+# The named triple only means anything on a remote that has exactly three positions,
+# which is the shape this integration started with. It is kept verbatim — including
+# its French labels — because these strings ARE the entity's state: renaming them
+# would break every automation that compares against one, and every recorder history
+# already written. Any other count is labelled by position instead; see
+# `actions.color_temp_options`.
+COLOR_TEMP_NAMED: Final = ["Chaud", "Neutre", "Froid"]
+# Historical name, kept so an external reference to it does not break.
+COLOR_TEMP_OPTIONS: Final = COLOR_TEMP_NAMED
 
 # Pause (seconds) between successive steps of a walk (colour, brightness) so a
 # debouncing receiver registers each as a separate press. A rapid burst with no gap
@@ -180,6 +204,23 @@ KELVIN_STEP_GAP_SEC: Final = STEP_GAP_SEC
 # is sized to cover a slow gateway rather than to be minimal, because the alternative
 # (a late echo) silently flips the toggle actions back.
 ECHO_SUPPRESS_SEC: Final = 2.0
+
+# Receive de-bounce window: a remote does not send one frame per press, it sends the
+# same frame four to six times so that at least one gets through, and the gateway
+# reports every one of them. Counting them all turns one press of a toggle key into a
+# flicker and one press of a step key into six steps (issue #24).
+#
+# This is the mirror image of ECHO_SUPPRESS_SEC — same per-code keying, opposite
+# direction — but it is a much shorter window, because it has to separate the frames
+# of one burst from a deliberate second press rather than cover a slow round trip.
+# The window slides: every frame of a burst pushes it forward, so a burst of any
+# length collapses to its first frame.
+#
+# 250 ms sits between the two things it has to tell apart: the frames of a burst
+# arrive milliseconds apart, and a human pressing a button twice takes appreciably
+# longer than a quarter of a second. It stays below STEP_GAP_SEC too, so a walk's own
+# steps would survive it even if they were not already echo-suppressed.
+RECEIVE_DEBOUNCE_SEC: Final = 0.25
 
 
 def speed_action(index: int, *, reverse: bool = False) -> str:

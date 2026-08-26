@@ -18,7 +18,6 @@ from .const import (
     COLOR_CONTROL_NONE,
     CONF_HAS_TIMERS,
     LIGHT_LEVEL_RELATIVE,
-    LIGHT_LEVEL_STEPS,
     STEP_GAP_SEC,
     TIMER_HOURS,
     timer_action,
@@ -72,7 +71,7 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
 
 
 class RfFanKelvinCalibrateButton(RfFanBaseEntity, ButtonEntity):
-    """Calibration button: resets the assumed color position to "Warm"."""
+    """Calibration button: resets the assumed colour position to the first one."""
 
     # Pure UI resync (no RF emitted): a configuration control, not a device control.
     _attr_entity_category = EntityCategory.CONFIG
@@ -115,7 +114,7 @@ class RfFanBrightnessResyncButton(RfFanBaseEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Step down to the bottom of the range and record the position."""
         if not await self._async_transmit_times(
-            ACTION_LIGHT_BRIGHT_DOWN, LIGHT_LEVEL_STEPS - 1, gap=STEP_GAP_SEC
+            ACTION_LIGHT_BRIGHT_DOWN, self._light_level_steps - 1, gap=STEP_GAP_SEC
         ):
             # Nothing went on the air (unmapped code): the lamp has not moved, so
             # claiming it sits at the bottom would replace one wrong position with

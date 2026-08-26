@@ -13,9 +13,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
 
-from .actions import transmit_repeat_count, walk_steps
+from .actions import (
+    color_temp_options,
+    color_temp_steps,
+    light_level_steps,
+    transmit_repeat_count,
+    walk_steps,
+)
 from .const import (
-    COLOR_TEMP_OPTIONS,
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
@@ -23,6 +28,7 @@ from .const import (
     CONF_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
+    RECEIVE_DEBOUNCE_SEC,
     STEP_GAP_SEC,
     STEP_UP,
 )
@@ -50,6 +56,12 @@ class RfFanBaseEntity(Entity):
         )
         self._fan_name: str = config_entry.data[CONF_FAN_NAME]
         self._codes: dict[str, str] = config_entry.data[CONF_CODES]
+        # How many positions the stepped controls model on THIS fan. Declared in the
+        # config flow because no part of it can be discovered: the hardware never
+        # reports a level, so the count is a fact about the remote, not about us.
+        self._color_temp_steps: int = color_temp_steps(dict(config_entry.data))
+        self._light_level_steps: int = light_level_steps(dict(config_entry.data))
+        self._color_temp_options: list[str] = color_temp_options(self._color_temp_steps)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
@@ -175,6 +187,54 @@ class RfFanBaseEntity(Entity):
         # No code reported by the gateway: nothing to match on, so fall back to a
         # blanket window over all reception.
         return any(until > now for until in self._runtime.echo_codes.values())
+
+    def _is_repeat(self, event: Any) -> bool:
+        """True if this frame is another copy of the press that produced the last one.
+
+        A remote does not send one frame per press: it sends the same frame four to
+        six times so that at least one arrives, and the gateway reports every one of
+        them. Counting them all turns one press of a toggle key into a flicker and
+        one press of a step key into six steps — issue #24, where the colour select
+        walked Warm → Cold → Neutral → Warm → Cold → Neutral from a single press.
+
+        The window slides: every frame of a burst pushes it forward, so a burst of
+        any length collapses to its first frame while a deliberate second press,
+        which takes a human far longer than RECEIVE_DEBOUNCE_SEC, lands outside it.
+
+        Called after `_is_echo`, and only for frames that survive it: a repeat of our
+        own transmission is already discarded, and there is no burst to track in it.
+
+        The verdict is computed once per frame and reused, because every platform of
+        the entry listens to the same bus event. Recomputing it per listener would
+        let the first entity slide the window and leave all the others concluding
+        the frame was a repeat — the same "one event, many listeners" constraint that
+        `_is_echo` handles by never consuming its window.
+        """
+        runtime = self._runtime
+        judged = runtime.receive_verdict
+        if judged is not None and judged[0] is event:
+            return judged[1]
+
+        code = event.data.get("code")
+        if isinstance(code, str) and code:
+            now = self.hass.loop.time()
+            seen = runtime.receive_seen
+            # Pruning with the same threshold the test uses means "still in the map"
+            # and "seen within the window" are the same statement, and keeps the map
+            # from growing over the life of the entry.
+            for stale in [
+                known for known, at in seen.items() if now - at > RECEIVE_DEBOUNCE_SEC
+            ]:
+                del seen[stale]
+            repeat = code in seen
+            seen[code] = now
+        else:
+            # No code reported by the gateway: there is nothing to key a burst on,
+            # and swallowing a frame we cannot identify would lose real presses.
+            repeat = False
+
+        runtime.receive_verdict = (event, repeat)
+        return repeat
 
     async def _async_walk(
         self,
@@ -309,7 +369,7 @@ class RfFanBaseEntity(Entity):
         can walk back past the first position, and the hardware comes round.
         """
         runtime = self._runtime
-        runtime.kelvin_position = (runtime.kelvin_position + delta) % len(COLOR_TEMP_OPTIONS)
+        runtime.kelvin_position = (runtime.kelvin_position + delta) % self._color_temp_steps
         return runtime.kelvin_position
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:

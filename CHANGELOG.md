@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which is silent and instant but only as good as what you tell it.
 - **Speed counts from 2 to 12** (was a fixed choice of 3–6). The old cap had no
   technical reason behind it; 9-speed remotes exist.
+- **The number of modelled positions is now declared per fan**, for both the colour
+  temperature and the brightness. Both used to be constants — ten brightness steps
+  and the three named colour positions. @elmr91 measured his Inspire Aruba Plus at
+  eight of each ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18)), which is
+  what moved them into the config flow: too few and the top of the slider never
+  reaches the hardware's maximum, too many and the last presses do nothing. Existing
+  entries keep the old numbers, so nothing changes until the counts are edited.
+  Three colour positions keep their names — those strings are the entity's state, so
+  renaming them would break automations — and any other count is numbered 1..N.
 - **`esphome/rf_fan_raw_gateway.yaml`** — a protocol-agnostic gateway for remotes
   rc_switch cannot decode. It captures the frame's raw transitions through `on_raw`
   and replays them verbatim as `raw:<t1>,<t2>,…`, which the ESPHome contract already
@@ -55,6 +64,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A frame repeated by the remote was counted as several presses**
+  ([#24](https://github.com/dasimon135/ha-rf-fan/issues/24)). A remote does not send
+  one frame per press: it sends the same frame four to six times so that at least one
+  arrives, and every copy was treated as a separate press. A toggle key flickered
+  on/off/on, and a step key advanced the assumed position once per frame — one press
+  of "brighter" moved the brightness six steps. Receptions are now de-bounced per
+  code over a sliding window, the mirror image of the anti-echo window that already
+  covered our own transmissions. Absolute actions were never affected: sending speed
+  3 six times still means speed 3, which is why this only surfaced once passive
+  tracking ([#16](https://github.com/dasimon135/ha-rf-fan/issues/16)) started
+  updating state and 1.8.0 gave it numbers to corrupt.
+- **The learning screens showed raw keys** such as `relearn_fan_speed_1_reverse`.
+  The translation files stopped at `fan_speed_6`: neither the reverse set nor the
+  speeds 7 to 12 that this release makes reachable had ever been added.
 - **The bundled card could drive the wrong sibling entity** once an entry owned two
   selects or two buttons. It picked "the first select" and "the button that is not a
   timer", so a fan with relative brightness could have its colour row wired to the

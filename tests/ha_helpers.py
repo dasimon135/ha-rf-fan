@@ -133,8 +133,18 @@ RELATIVE_CODES = {
 }
 
 
-def relative_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
-    """Create an entry whose remote steps its values (issue #18 shape)."""
+def relative_entry(
+    hass: HomeAssistant,
+    repeat_count: int = 2,
+    *,
+    color_temp_steps: int | None = None,
+    light_level_steps: int | None = None,
+) -> MockConfigEntry:
+    """Create an entry whose remote steps its values (issue #18 shape).
+
+    The step counts are left out of the data unless asked for, so the default entry
+    exercises the fallbacks an entry created before they existed relies on.
+    """
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Relative",
@@ -153,16 +163,29 @@ def relative_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntr
             "has_light": True,
             "repeat_count": repeat_count,
             "codes": dict(RELATIVE_CODES),
+            **({} if color_temp_steps is None else {"color_temp_steps": color_temp_steps}),
+            **({} if light_level_steps is None else {"light_level_steps": light_level_steps}),
         },
     )
     entry.add_to_hass(hass)
     return entry
 
 
-async def setup_relative(hass: HomeAssistant, repeat_count: int = 2):
+async def setup_relative(
+    hass: HomeAssistant,
+    repeat_count: int = 2,
+    *,
+    color_temp_steps: int | None = None,
+    light_level_steps: int | None = None,
+):
     """Register the stub, set up a stepped-control entry, and return (entry, calls)."""
     calls = register_stub(hass)
-    entry = relative_entry(hass, repeat_count=repeat_count)
+    entry = relative_entry(
+        hass,
+        repeat_count=repeat_count,
+        color_temp_steps=color_temp_steps,
+        light_level_steps=light_level_steps,
+    )
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry, calls

@@ -1,7 +1,10 @@
 from actions import (
     caps_from_data,
     classify_reconfigure_actions,
+    color_temp_options,
+    color_temp_steps,
     expected_unique_ids,
+    light_level_steps,
     split_actions,
     validate_codes,
     walk_steps,
@@ -20,6 +23,11 @@ from const import (
     ACTION_LIGHT_ON,
     ACTION_LIGHT_TOGGLE,
     ACTION_SOUND_TOGGLE,
+    COLOR_TEMP_NAMED,
+    DEFAULT_COLOR_TEMP_STEPS,
+    DEFAULT_LIGHT_LEVEL_STEPS,
+    MAX_STEP_COUNT,
+    MIN_STEP_COUNT,
     STEP_DOWN,
     STEP_UP,
     speed_action,
@@ -505,3 +513,40 @@ def test_walk_unknown_position_is_treated_as_the_bottom():
 def test_walk_single_position_never_emits():
     assert walk_steps(0, 0, 1, wrap=False) == (STEP_UP, 0)
     assert walk_steps(None, 5, 1, wrap=True) == (STEP_UP, 0)
+
+
+def test_color_temp_options_keep_the_named_positions_at_three():
+    """The three-way labels are the entity's state; renaming them breaks automations."""
+    assert color_temp_options(3) == COLOR_TEMP_NAMED
+
+
+def test_color_temp_options_are_numbered_at_any_other_count():
+    """"Warm / Neutral / Cold" describes a three-way switch, and eight is not one."""
+    assert color_temp_options(8) == ["1", "2", "3", "4", "5", "6", "7", "8"]
+    assert color_temp_options(2) == ["1", "2"]
+
+
+def test_step_counts_fall_back_for_an_entry_that_predates_them():
+    """An entry created before the counts existed keeps the behaviour it had."""
+    assert color_temp_steps({}) == DEFAULT_COLOR_TEMP_STEPS
+    assert light_level_steps({}) == DEFAULT_LIGHT_LEVEL_STEPS
+
+
+def test_step_counts_are_clamped_into_the_supported_range():
+    """Stored data outlives the form that validated it, and every consumer divides by it."""
+    assert light_level_steps({"light_level_steps": 0}) == MIN_STEP_COUNT
+    assert light_level_steps({"light_level_steps": -4}) == MIN_STEP_COUNT
+    assert color_temp_steps({"color_temp_steps": 999}) == MAX_STEP_COUNT
+
+
+def test_step_counts_survive_a_value_that_is_not_a_number():
+    """A corrupted entry falls back rather than raising during setup."""
+    assert light_level_steps({"light_level_steps": "eight"}) == DEFAULT_LIGHT_LEVEL_STEPS
+    assert color_temp_steps({"color_temp_steps": None}) == DEFAULT_COLOR_TEMP_STEPS
+
+
+def test_a_declared_count_is_read_back():
+    """@elmr91's fan: eight of each, measured on the hardware (issue #18)."""
+    data = {"color_temp_steps": 8, "light_level_steps": 8}
+    assert color_temp_steps(data) == 8
+    assert light_level_steps(data) == 8
