@@ -61,7 +61,6 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         self._attr_unique_id = f"{config_entry.entry_id}_color_temp"
         self._attr_translation_key = "color_temperature"
         self._attr_options = self._color_temp_options
-        self._color_control: str = caps_from_data(dict(config_entry.data))["color_control"]
         self._event_unsub = None
         self._signal_unsub = None
 
@@ -96,7 +95,10 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
             down_action=ACTION_LIGHT_KELVIN_DOWN if relative else None,
             target=self._color_temp_options.index(option),
             size=self._color_temp_steps,
-            wrap=True,
+            # A pair of +/- keys stops at the ends, so a walk that counted on
+            # coming round the back would send presses the lamp ignores and then
+            # believe they landed.
+            wrap=not relative,
             get_position=lambda: self._runtime.kelvin_position,
             set_position=self._set_kelvin_position,
         )
