@@ -80,6 +80,8 @@ export async function loadCard() {
 export function makeHass({
   fanState = "on",
   light = null,
+  lightAttrs = {},
+  direction = null,
   language = "en",
   supportedFeatures = 61,
   buttons = [],
@@ -93,13 +95,17 @@ export function makeHass({
         percentage: fanState === "on" ? 50 : 0,
         percentage_step: 100 / 3,
         supported_features: supportedFeatures,
+        ...(direction === null ? {} : { direction }),
       },
     },
   };
   const entities = { "fan.x": { device_id: "d1", platform: "rf_fan" } };
 
+  // `lightAttrs` carries what the light entity declares about itself — notably
+  // `supported_color_modes`, which is how the card tells a dimmable lamp from a
+  // bare on/off one, and `brightness`.
   if (light !== null) {
-    states["light.x"] = { state: light, attributes: {} };
+    states["light.x"] = { state: light, attributes: { ...lightAttrs } };
     entities["light.x"] = { device_id: "d1", platform: "rf_fan" };
   }
 

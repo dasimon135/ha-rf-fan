@@ -53,6 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exact string equality, so transmitting works while following the physical remote
   cannot. The gateway also rate-limits published receptions and drops bursts shorter
   than a threshold — a held button otherwise fills the ESPHome API queue.
+- **A brightness row on the bundled card**, and blades that turn the way the fan
+  says it is turning ([#27](https://github.com/dasimon135/ha-rf-fan/issues/27),
+  reported by @elmr91). The card offered a bare on/off lamp button, so the only way
+  to reach the brightness of a `light_level: relative` lamp was the standard
+  more-info dialog. The row appears only when the light entity declares
+  `ColorMode.BRIGHTNESS` — the card applies the same rule as the entity, and does
+  not draw a slider that can move nothing. The animation used one set of keyframes
+  for both directions, so a fan in winter mode was drawn turning forwards; it is now
+  played in reverse, which is one CSS property and cannot drift from the forward
+  case. Colour segments past the third also give up padding, so eight numbered
+  positions stay on one line in a half-width dashboard column.
 
 ### Changed
 
@@ -78,6 +89,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The learning screens showed raw keys** such as `relearn_fan_speed_1_reverse`.
   The translation files stopped at `fan_speed_6`: neither the reverse set nor the
   speeds 7 to 12 that this release makes reachable had ever been added.
+- **The card's colour row could not be used while the lamp read off**
+  ([#29](https://github.com/dasimon135/ha-rf-fan/issues/29)). Every segment carried
+  `disabled`, so the row rendered normally and then refused every click — @elmr91
+  read it as a read-only field. The select entity accepts the change in that state,
+  and the standard more-info dialog performs it, so the card was forbidding on its
+  own what the integration allows. Nothing in the row is disabled any more. Not
+  specific to the new position counts: three named positions behaved the same way.
 - **The bundled card could drive the wrong sibling entity** once an entry owned two
   selects or two buttons. It picked "the first select" and "the button that is not a
   timer", so a fan with relative brightness could have its colour row wired to the
