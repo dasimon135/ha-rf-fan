@@ -205,3 +205,56 @@ describe("blade direction", () => {
     assert.match(html, /class="tfan on reverse"/);
   });
 });
+
+describe("card i18n", () => {
+  // The card carries its own two-language table rather than reading Home
+  // Assistant's, so anything it writes has to be added there by hand — which is
+  // exactly what gets forgotten. aria-labels count: a screen reader announces them.
+  const FR = { entity: "fan.x" };
+
+  it("translates the tile's speed buttons", () => {
+    const en = render(RfFanCard, { ...FR, layout: "tile" }, makeHass({}).hass).html;
+    const fr = render(RfFanCard, { ...FR, layout: "tile" }, makeHass({ language: "fr" }).hass).html;
+
+    assert.match(en, /aria-label="Lower"/);
+    assert.match(fr, /aria-label="Diminuer"/);
+    assert.match(fr, /aria-label="Augmenter"/);
+  });
+
+  it("translates the power control and the brightness slider", () => {
+    const fr = render(
+      RfFanCard,
+      FR,
+      makeHass({ language: "fr", light: "on", lightAttrs: DIMMABLE }).hass
+    ).html;
+
+    assert.match(fr, /aria-label="Marche\/Arrêt"/);
+    assert.match(fr, /aria-label="Luminosité"/);
+  });
+
+  it("translates the missing-entity warning", () => {
+    const { hass } = makeHass({});
+    const fr = render(RfFanCard, { entity: "fan.gone" }, { ...hass, language: "fr" }).html;
+    const en = render(RfFanCard, { entity: "fan.gone" }, hass).html;
+
+    assert.match(fr, /Entité fan\.gone introuvable/);
+    assert.match(en, /Entity fan\.gone not found/);
+  });
+
+  it("leaves no English string behind in a French render", () => {
+    const fr = render(
+      RfFanCard,
+      FR,
+      makeHass({
+        language: "fr",
+        light: "on",
+        lightAttrs: DIMMABLE,
+        selects: COLOR(["Chaud", "Neutre", "Froid"], "Chaud"),
+      }).hass
+    ).html;
+
+    for (const english of ["Lower", "Raise", "On/Off", "Brightness", "Light", "Sound", "Forward"]) {
+      assert.doesNotMatch(fr, new RegExp(`"${english}"|>${english}<`), `untranslated: ${english}`);
+    }
+  });
+});

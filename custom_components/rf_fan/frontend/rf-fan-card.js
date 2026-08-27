@@ -206,6 +206,10 @@ class RfFanCard extends HTMLElement {
       off: fr ? "Arrêt" : "Off",
       recalibrate: fr ? "Recaler la couleur" : "Recalibrate colour",
       fan: fr ? "Ventilateur" : "Fan",
+      lower: fr ? "Diminuer" : "Lower",
+      raise: fr ? "Augmenter" : "Raise",
+      close: fr ? "Fermer" : "Close",
+      missing: (id) => (fr ? `Entité ${id} introuvable` : `Entity ${id} not found`),
       color: (o) => color[o] || o,
     };
   }
@@ -220,7 +224,7 @@ class RfFanCard extends HTMLElement {
     const tile = this._config.layout === "tile";
     this._root.classList.toggle("tilecard", tile);
     if (!fan) {
-      this._body.innerHTML = `<div class="warn">Entity ${esc(ent.fan)} not found</div>`;
+      this._body.innerHTML = `<div class="warn">${esc(this._labels().missing(ent.fan))}</div>`;
       return;
     }
 
@@ -267,8 +271,8 @@ class RfFanCard extends HTMLElement {
           </div>
           <div class="tctl">
             ${lightBtn}
-            <button class="tbtn" data-tspeed="down" aria-label="Lower">−</button>
-            <button class="tbtn" data-tspeed="up" aria-label="Raise">+</button>
+            <button class="tbtn" data-tspeed="down" aria-label="${esc(L.lower)}">−</button>
+            <button class="tbtn" data-tspeed="up" aria-label="${esc(L.raise)}">+</button>
           </div>
         </div>`;
       return;
@@ -375,7 +379,7 @@ class RfFanCard extends HTMLElement {
         <div class="state ${on ? "on" : ""}">${esc(on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off)}</div>
       </div>
       <div class="hero">
-        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
+        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="${esc(L.on)}/${esc(L.off)}">
           <defs>
             <radialGradient id="rfDisc" cx="50%" cy="42%" r="62%">
               <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.22"/>
@@ -486,7 +490,7 @@ class RfFanCard extends HTMLElement {
       .x:focus-visible { outline:2px solid var(--primary-color,#03a9f4); outline-offset:2px; }
       @media (prefers-reduced-motion: reduce) { .scrim { animation:none } }
     </style>
-    <div class="scrim"><div class="wrap"><button class="x" aria-label="Close">✕</button></div></div>`;
+    <div class="scrim"><div class="wrap"><button class="x" aria-label="${esc(this._labels().close)}">✕</button></div></div>`;
     const card = document.createElement("rf-fan-card");
     card.setConfig({ ...this._config, layout: "full" });
     card.hass = this._hass;

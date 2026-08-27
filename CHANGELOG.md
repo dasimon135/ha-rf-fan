@@ -97,7 +97,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updating state and 1.8.0 gave it numbers to corrupt.
 - **The learning screens showed raw keys** such as `relearn_fan_speed_1_reverse`.
   The translation files stopped at `fan_speed_6`: neither the reverse set nor the
-  speeds 7 to 12 that this release makes reachable had ever been added.
+  speeds 7 to 12 that this release makes reachable had ever been added. Filling those
+  in by hand then missed the four stepping keys this same release introduces —
+  `light_kelvin_up` / `_down` and `light_bright_up` / `_down`, which is precisely the
+  remote shape that prompted all of it. A test now derives the full action space from
+  `split_actions` and fails if any reachable action lacks a label, a re-learn label,
+  or a French translation, in any of the three files. This had shipped three times.
+- **The card's own labels are complete in both languages.** It carries a two-language
+  table rather than reading Home Assistant's translations, so every string it writes
+  has to be added there by hand, and the `aria-label`s never were — a screen reader
+  announced "Lower", "Raise", "On/Off" and "Close" in English on a French install.
 - **The colour position rolled over at the end of its range**
   ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18), measured by @elmr91 on
   `v1.8.0b2`). Pressing "warmer" on the top position moved nothing on the lamp — it
