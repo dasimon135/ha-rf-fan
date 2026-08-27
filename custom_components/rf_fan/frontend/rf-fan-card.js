@@ -86,6 +86,14 @@ class RfFanCard extends HTMLElement {
     };
 
     const keyOf = (e) => (reg[e] || {}).translation_key;
+    // The registry sends the category as an INDEX over the wire (config is 0) and
+    // the frontend expands it back to a string. Both are accepted because the whole
+    // point of this check is to survive a registry that hands over less than
+    // expected — and 0 is falsy, so it has to be compared, never tested for truth.
+    const isConfig = (e) => {
+      const category = (reg[e] || {}).entity_category;
+      return category === "config" || category === 0;
+    };
 
     // Buttons: prefer the registry's translation_key, which survives a rename of
     // the entity_id. Fall back to the "<n>h" token in the id for registries that
@@ -126,7 +134,14 @@ class RfFanCard extends HTMLElement {
     // straight into the brightness position — a control that emits nothing, so the
     // row would look dead rather than wrong. Match on the key, and only fall back
     // to "the first select" for a registry that exposes none.
-    const selects = siblings.filter((e) => e.startsWith("select."));
+    // Two independent signals, because the translation key demonstrably does not
+    // always reach the card: @elmr91's fell through to "the first select" and drew
+    // the assumed brightness position under a thermometer icon (#29). The category
+    // needs no key to be exposed and says the right thing by construction — a
+    // CONFIG entity declares the integration's belief and emits nothing, so it can
+    // never be the colour row. Filtering first also makes the last-resort
+    // "first select" land on the right one.
+    const selects = siblings.filter((e) => e.startsWith("select.") && !isConfig(e));
     const colorSelect =
       cfg.color_entity ||
       selects.find((e) => keyOf(e) === "color_temperature") ||
@@ -154,7 +169,7 @@ class RfFanCard extends HTMLElement {
         const s = this._hass.states[id];
         if (!s) return id + ":none";
         const a = s.attributes;
-        return `${id}:${s.state}:${a.percentage}:${a.direction}:${a.preset_mode}`;
+        return `${id}:${s.state}:${a.percentage}:${a.direction}:${a.preset_mode}:${a.brightness}`;
       })
       .join("|");
   }
@@ -179,6 +194,7 @@ class RfFanCard extends HTMLElement {
     const color = { Chaud: fr ? "Chaud" : "Warm", Neutre: fr ? "Neutre" : "Neutral", Froid: fr ? "Froid" : "Cold" };
     return {
       light: fr ? "Lampe" : "Light",
+      brightness: fr ? "Luminosité" : "Brightness",
       sound: fr ? "Son" : "Sound",
       forward: fr ? "Avant" : "Forward",
       reverse: fr ? "Arrière" : "Reverse",
@@ -212,6 +228,11 @@ class RfFanCard extends HTMLElement {
     const compact = this._config.layout === "compact";
     const { count, index, pct } = this._speedInfo(fan);
     const spinDur = on && index > 0 ? (3.4 - (index / count) * 3.0).toFixed(2) : 0;
+    // The blades turn the way the fan says it is turning. `direction` is published
+    // whenever the remote can express a direction at all, which since 1.8.0 covers
+    // every `per_speed` remote — the card's whole point is showing the state at a
+    // glance, and one animation for both directions shows the wrong one half the time.
+    const spinBack = fan.attributes.direction === "reverse";
     const name = this._config.name || fan.attributes.friendly_name || L.fan;
 
     const blades = [0, 120, 240]
@@ -233,7 +254,7 @@ class RfFanCard extends HTMLElement {
       this._body.innerHTML = `
         <div class="tile ${on ? "" : "off"}">
           <button class="tdot" data-act="power" aria-label="${L.on}/${L.off}">
-            <svg viewBox="0 0 100 100" class="tfan ${on ? "on" : "off"}" style="--spin-dur:${spinDur}s">
+            <svg viewBox="0 0 100 100" class="tfan ${on ? "on" : "off"}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s">
               <g class="blades">${blades}</g>
               <circle class="hub" cx="50" cy="50" r="9"/>
               <circle class="hub2" cx="50" cy="50" r="3.5"/>
@@ -276,17 +297,42 @@ class RfFanCard extends HTMLElement {
       rows.push(`<button class="chip ${son ? "active" : ""}" data-act="sound"><ha-icon icon="mdi:volume-${son ? "high" : "off"}"></ha-icon><span>${L.sound}</span></button>`);
     }
 
+    // Brightness. Offered only when the light really has +/- keys behind it, which
+    // is exactly when the entity declares `ColorMode.BRIGHTNESS`; on a remote with
+    // a bare on/off lamp key the entity declares `ColorMode.ONOFF` and there is
+    // nothing to drive. A slider that moves nothing is the failure the entity side
+    // takes care to avoid, and the card must not reintroduce it.
+    let brightRow = "";
+    if (ent.light) {
+      const l = this._hass.states[ent.light];
+      const modes = (l && l.attributes.supported_color_modes) || [];
+      if (modes.includes("brightness")) {
+        // Off means no brightness attribute at all, so the slider rests at the
+        // bottom; moving it from there turns the lamp on at that level, which is
+        // what the same slider does in the standard more-info dialog.
+        const level = (l && l.attributes.brightness) || 1;
+        brightRow = `<div class="crow"><ha-icon icon="mdi:brightness-6"></ha-icon><input class="slider" type="range" min="1" max="255" step="1" value="${level}" data-bright aria-label="${esc(L.brightness)}"/></div>`;
+      }
+    }
+
     let colorRow = "";
     if (ent.color) {
       const c = this._hass.states[ent.color];
       const opts = (c && c.attributes.options) || [];
       const cur = c && c.state;
-      const lightOff = ent.light && this._hass.states[ent.light] && this._hass.states[ent.light].state === "off";
+      // Nothing here is ever disabled, including while the lamp reads off. The
+      // select entity accepts the change in that state — the standard more-info
+      // dialog proves it — so a card that refuses it forbids on its own what the
+      // integration allows, and looks broken rather than protective (#29).
       const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
       const segsC = opts
-        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}" ${lightOff ? "disabled" : ""}>${esc(L.color(o))}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}">${esc(L.color(o))}</button>`)
         .join("");
-      colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon><div class="csegs">${segsC}</div>${ent.calibrate ? `<button class="mini" data-act="calibrate" title="${L.recalibrate}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
+      // Three named positions was the only case this row was ever drawn for. Past
+      // four, the labels are bare numbers and the segments have to give up padding
+      // to stay on one line in a half-width dashboard column.
+      const csegs = `<div class="csegs${opts.length > 4 ? " many" : ""}">${segsC}</div>`;
+      colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon>${csegs}${ent.calibrate ? `<button class="mini" data-act="calibrate" title="${L.recalibrate}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
     }
 
     const feat = fan.attributes.supported_features || 0;
@@ -328,7 +374,7 @@ class RfFanCard extends HTMLElement {
         <div class="state ${on ? "on" : ""}">${esc(on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off)}</div>
       </div>
       <div class="hero">
-        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
+        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
           <defs>
             <radialGradient id="rfDisc" cx="50%" cy="42%" r="62%">
               <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.22"/>
@@ -343,6 +389,7 @@ class RfFanCard extends HTMLElement {
       </div>
       ${speedHtml}
       ${rows.length ? `<div class="chips">${rows.join("")}</div>` : ""}
+      ${compact ? "" : brightRow}
       ${compact ? "" : colorRow}
       ${compact || !modeChips.length ? "" : `<div class="chips">${modeChips.join("")}</div>`}
       ${compact ? "" : timerLine}
@@ -466,10 +513,12 @@ class RfFanCard extends HTMLElement {
   disconnectedCallback() { this._closeCardDialog(); }
 
   _onChange(e) {
-    const s = e.target.closest("[data-slider]");
-    if (!s) return;
+    const bright = e.target.closest("[data-bright]");
+    const speed = bright ? null : e.target.closest("[data-slider]");
+    if (!bright && !speed) return;
     const ent = this._discover();
-    this._call("fan", "set_percentage", { entity_id: ent.fan, percentage: Number(s.value) });
+    if (bright) this._call("light", "turn_on", { entity_id: ent.light, brightness: Number(bright.value) });
+    else this._call("fan", "set_percentage", { entity_id: ent.fan, percentage: Number(speed.value) });
   }
 
   _onClick(e) {
@@ -544,6 +593,9 @@ class RfFanCard extends HTMLElement {
       .fan.off .blades ellipse { fill: var(--disabled-text-color); }
       .fan .hub { fill: var(--card-background-color); }
       .fan .hub2 { fill: var(--primary-color); }
+      /* One keyframe set, played backwards for the winter direction, so the two
+         directions can never drift apart in duration or easing. */
+      .fan.reverse .blades, .tfan.reverse .blades { animation-direction: reverse; }
       @keyframes rf-spin { from { transform:rotate(0); } to { transform:rotate(360deg); } }
       .speed { display:flex; gap:5px; margin:2px 0 12px; }
       .seg { flex:1; height:12px; border:none; border-radius:6px; background: var(--divider-color); cursor:pointer; padding:0; }
@@ -556,8 +608,8 @@ class RfFanCard extends HTMLElement {
       .chip.active { background: var(--primary-color); color: var(--text-primary-color, #fff); }
       .chip.active.amber { background:#f5a623; }
       .chip, .seg, .cseg, .mini { transition: filter .15s ease, transform .1s ease, background .2s ease; }
-      .chip:hover, .seg:hover, .cseg:not(:disabled):hover, .mini:hover { filter: brightness(1.12); }
-      .chip:active, .seg:active, .cseg:not(:disabled):active, .mini:active, .fan:active { transform: scale(.95); }
+      .chip:hover, .seg:hover, .cseg:hover, .mini:hover { filter: brightness(1.12); }
+      .chip:active, .seg:active, .cseg:active, .mini:active, .fan:active { transform: scale(.95); }
       .crow { display:flex; align-items:center; gap:8px; margin:8px 0; }
       .crow > ha-icon { color: var(--secondary-text-color); --mdc-icon-size:20px; }
       .csegs { display:flex; flex:1; gap:0; border-radius:10px; overflow:hidden; }
@@ -565,7 +617,7 @@ class RfFanCard extends HTMLElement {
               cursor:pointer; font-size:.82rem; border-right:1px solid var(--card-background-color); }
       .cseg:last-child { border-right:none; }
       .cseg.active { background: var(--primary-color); color: var(--text-primary-color,#fff); }
-      .cseg:disabled { opacity:.4; cursor:not-allowed; }
+      .csegs.many .cseg { padding:8px 1px; font-size:.75rem; }
       .mini { border:none; background: var(--divider-color); border-radius:10px; padding:8px; cursor:pointer; color: var(--secondary-text-color); }
       .timers { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
       .timers .chip { flex:1; justify-content:center; }
