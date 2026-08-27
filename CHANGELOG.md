@@ -107,6 +107,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is a range, exactly like the brightness, and it now clamps at both ends: reception
   no longer rolls over, and a walk no longer plans a route through an end stop it
   would then believe it had taken. `color_control: cycle` is unchanged.
+- **The card was served with a month of cache headers, and a stale copy said nothing**
+  ([#29](https://github.com/dasimon135/ha-rf-fan/issues/29), hit by @elmr91). The file
+  was registered with `cache_headers=True`, so Home Assistant served it
+  `public, max-age=2678400` — 31 days. The `?v=<version>` on the URL the integration
+  loads made that harmless for the integration's own copy, since the URL changes with
+  every release; a dashboard resource registered by hand has no such luck, and stays
+  frozen for a month whatever is on disk. He upgraded twice and his browser kept
+  executing the 1.7.0 card. Now served without cache headers: one conditional request
+  per page load, for a file that changes every release.
+
+  The second half of the trap was silence. The card guards its `define()` because it
+  can legitimately be loaded twice, but that means the copy that loads **first** wins
+  and a defined custom element cannot be replaced — so an old build keeps rendering
+  and a release looks like it changed nothing. The new copy now says so in the
+  console, naming both versions and where the stale one usually lives.
 - **The card's colour row drove the wrong select, and refused clicks anyway**
   ([#29](https://github.com/dasimon135/ha-rf-fan/issues/29), reported by @elmr91).
   Two separate defects behind one symptom. The row was bound to the *assumed

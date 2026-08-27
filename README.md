@@ -199,6 +199,21 @@ Home Assistant's native more-info dialog instead.
 An example automation **blueprint** (control the fan by temperature) is in
 [`blueprints/automation/rf_fan/`](blueprints/automation/rf_fan/).
 
+### The card looks like it did not update
+
+The console prints a banner on every load — `RF-FAN-CARD v1.9.0` — and that is the
+build you are actually looking at, whatever the integration reports. If it names an
+older version after an upgrade, a stale copy is being served, and it is almost
+always a **dashboard resource you registered by hand**: the integration loads the
+card on its own, so a leftover manual entry is a second copy under a second URL.
+
+Whichever copy loads first wins. A custom element cannot be replaced once defined,
+so the old build keeps rendering and the new one can only say so — which it does,
+naming both versions in the console.
+
+Remove the resource under **Settings → Dashboards → ⋮ → Resources**, or bump its
+`?v=` suffix, then hard-reload (and clear the app cache on the companion app).
+
 ### Disabling automatic card loading
 
 The card is auto-loaded for the whole frontend when the integration starts. If you
@@ -210,9 +225,11 @@ auto-load for all of them.
 
 The card file remains served at `/rf_fan_frontend/rf-fan-card.js`, so you can
 still register it manually under **Settings → Dashboards → ⋮ → Resources** (type
-*JavaScript module*). Add a `?v=<version>` query suffix and bump it after
-updates to bust the browser cache. If automatic registration ever fails, the
-integration logs an error at startup and this manual route works as a fallback.
+*JavaScript module*). Add a `?v=<version>` query suffix and bump it after updates:
+the file itself is served without long-lived cache headers, but a proxy or a
+service worker in front of Home Assistant can still hold a copy. If automatic
+registration ever fails, the integration logs an error at startup and this manual
+route works as a fallback.
 
 ## Reconfiguring an existing fan
 
