@@ -53,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exact string equality, so transmitting works while following the physical remote
   cannot. The gateway also rate-limits published receptions and drops bursts shorter
   than a threshold — a held button otherwise fills the ESPHome API queue.
+- **`fan_natural_reverse`, the winter code of the natural-airflow key**
+  ([#28](https://github.com/dasimon135/ha-rf-fan/issues/28), reported by @elmr91).
+  `direction_control: per_speed` describes a remote whose internal winter/summer
+  switch sits in front of every code it sends, and 1.8.0 modelled that for the speeds
+  only — so in winter the preset button transmitted the summer code, and either
+  nothing happened or the wrong thing did. One extra key to learn, asked for only
+  when the fan has the preset **and** the remote is `per_speed`; existing entries of
+  any other shape are untouched. A sniffed winter natural frame now reports the
+  preset and the direction together, the same way a reverse speed code does.
 - **A brightness row on the bundled card**, and blades that turn the way the fan
   says it is turning ([#27](https://github.com/dasimon135/ha-rf-fan/issues/27),
   reported by @elmr91). The card offered a bare on/off lamp button, so the only way

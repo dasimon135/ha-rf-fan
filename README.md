@@ -105,7 +105,10 @@ they are deliberately different:
 Some remotes have no direction code at all: an internal switch selects winter or
 summer and the remote then emits a *different set of speed codes* for each. Declare
 `direction_control: per_speed` and you will be asked to learn both sets
-(`fan_speed_N` and `fan_speed_N_reverse`) — twice the buttons to teach.
+(`fan_speed_N` and `fan_speed_N_reverse`) — twice the buttons to teach. The natural
+airflow key gets the same treatment where the fan has one (`fan_natural` and
+`fan_natural_reverse`): the switch is in front of *every* code the remote sends, not
+only the speeds.
 
 What you get for it is a direction that is **absolute** rather than guessed. With a
 single reverse button, the integration can only flip and hope, because it has no way
