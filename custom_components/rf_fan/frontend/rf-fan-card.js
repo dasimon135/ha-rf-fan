@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.8.0b3";
+const VERSION = "1.8.0b4";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -130,17 +130,18 @@ class RfFanCard extends HTMLElement {
     const calibrate = cfg.calibrate_entity || buttons.find(isCalibrate);
 
     // Selects: the entry can own two of them (colour temperature, and the assumed
-    // brightness position). Taking whichever comes first would drive the colour row
+    // brightness position). Taking whichever comes first drives the colour row
     // straight into the brightness position — a control that emits nothing, so the
-    // row would look dead rather than wrong. Match on the key, and only fall back
-    // to "the first select" for a registry that exposes none.
+    // row looks dead as well as wrong. That is what @elmr91 was actually seeing on
+    // #29: nine segments under a thermometer icon, on a fan configured with five
+    // colour positions.
+    //
     // Two independent signals, because the translation key demonstrably does not
-    // always reach the card: @elmr91's fell through to "the first select" and drew
-    // the assumed brightness position under a thermometer icon (#29). The category
-    // needs no key to be exposed and says the right thing by construction — a
-    // CONFIG entity declares the integration's belief and emits nothing, so it can
-    // never be the colour row. Filtering first also makes the last-resort
-    // "first select" land on the right one.
+    // always reach the card — his fell through to the fallback. The category needs
+    // no key to be exposed and is right by construction: a CONFIG entity declares
+    // the integration's belief and emits nothing, so it can never be the colour
+    // row. Filtering on it first also makes the last-resort "first select" land on
+    // the correct one instead of a coin toss.
     const selects = siblings.filter((e) => e.startsWith("select.") && !isConfig(e));
     const colorSelect =
       cfg.color_entity ||
@@ -205,6 +206,10 @@ class RfFanCard extends HTMLElement {
       off: fr ? "Arrêt" : "Off",
       recalibrate: fr ? "Recaler la couleur" : "Recalibrate colour",
       fan: fr ? "Ventilateur" : "Fan",
+      lower: fr ? "Diminuer" : "Lower",
+      raise: fr ? "Augmenter" : "Raise",
+      close: fr ? "Fermer" : "Close",
+      missing: (id) => (fr ? `Entité ${id} introuvable` : `Entity ${id} not found`),
       color: (o) => color[o] || o,
     };
   }
@@ -219,7 +224,7 @@ class RfFanCard extends HTMLElement {
     const tile = this._config.layout === "tile";
     this._root.classList.toggle("tilecard", tile);
     if (!fan) {
-      this._body.innerHTML = `<div class="warn">Entity ${esc(ent.fan)} not found</div>`;
+      this._body.innerHTML = `<div class="warn">${esc(this._labels().missing(ent.fan))}</div>`;
       return;
     }
 
@@ -266,8 +271,8 @@ class RfFanCard extends HTMLElement {
           </div>
           <div class="tctl">
             ${lightBtn}
-            <button class="tbtn" data-tspeed="down" aria-label="Lower">−</button>
-            <button class="tbtn" data-tspeed="up" aria-label="Raise">+</button>
+            <button class="tbtn" data-tspeed="down" aria-label="${esc(L.lower)}">−</button>
+            <button class="tbtn" data-tspeed="up" aria-label="${esc(L.raise)}">+</button>
           </div>
         </div>`;
       return;
@@ -374,7 +379,7 @@ class RfFanCard extends HTMLElement {
         <div class="state ${on ? "on" : ""}">${esc(on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off)}</div>
       </div>
       <div class="hero">
-        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="On/Off">
+        <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="${esc(L.on)}/${esc(L.off)}">
           <defs>
             <radialGradient id="rfDisc" cx="50%" cy="42%" r="62%">
               <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.22"/>
@@ -485,7 +490,7 @@ class RfFanCard extends HTMLElement {
       .x:focus-visible { outline:2px solid var(--primary-color,#03a9f4); outline-offset:2px; }
       @media (prefers-reduced-motion: reduce) { .scrim { animation:none } }
     </style>
-    <div class="scrim"><div class="wrap"><button class="x" aria-label="Close">✕</button></div></div>`;
+    <div class="scrim"><div class="wrap"><button class="x" aria-label="${esc(this._labels().close)}">✕</button></div></div>`;
     const card = document.createElement("rf-fan-card");
     card.setConfig({ ...this._config, layout: "full" });
     card.hass = this._hass;
