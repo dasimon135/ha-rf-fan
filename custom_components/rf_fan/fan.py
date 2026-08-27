@@ -19,6 +19,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .actions import caps_from_data
 from .const import (
     ACTION_FAN_NATURAL,
+    ACTION_FAN_NATURAL_REVERSE,
     ACTION_FAN_OFF,
     ACTION_FAN_ON,
     ACTION_FAN_REVERSE,
@@ -192,6 +193,18 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         reverse = self._per_speed_direction and self._direction == DIRECTION_REVERSE
         return speed_action(index, reverse=reverse)
 
+    def _natural_action_for(self) -> str:
+        """Natural-airflow action key, in the current direction.
+
+        The mirror of `_speed_action_for`, one level down: a `per_speed` remote
+        gives this key a code per direction as well, so sending the summer code
+        while the fan is running in winter reaches the wrong receiver state — or
+        nothing at all. An unknown direction sends the forward code, exactly as
+        the speeds do.
+        """
+        reverse = self._per_speed_direction and self._direction == DIRECTION_REVERSE
+        return ACTION_FAN_NATURAL_REVERSE if reverse else ACTION_FAN_NATURAL
+
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the speed via a fan_speed_X action."""
         if percentage <= 0:
@@ -249,7 +262,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         """Toggle the natural airflow preset (single-toggle remote)."""
         if self._preset == preset_mode:
             return
-        sent = await self._async_transmit_action(ACTION_FAN_NATURAL)
+        sent = await self._async_transmit_action(self._natural_action_for())
         if sent:
             self._preset = preset_mode
             self.async_write_ha_state()
@@ -289,10 +302,20 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             self.async_write_ha_state()
             return
 
-        if action == ACTION_FAN_NATURAL:
+        if action in (ACTION_FAN_NATURAL, ACTION_FAN_NATURAL_REVERSE):
             self._preset = (
                 PRESET_NORMAL if self._preset == PRESET_NATURAL else PRESET_NATURAL
             )
+            # Like a reverse speed code, the winter natural code says which
+            # direction the remote is in as well as which preset was pressed. The
+            # guard matters: on a `toggle` remote the direction is dead-reckoned
+            # from its own key, and a preset press must not overwrite it.
+            if self._per_speed_direction:
+                self._direction = (
+                    DIRECTION_REVERSE
+                    if action == ACTION_FAN_NATURAL_REVERSE
+                    else DIRECTION_FORWARD
+                )
             self.async_write_ha_state()
             return
 

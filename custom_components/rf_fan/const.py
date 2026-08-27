@@ -124,6 +124,12 @@ MAX_STEP_COUNT: Final = 20
 # New actions
 ACTION_FAN_REVERSE: Final = "fan_reverse"
 ACTION_FAN_NATURAL: Final = "fan_natural"
+# The winter twin of the key above, learned only for a `per_speed` remote — the
+# same shape as `fan_speed_N_reverse`, one level down. @elmr91 found that his
+# remote gives the natural-airflow key a dedicated code per direction too
+# (#28), which is what `per_speed` means: the direction is a dimension of every
+# code the remote sends, not a button on it.
+ACTION_FAN_NATURAL_REVERSE: Final = "fan_natural_reverse"
 ACTION_LIGHT_KELVIN: Final = "light_kelvin"
 ACTION_LIGHT_KELVIN_UP: Final = "light_kelvin_up"
 ACTION_LIGHT_KELVIN_DOWN: Final = "light_kelvin_down"
@@ -169,6 +175,14 @@ TOGGLE_ACTIONS: Final = frozenset(
         ACTION_SOUND_TOGGLE,
         ACTION_FAN_REVERSE,
         ACTION_FAN_NATURAL,
+        # Listed without having been able to confirm that the winter natural key
+        # flips rather than sets, because the two errors are not symmetric. The
+        # only thing membership does is round an even repeat_count down to odd
+        # (`actions.transmit_repeat_count`), and sending an ABSOLUTE code an odd
+        # number of times lands in exactly the same state as an even number —
+        # harmless. Leaving a real toggle out, on an even count, nets zero flips
+        # and the key does nothing at all. So the safe default is in here.
+        ACTION_FAN_NATURAL_REVERSE,
     }
 )
 

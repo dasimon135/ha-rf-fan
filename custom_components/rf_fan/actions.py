@@ -5,6 +5,7 @@ from __future__ import annotations
 try:  # Home Assistant runtime: relative import within the package
     from .const import (
         ACTION_FAN_NATURAL,
+        ACTION_FAN_NATURAL_REVERSE,
         ACTION_FAN_OFF,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
@@ -44,6 +45,7 @@ try:  # Home Assistant runtime: relative import within the package
 except ImportError:  # pragma: no cover - tests: top-level import via conftest
     from const import (
         ACTION_FAN_NATURAL,
+        ACTION_FAN_NATURAL_REVERSE,
         ACTION_FAN_OFF,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
@@ -108,7 +110,8 @@ def split_actions(
 
     - `direction_control: per_speed` has NO direction key at all. The remote stores
       the mode itself and emits a different speed code per direction, so the reverse
-      set is learned alongside the forward one (`fan_speed_N_reverse`).
+      set is learned alongside the forward one (`fan_speed_N_reverse`) — and, when
+      the fan also has the preset, `fan_natural_reverse` beside `fan_natural`.
     - `color_control: relative` and `light_level: relative` have two dedicated keys
       instead of one cycling key, so they take an up/down pair.
     """
@@ -130,6 +133,11 @@ def split_actions(
         required.append(ACTION_FAN_REVERSE)
     if has_natural_preset:
         required.append(ACTION_FAN_NATURAL)
+        # Same reasoning as the reverse speeds, and the same combination: a remote
+        # that has no direction key gives its natural-airflow key a code per
+        # direction too, so one more key has to be learned — and only here.
+        if direction_control == DIRECTION_CONTROL_PER_SPEED:
+            required.append(ACTION_FAN_NATURAL_REVERSE)
     if color_control == COLOR_CONTROL_CYCLE:
         required.append(ACTION_LIGHT_KELVIN)
     elif color_control == COLOR_CONTROL_RELATIVE:

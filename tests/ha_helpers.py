@@ -132,6 +132,13 @@ RELATIVE_CODES = {
     "light_bright_down": "r_bd",
 }
 
+# The natural-airflow key of a `per_speed` remote: one code per direction, the
+# same shape as the speeds (issue #28).
+NATURAL_CODES = {
+    "fan_natural": "r_nat",
+    "fan_natural_reverse": "r_natr",
+}
+
 
 def relative_entry(
     hass: HomeAssistant,
@@ -139,6 +146,7 @@ def relative_entry(
     *,
     color_temp_steps: int | None = None,
     light_level_steps: int | None = None,
+    natural_preset: bool = False,
 ) -> MockConfigEntry:
     """Create an entry whose remote steps its values (issue #18 shape).
 
@@ -155,14 +163,14 @@ def relative_entry(
             "light_control": "toggle",
             "has_fan_on": False,
             "direction_control": "per_speed",
-            "has_natural_preset": False,
+            "has_natural_preset": natural_preset,
             "color_control": "relative",
             "light_level": "relative",
             "has_timers": False,
             "has_sound": False,
             "has_light": True,
             "repeat_count": repeat_count,
-            "codes": dict(RELATIVE_CODES),
+            "codes": dict(RELATIVE_CODES) | (NATURAL_CODES if natural_preset else {}),
             **({} if color_temp_steps is None else {"color_temp_steps": color_temp_steps}),
             **({} if light_level_steps is None else {"light_level_steps": light_level_steps}),
         },
@@ -177,6 +185,7 @@ async def setup_relative(
     *,
     color_temp_steps: int | None = None,
     light_level_steps: int | None = None,
+    natural_preset: bool = False,
 ):
     """Register the stub, set up a stepped-control entry, and return (entry, calls)."""
     calls = register_stub(hass)
@@ -185,6 +194,7 @@ async def setup_relative(
         repeat_count=repeat_count,
         color_temp_steps=color_temp_steps,
         light_level_steps=light_level_steps,
+        natural_preset=natural_preset,
     )
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
