@@ -633,8 +633,28 @@ class RfFanCard extends HTMLElement {
 // also register it as a Lovelace resource (the only mechanism the Android
 // companion app reliably loads). An unguarded define() throws on the second
 // pass and takes the card down everywhere.
-if (!customElements.get("rf-fan-card")) {
+//
+// But whichever copy runs FIRST wins, and a defined custom element cannot be
+// replaced. So when the two are different builds the browser silently keeps the
+// older one, and a release looks like it changed nothing — which is exactly how
+// a stale dashboard resource hid three card fixes from @elmr91 (#29). Nothing
+// can be done about it from here except say so, by name and version, instead of
+// leaving someone to conclude the fix did not work.
+const alreadyRegistered = customElements.get("rf-fan-card");
+if (!alreadyRegistered) {
+  // Read by a later copy of this module to name the version that beat it. Older
+  // builds never set it, hence the fallback below.
+  window.__rfFanCardVersion = VERSION;
   customElements.define("rf-fan-card", RfFanCard);
+} else if (window.__rfFanCardVersion !== VERSION) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[rf-fan-card] v${VERSION} was loaded, but v${window.__rfFanCardVersion || "1.7.0 or older"} ` +
+      "is already registered and a custom element cannot be replaced, so the OLDER one is what " +
+      "you are looking at. Something is serving a stale copy — almost always a dashboard resource " +
+      "added by hand under Settings > Dashboards > Resources. Remove it: the integration loads the " +
+      "card on its own."
+  );
 }
 
 /** Visual editor: a native ha-form with a fan entity picker + optional name. */

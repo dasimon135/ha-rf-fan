@@ -71,8 +71,15 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     from homeassistant.loader import async_get_integration
 
     card_path = Path(__file__).parent / "frontend" / "rf-fan-card.js"
+    # cache_headers=False, deliberately. With it on, Home Assistant serves the file
+    # `public, max-age=2678400` — 31 days. The `?v=` below makes our own URL immune,
+    # because it changes with every release, but a dashboard resource a user added
+    # by hand does not: that URL is frozen for a month, and no reload revalidates
+    # it. @elmr91 upgraded twice and his browser kept executing the 1.7.0 card
+    # (#29). One conditional request per page load for a 30 KB file is the right
+    # price for a card that changes every release.
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(card_path), True)]
+        [StaticPathConfig(CARD_URL, str(card_path), False)]
     )
 
     # Opt-out (integration options): keep serving the file so a manually
