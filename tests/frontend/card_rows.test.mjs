@@ -119,6 +119,59 @@ describe("colour row", () => {
     ]);
   });
 
+  // His registry handed the card no translation keys, so it fell through to "the
+  // first select" and drew the assumed brightness position — nine segments under a
+  // thermometer icon, for a fan configured with five colour positions, and every
+  // click silent because that select emits nothing by design.
+  const POSITION_FIRST = [
+    {
+      id: "select.pos",
+      translation_key: null,
+      entity_category: "config",
+      name: "Assumed brightness position",
+      options: ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+      state: "5",
+    },
+    {
+      id: "select.c",
+      translation_key: null,
+      name: "Colour",
+      options: ["1", "2", "3", "4", "5"],
+      state: "2",
+    },
+  ];
+
+  it("ignores a config-category select even with no translation key (#29)", () => {
+    const { hass } = makeHass({ light: "on", selects: POSITION_FIRST });
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.doesNotMatch(html, /data-color="9"/, "the row is drawing the position select");
+    assert.match(html, /data-color="5"/);
+    assert.doesNotMatch(html, /data-color="6"/, "five positions, not nine");
+  });
+
+  it("drives the colour select, not the position one", () => {
+    const { hass, calls } = makeHass({ light: "on", selects: POSITION_FIRST });
+    const { card } = render(RfFanCard, FULL, hass);
+
+    card._onClick({ target: { closest: () => ({ dataset: { color: "4" } }) } });
+
+    assert.deepEqual(calls, [
+      { domain: "select", service: "select_option", data: { entity_id: "select.c", option: "4" } },
+    ]);
+  });
+
+  it("also recognises the category as the raw wire index", () => {
+    // `config` travels as 0, which is falsy — a truthiness test would let it past.
+    const numbered = POSITION_FIRST.map((s) =>
+      s.entity_category === "config" ? { ...s, entity_category: 0 } : s
+    );
+    const { hass } = makeHass({ light: "on", selects: numbered });
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.doesNotMatch(html, /data-color="9"/);
+  });
+
   it("tightens the segments once there are more than the three named ones", () => {
     const three = render(RfFanCard, FULL, makeHass({ selects: COLOR(["Chaud", "Neutre", "Froid"], "Chaud") }).hass).html;
     const eight = render(RfFanCard, FULL, makeHass({ selects: COLOR(["1", "2", "3", "4", "5", "6", "7", "8"], "1") }).hass).html;

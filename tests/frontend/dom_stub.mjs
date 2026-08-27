@@ -122,6 +122,12 @@ export function makeHass({
     };
     entities[sel.id] = { device_id: "d1", platform: "rf_fan" };
     if (sel.translation_key) entities[sel.id].translation_key = sel.translation_key;
+    // `entity_category` reaches the frontend independently of the translation key,
+    // which is the whole reason the card leans on it. Pass "config" (or the raw
+    // wire index 0) to emulate the assumed-position select.
+    if (sel.entity_category !== undefined) {
+      entities[sel.id].entity_category = sel.entity_category;
+    }
   }
 
   const calls = [];

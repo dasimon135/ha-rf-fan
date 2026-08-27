@@ -86,6 +86,14 @@ class RfFanCard extends HTMLElement {
     };
 
     const keyOf = (e) => (reg[e] || {}).translation_key;
+    // The registry sends the category as an INDEX over the wire (config is 0) and
+    // the frontend expands it back to a string. Both are accepted because the whole
+    // point of this check is to survive a registry that hands over less than
+    // expected — and 0 is falsy, so it has to be compared, never tested for truth.
+    const isConfig = (e) => {
+      const category = (reg[e] || {}).entity_category;
+      return category === "config" || category === 0;
+    };
 
     // Buttons: prefer the registry's translation_key, which survives a rename of
     // the entity_id. Fall back to the "<n>h" token in the id for registries that
@@ -126,7 +134,14 @@ class RfFanCard extends HTMLElement {
     // straight into the brightness position — a control that emits nothing, so the
     // row would look dead rather than wrong. Match on the key, and only fall back
     // to "the first select" for a registry that exposes none.
-    const selects = siblings.filter((e) => e.startsWith("select."));
+    // Two independent signals, because the translation key demonstrably does not
+    // always reach the card: @elmr91's fell through to "the first select" and drew
+    // the assumed brightness position under a thermometer icon (#29). The category
+    // needs no key to be exposed and says the right thing by construction — a
+    // CONFIG entity declares the integration's belief and emits nothing, so it can
+    // never be the colour row. Filtering first also makes the last-resort
+    // "first select" land on the right one.
+    const selects = siblings.filter((e) => e.startsWith("select.") && !isConfig(e));
     const colorSelect =
       cfg.color_entity ||
       selects.find((e) => keyOf(e) === "color_temperature") ||
