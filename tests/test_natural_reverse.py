@@ -21,7 +21,15 @@ from custom_components.rf_fan.const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_NATURAL_REVERSE,
 )
-from tests.ha_helpers import actions_sent, fire_rf, one_id, setup_full, setup_relative
+from tests.ha_helpers import (
+    actions_sent,
+    fire_rf,
+    one_id,
+    register_stub,
+    relative_entry,
+    setup_full,
+    setup_relative,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -106,6 +114,39 @@ async def test_an_unknown_direction_still_sends_the_summer_code(
 
     assert ACTION_FAN_NATURAL in actions_sent(calls)
     assert ACTION_FAN_NATURAL_REVERSE not in actions_sent(calls)
+
+
+async def test_an_entry_predating_the_winter_code_keeps_working(
+    hass: HomeAssistant,
+) -> None:
+    """Upgrading must not make the preset button go dead until it is reconfigured.
+
+    A `per_speed` entry created before this release has the preset and no winter
+    code, which is a shape the reverse speeds can never be in. Falling back to the
+    summer code leaves it exactly as 1.8.0 left it.
+    """
+    calls = register_stub(hass)
+    entry = relative_entry(hass, natural_preset=True)
+    codes = {
+        action: code
+        for action, code in entry.data["codes"].items()
+        if action != ACTION_FAN_NATURAL_REVERSE
+    }
+    hass.config_entries.async_update_entry(entry, data={**entry.data, "codes": codes})
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    fan = one_id(hass, "fan")
+    await _face(hass, fan, "reverse")
+
+    await hass.services.async_call(
+        "fan",
+        "set_preset_mode",
+        {"entity_id": fan, ATTR_PRESET_MODE: "natural"},
+        blocking=True,
+    )
+
+    assert ACTION_FAN_NATURAL in actions_sent(calls)
+    assert hass.states.get(fan).attributes[ATTR_PRESET_MODE] == "natural"
 
 
 async def test_a_winter_natural_frame_reports_the_preset_and_the_direction(

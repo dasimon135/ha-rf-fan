@@ -201,9 +201,17 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         while the fan is running in winter reaches the wrong receiver state — or
         nothing at all. An unknown direction sends the forward code, exactly as
         the speeds do.
+
+        The reverse speeds need no such check because `per_speed` has always
+        required them. This key is new, so an entry created before it existed is
+        legitimately `per_speed` with a preset and no winter code; falling back
+        leaves it behaving exactly as it did, rather than going silently dead
+        until it is reconfigured.
         """
         reverse = self._per_speed_direction and self._direction == DIRECTION_REVERSE
-        return ACTION_FAN_NATURAL_REVERSE if reverse else ACTION_FAN_NATURAL
+        if reverse and self._codes.get(ACTION_FAN_NATURAL_REVERSE):
+            return ACTION_FAN_NATURAL_REVERSE
+        return ACTION_FAN_NATURAL
 
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the speed via a fan_speed_X action."""
