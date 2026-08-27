@@ -14,6 +14,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
 
 from .actions import (
+    caps_from_data,
     color_temp_options,
     color_temp_steps,
     light_level_steps,
@@ -21,6 +22,7 @@ from .actions import (
     walk_steps,
 )
 from .const import (
+    COLOR_CONTROL_RELATIVE,
     CONF_CODES,
     CONF_ESPHOME_DEVICE,
     CONF_FAN_NAME,
@@ -62,6 +64,11 @@ class RfFanBaseEntity(Entity):
         self._color_temp_steps: int = color_temp_steps(dict(config_entry.data))
         self._light_level_steps: int = light_level_steps(dict(config_entry.data))
         self._color_temp_options: list[str] = color_temp_options(self._color_temp_steps)
+        # Whether the colour ends join up is a property of the REMOTE, not of the
+        # value, so every entity that moves the position needs to know the shape.
+        self._color_control: str = caps_from_data(dict(config_entry.data))[
+            "color_control"
+        ]
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
@@ -363,13 +370,24 @@ class RfFanBaseEntity(Entity):
         return f"{DOMAIN}_{self._config_entry.entry_id}_level"
 
     def _advance_kelvin_position(self, delta: int = 1) -> int:
-        """Move the color position by `delta` steps (mod N) and return it.
+        """Move the color position by `delta` steps and return it.
 
-        The cycle wraps in both directions: a remote with a dedicated "warmer" key
-        can walk back past the first position, and the hardware comes round.
+        Whether the ends join up is a property of the remote, not of the value.
+
+        - `cycle`: one key, and coming round is the only move it has. Wrapping is
+          not a convenience here, it is what the hardware does.
+        - `relative`: two keys that stop at the ends, exactly like the brightness
+          pair. @elmr91 pressed "warmer" on the top position: the lamp did not
+          move, and the assumed position rolled back to the first one (#18). A
+          wrap there does not shorten a walk, it desynchronises one — the same
+          class of damage as counting a repeated frame twice.
         """
         runtime = self._runtime
-        runtime.kelvin_position = (runtime.kelvin_position + delta) % self._color_temp_steps
+        moved = runtime.kelvin_position + delta
+        if self._color_control == COLOR_CONTROL_RELATIVE:
+            runtime.kelvin_position = max(0, min(self._color_temp_steps - 1, moved))
+        else:
+            runtime.kelvin_position = moved % self._color_temp_steps
         return runtime.kelvin_position
 
     def _is_own_event(self, event_data: dict[str, Any]) -> bool:

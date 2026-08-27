@@ -129,14 +129,20 @@ async def test_the_colour_walk_reaches_a_position_the_old_count_could_not(
     assert hass.states.get(color).state == "5"
 
 
-async def test_following_the_remote_wraps_at_the_declared_count(
+async def test_following_the_remote_stops_at_the_declared_count(
     hass: HomeAssistant,
 ) -> None:
-    """The cycle comes round after the declared number of positions, not after three."""
+    """The range ends where it was declared to end, and a press past it stays there.
+
+    This asserted a wrap when it was written, on the assumption that the colour
+    value cycles whatever the remote. It does not: with a +/- pair the lamp stops,
+    which @elmr91 then measured on his (#18). One press more than the range is
+    absorbed, so reaching the top takes MEASURED-1 and the last press changes nothing.
+    """
     entry, _calls = await setup_relative(hass, color_temp_steps=MEASURED)
     color = id_by_unique_suffix(hass, entry, "select", "_color_temp")
 
     for _ in range(MEASURED):
         await _press_remote(hass, entry, "r_ku")
 
-    assert hass.states.get(color).state == "1"
+    assert hass.states.get(color).state == str(MEASURED)

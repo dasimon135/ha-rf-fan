@@ -98,6 +98,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The learning screens showed raw keys** such as `relearn_fan_speed_1_reverse`.
   The translation files stopped at `fan_speed_6`: neither the reverse set nor the
   speeds 7 to 12 that this release makes reachable had ever been added.
+- **The colour position rolled over at the end of its range**
+  ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18), measured by @elmr91 on
+  `v1.8.0b2`). Pressing "warmer" on the top position moved nothing on the lamp — it
+  was already at the end — while the integration jumped back to the first position.
+  The walk was written when the only modelled shape was a single cycling key, for
+  which coming round really is what the hardware does. A `relative` pair of +/- keys
+  is a range, exactly like the brightness, and it now clamps at both ends: reception
+  no longer rolls over, and a walk no longer plans a route through an end stop it
+  would then believe it had taken. `color_control: cycle` is unchanged.
 - **The card's colour row drove the wrong select, and refused clicks anyway**
   ([#29](https://github.com/dasimon135/ha-rf-fan/issues/29), reported by @elmr91).
   Two separate defects behind one symptom. The row was bound to the *assumed
