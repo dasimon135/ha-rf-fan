@@ -254,13 +254,19 @@ async def test_brightness_position_select_declares_without_emitting(
 # --- Colour -------------------------------------------------------------------
 
 
-async def test_colour_relative_takes_the_short_way_round(
+async def test_colour_relative_can_walk_backwards(
     hass: HomeAssistant, no_gap: list
 ) -> None:
-    """Two keys mean the cycle can be walked backwards, so 0 -> 2 is ONE press.
+    """Two keys mean the walk has a reverse gear: Neutre(1) -> Chaud(0) is ONE press.
 
-    A cycling remote has to send two presses for the same move, because the only
-    key it has goes forwards.
+    A cycling remote needs two presses for the same move, because the only key it
+    has goes forwards and it has to come round.
+
+    The old name said "the short way ROUND", and the old text claimed 0 -> 2 was one
+    press. That was true while a relative walk wrapped, and it stopped being true
+    when the ends became stops — @elmr91 measured that his lamp does not roll over
+    (#18). Going 0 -> 2 is now two presses up; what two keys still buy is the ability
+    to go DOWN, which is what this test actually exercises.
     """
     entry, calls = await _setup_relative(hass)
     light_id = _one_id(hass, "light")
