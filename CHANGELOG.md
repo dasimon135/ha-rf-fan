@@ -156,6 +156,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   position ended up describing neither. A second move now cancels the first and
   plans from the frames that actually went on the air. Present since the colour
   cycle was introduced — rare with three colours, routine with ten brightness steps.
+- **The colour position was bumped on every light power-on, on remotes that have no
+  reason to do it** ([#38](https://github.com/dasimon135/ha-rf-fan/issues/38)). The
+  bump models a real property of the reference lamp -- a single colour key that
+  cycles, on a fixture that walks forward each time it is powered -- but it fired for
+  any entry with colour at all, `color_control: relative` included. Nobody has
+  measured a two-key lamp behaving that way. It stayed invisible while a relative
+  walk still wrapped, because the spurious steps rolled around and looked like
+  ordinary drift; clamping the ends made them accumulate instead, so a handful of
+  on/off cycles pinned the assumed position at the coldest end while the lamp had not
+  moved. The bump is now gated on `color_control: cycle`, which is the shape it
+  describes. Should a `relative` lamp ever be measured advancing on power-on, that
+  becomes a capability of its own rather than something inferred.
 
 ## [1.7.0] - 2026-08-23
 

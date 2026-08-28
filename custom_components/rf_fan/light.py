@@ -19,7 +19,7 @@ from .const import (
     ACTION_LIGHT_ON,
     ACTION_LIGHT_TOGGLE,
     AXIS_LEVEL,
-    COLOR_CONTROL_NONE,
+    COLOR_CONTROL_CYCLE,
     CONF_HAS_LIGHT,
     DEFAULT_LIGHT_LEVEL_STEPS,
     EVENT_RF_FAN_RECEIVED,
@@ -76,7 +76,6 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         self._signal_unsub = None
 
         caps = caps_from_data(dict(config_entry.data))
-        self._has_color_temp: bool = caps["color_control"] != COLOR_CONTROL_NONE
         self._has_level: bool = caps["light_level"] == LIGHT_LEVEL_RELATIVE
 
         if self._has_level:
@@ -138,8 +137,19 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         self.async_write_ha_state()
 
     def _bump_kelvin(self) -> None:
-        """Advance the color position by one step (the hardware advances on each power-on)."""
-        if not self._has_color_temp:
+        """Advance the color position by one step, on the remotes that work that way.
+
+        This models one shape and one only: a single cycling key, on a fixture that
+        walks its colour forward every time it is powered. A +/- pair has no reason
+        to behave that way, and nobody has measured one that does -- while the cost
+        of assuming it is real, because a clamped range (#32) accumulates the
+        spurious steps against the top stop instead of rolling them around, until
+        the assumed position pins there and the lamp has not moved at all (#38).
+
+        If a `relative` lamp is ever measured advancing on power-on, that is a
+        capability of its own rather than something to infer from the colour keys.
+        """
+        if self._color_control != COLOR_CONTROL_CYCLE:
             return
         self._advance_kelvin_position()
         async_dispatcher_send(self.hass, self._kelvin_signal())
