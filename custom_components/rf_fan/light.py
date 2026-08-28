@@ -181,42 +181,41 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         )
 
     async def _async_transmit_power(self, *, turn_on: bool) -> bool:
-        """Put a power command on the air, if sending one would help.
+        """Put a power command on the air.
 
-        Returns whether the lamp is now in the requested state, so a caller that
-        sent nothing because nothing was needed is not mistaken for one that failed.
+        Always: a power command that was asked for is asked for, including towards
+        the state the lamp is already believed to be in. On a device that never
+        reports back, that press is the only way a person can say "you are wrong
+        about my lamp" -- @elmr91 uses exactly that to resynchronise (#45), and it
+        is why Home Assistant gives an `assumed_state` light two buttons instead of
+        one toggle.
 
-        The two shapes of power key differ in what a redundant press costs:
-
-        - `light_on` / `light_off` are ABSOLUTE. Re-sending one lands the lamp
-          where it already is, and on a device that never reports back that is
-          worth doing: an assumed state that has drifted realigns for free.
-        - `light_toggle` is a FLIP. Sending it towards a state the lamp is already
-          in takes it OUT of that state. That is what switched @elmr91's lamp on
-          and off at every move of the brightness slider (#41): setting a
-          brightness goes through `async_turn_on`, which powered first and asked
-          questions later.
-
-        An unknown state transmits. Nothing is established until something is sent,
-        and only a state the integration actually holds can justify silence -- the
-        rule `switch.py` has always applied to the sound toggle.
+        The first attempt at #41 withheld it whenever the lamp already read the
+        requested state, which took that gesture away. The line is not there: it is
+        between a power command that was requested and one that merely rides along
+        with a brightness -- see `async_turn_on`.
         """
         absolute = ACTION_LIGHT_ON if turn_on else ACTION_LIGHT_OFF
         if await self._async_transmit_action(absolute):
-            return True
-        if self._is_on is turn_on:
             return True
         return await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light, and step it to a requested brightness.
 
-        Home Assistant sets a brightness through this same service, so on a lamp
-        that is already lit the power key has nothing to add and a flip would undo
-        the very state being asked for (#41).
+        Home Assistant sets a brightness through this same service, so this is two
+        commands wearing one name. Powering a lamp that is already lit is not part
+        of what a brightness request asked for, and on a toggle-only remote that
+        stray press switched the lamp off at every move of the slider (#41).
+
+        Only that case is withheld. A bare `light.turn_on` still presses the key
+        whatever the assumed state, because there the press IS the request (#45).
         """
         was_on = self._is_on
-        if not await self._async_transmit_power(turn_on=True):
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        # The power key rides along rather than being asked for: nothing to do.
+        rides_along = self._has_level and brightness is not None and was_on is True
+        if not rides_along and not await self._async_transmit_power(turn_on=True):
             return
 
         self._is_on = True
@@ -226,7 +225,6 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         self._publish_light_state()
 
         # Applied after the power: the +/- keys only reach a lamp that is already lit.
-        brightness = kwargs.get(ATTR_BRIGHTNESS)
         if self._has_level and brightness is not None:
             await self._async_walk_brightness(int(brightness))
 
