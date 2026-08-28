@@ -13,17 +13,20 @@ slider flipped the lamp, and the walk that followed stepped a lamp that had just
 gone dark. The card is not involved: the native more-info slider does the same, and
 so does a scene.
 
-The distinction the fix rests on is between the two shapes of power key:
+The distinction is not between the two shapes of power key, which is where the
+first attempt at this went wrong (#45). It is between a power command that was
+ASKED FOR and one that merely rides along:
 
-- `light_on` / `light_off` are ABSOLUTE. Re-sending one lands the lamp where it
-  already is, which is worth doing — a drifted assumed state realigns for free.
-- `light_toggle` is a FLIP. Sending it towards a state the lamp is already in
-  takes it out of that state.
+- `light.turn_on()` / `light.turn_off()` are the request. They always transmit,
+  even towards the state the lamp is already believed to be in, because on an
+  assumed-state device that is the only way a human can say "you are wrong about
+  my lamp" -- which is what Home Assistant's separate on/off buttons are for.
+- A brightness request carries a power key it never asked for. On a lamp already
+  believed lit there is nothing to power, and a flip there undoes the very state
+  being set.
 
-Which is what `switch.py` has always done with the sound toggle. This module holds
-`light.py` to the same rule, and asserts the COMPLETE list of frames: counting the
-stepping frames while ignoring everything around them is how the stray toggle
-shipped in the first place.
+Every test asserts the COMPLETE list of frames: counting the stepping frames while
+ignoring everything around them is how the stray toggle shipped in the first place.
 """
 
 from __future__ import annotations
@@ -64,7 +67,11 @@ async def _power(hass: HomeAssistant, light_id: str, service: str) -> None:
 async def test_setting_the_brightness_does_not_flip_a_lamp_that_is_on(
     hass: HomeAssistant, no_gap
 ) -> None:
-    """The bug @elmr91 reported: nine steps up, and a power key among them."""
+    """The bug @elmr91 reported (#41): nine steps up, and a power key among them.
+
+    The narrow case, and the only one: nobody asked for the power key here, so a
+    lamp already believed lit has nothing to switch.
+    """
     _entry, calls = await _setup_relative(hass)
     light_id = _one_id(hass, "light")
     await _power(hass, light_id, "turn_on")
@@ -96,10 +103,34 @@ async def test_setting_the_brightness_still_powers_a_lamp_that_is_off(
     assert _actions_sent(calls) == ["light_toggle"] + ["light_bright_up"] * 9
 
 
-async def test_turning_on_a_lamp_that_is_already_on_sends_nothing(
+async def test_turning_off_a_lamp_believed_off_still_presses_the_key(
     hass: HomeAssistant,
 ) -> None:
-    """The same defect reached by the plain service: a scene asserting a lamp is on."""
+    """This is how a human resynchronises an assumed state, and it must keep working.
+
+    @elmr91 relies on it (#45): the lamp is lit, Home Assistant says off, and
+    pressing OFF sends the toggle -- the lamp goes dark and the two agree again.
+    Withholding the press because "it is already off" leaves no way back, and the
+    entity is `assumed_state` precisely because its belief can be wrong.
+
+    Home Assistant shows separate on/off buttons for exactly this reason, rather
+    than the single toggle a light with real feedback gets.
+    """
+    _entry, calls = await _setup_relative(hass)
+    light_id = _one_id(hass, "light")
+    await _power(hass, light_id, "turn_off")
+    calls.clear()
+
+    await _power(hass, light_id, "turn_off")
+
+    assert _actions_sent(calls) == ["light_toggle"]
+    assert hass.states.get(light_id).state == "off", "the belief is what was asserted"
+
+
+async def test_turning_on_a_lamp_believed_on_still_presses_the_key(
+    hass: HomeAssistant,
+) -> None:
+    """The mirror gesture, for a lamp that is really off while Home Assistant says on."""
     _entry, calls = await _setup_relative(hass)
     light_id = _one_id(hass, "light")
     await _power(hass, light_id, "turn_on")
@@ -107,23 +138,8 @@ async def test_turning_on_a_lamp_that_is_already_on_sends_nothing(
 
     await _power(hass, light_id, "turn_on")
 
-    assert _actions_sent(calls) == []
+    assert _actions_sent(calls) == ["light_toggle"]
     assert hass.states.get(light_id).state == "on"
-
-
-async def test_turning_off_a_lamp_that_is_already_off_sends_nothing(
-    hass: HomeAssistant,
-) -> None:
-    """The mirror image, and the one nobody had reported: turning off switched it on."""
-    _entry, calls = await _setup_relative(hass)
-    light_id = _one_id(hass, "light")
-    await _power(hass, light_id, "turn_off")
-    calls.clear()
-
-    await _power(hass, light_id, "turn_off")
-
-    assert _actions_sent(calls) == []
-    assert hass.states.get(light_id).state == "off"
 
 
 async def test_an_unknown_state_still_transmits(hass: HomeAssistant) -> None:
@@ -146,9 +162,8 @@ async def test_an_absolute_remote_re_asserts_the_state_it_is_asked_for(
 ) -> None:
     """`light_on` lands the lamp on whether or not it was already there.
 
-    So it is still sent, deliberately: on a device that never reports back, a free
-    re-assertion is the cheapest way to recover from an assumed state that drifted.
-    Only a flip has to hold its fire.
+    Absolute codes have never been in question: re-sending one costs nothing and
+    realigns a drifted assumed state for free.
     """
     _entry, calls = await _setup_on_off(hass)
     light_id = _one_id(hass, "light")

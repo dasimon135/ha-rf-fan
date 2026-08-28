@@ -210,17 +210,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nor the stepping was at fault: the native more-info slider did the same, and so did
   a scene.
 
-  A power command now goes on the air only when it would help. `light_on` and
-  `light_off` are absolute, so they are still sent whatever the assumed state -- on a
-  device that never reports back, a free re-assertion is the cheapest way to recover
-  from a state that has drifted. `light_toggle` is a flip, so it is held back when
-  the lamp is already in the state being asked for. An unknown state still transmits,
-  because nothing is established until something is sent. This is the rule
-  `switch.py` has always applied to the sound toggle; the light was the exception.
+  The line is between a power command that was **asked for** and one that merely
+  **rides along**. Setting a brightness asks for a level, not for the power key, so
+  on a lamp already believed lit that key is not sent. Everything else -- a bare
+  `light.turn_on`, a `light.turn_off` -- still presses it, whatever the assumed
+  state.
 
-  The same defect existed in `async_turn_off` and had never been reported: turning
-  off a lamp already believed off switched it **on**, so a scene asserting "lights
-  out" could light one. Fixed by the same change.
+  That last part was got wrong first: `v1.8.0b8` withheld the press whenever the
+  lamp already read the requested state, in both directions, on the grounds that a
+  scene asserting "lights out" should not light a lamp. @elmr91 reported within the
+  hour what that cost ([#45](https://github.com/dasimon135/ha-rf-fan/issues/45)):
+  pressing OFF on a lamp Home Assistant already believes off is how a person
+  **resynchronises** an assumed state -- the lamp is really lit, the press puts it
+  out, and the two agree again. Home Assistant gives an `assumed_state` light two
+  buttons rather than one toggle for exactly that reason. Restored in `v1.8.0b10`,
+  and now the only case held back is the one nobody asked for.
 
   It hid because the brightness tests counted the stepping frames and ignored what
   went out around them. They now assert the complete sequence.
