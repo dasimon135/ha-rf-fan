@@ -209,6 +209,54 @@ async def setup_relative(
     return entry, calls
 
 
+# A remote with two dedicated light keys instead of one flipping key. The power
+# codes are ABSOLUTE here, which is the whole difference: re-sending one lands the
+# lamp where it already is, so it is worth sending even when nothing changes.
+ON_OFF_CODES = {
+    "fan_off": "o_off",
+    "fan_speed_1": "o_s1",
+    "fan_speed_2": "o_s2",
+    "fan_speed_3": "o_s3",
+    "light_on": "o_lon",
+    "light_off": "o_loff",
+}
+
+
+def on_off_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
+    """Create an entry whose light has separate on and off keys."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="OnOff",
+        data={
+            "esphome_device": DEVICE,
+            "fan_name": "OnOff",
+            "speed_count": 3,
+            "light_control": "on_off",
+            "has_fan_on": False,
+            "direction_control": "none",
+            "natural_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "has_timers": False,
+            "has_sound": False,
+            "has_light": True,
+            "repeat_count": repeat_count,
+            "codes": dict(ON_OFF_CODES),
+        },
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def setup_on_off(hass: HomeAssistant, repeat_count: int = 2):
+    """Register the stub, set up a two-key-light entry, and return (entry, calls)."""
+    calls = register_stub(hass)
+    entry = on_off_entry(hass, repeat_count=repeat_count)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry, calls
+
+
 def id_by_unique_suffix(hass: HomeAssistant, entry, domain: str, suffix: str) -> str:
     """Entity id for one of an entry's entities, picked by unique-id suffix.
 

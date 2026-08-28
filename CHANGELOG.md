@@ -197,6 +197,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the direction a `per_speed` remote records with the fan off.
   - No code changes name and nothing is relearned; `toggle` and `dedicated` learn the
     same `fan_natural` (and `fan_natural_reverse` on a `per_speed` remote).
+- **Setting the brightness switched the lamp on and off**
+  ([#41](https://github.com/dasimon135/ha-rf-fan/issues/41), reported by @elmr91 on
+  `v1.8.0b5`). Home Assistant sets a brightness through `light.turn_on`, and that
+  path transmitted the power key before stepping -- unconditionally. On a remote
+  whose only light key is `light_toggle`, every move of the slider flipped the lamp,
+  and the walk that followed stepped a lamp that had just gone dark. Neither the card
+  nor the stepping was at fault: the native more-info slider did the same, and so did
+  a scene.
+
+  A power command now goes on the air only when it would help. `light_on` and
+  `light_off` are absolute, so they are still sent whatever the assumed state -- on a
+  device that never reports back, a free re-assertion is the cheapest way to recover
+  from a state that has drifted. `light_toggle` is a flip, so it is held back when
+  the lamp is already in the state being asked for. An unknown state still transmits,
+  because nothing is established until something is sent. This is the rule
+  `switch.py` has always applied to the sound toggle; the light was the exception.
+
+  The same defect existed in `async_turn_off` and had never been reported: turning
+  off a lamp already believed off switched it **on**, so a scene asserting "lights
+  out" could light one. Fixed by the same change.
+
+  It hid because the brightness tests counted the stepping frames and ignored what
+  went out around them. They now assert the complete sequence.
 
 ## [1.7.0] - 2026-08-23
 

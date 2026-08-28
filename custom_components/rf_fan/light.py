@@ -180,13 +180,43 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
             set_position=self._set_level_position,
         )
 
+    async def _async_transmit_power(self, *, turn_on: bool) -> bool:
+        """Put a power command on the air, if sending one would help.
+
+        Returns whether the lamp is now in the requested state, so a caller that
+        sent nothing because nothing was needed is not mistaken for one that failed.
+
+        The two shapes of power key differ in what a redundant press costs:
+
+        - `light_on` / `light_off` are ABSOLUTE. Re-sending one lands the lamp
+          where it already is, and on a device that never reports back that is
+          worth doing: an assumed state that has drifted realigns for free.
+        - `light_toggle` is a FLIP. Sending it towards a state the lamp is already
+          in takes it OUT of that state. That is what switched @elmr91's lamp on
+          and off at every move of the brightness slider (#41): setting a
+          brightness goes through `async_turn_on`, which powered first and asked
+          questions later.
+
+        An unknown state transmits. Nothing is established until something is sent,
+        and only a state the integration actually holds can justify silence -- the
+        rule `switch.py` has always applied to the sound toggle.
+        """
+        absolute = ACTION_LIGHT_ON if turn_on else ACTION_LIGHT_OFF
+        if await self._async_transmit_action(absolute):
+            return True
+        if self._is_on is turn_on:
+            return True
+        return await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
+
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn on the light, and step it to a requested brightness."""
+        """Turn on the light, and step it to a requested brightness.
+
+        Home Assistant sets a brightness through this same service, so on a lamp
+        that is already lit the power key has nothing to add and a flip would undo
+        the very state being asked for (#41).
+        """
         was_on = self._is_on
-        sent = await self._async_transmit_action(ACTION_LIGHT_ON)
-        if not sent:
-            sent = await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
-        if not sent:
+        if not await self._async_transmit_power(turn_on=True):
             return
 
         self._is_on = True
@@ -202,10 +232,7 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
-        sent = await self._async_transmit_action(ACTION_LIGHT_OFF)
-        if not sent:
-            sent = await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
-        if sent:
+        if await self._async_transmit_power(turn_on=False):
             self._is_on = False
             self._publish_light_state()
 
