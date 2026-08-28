@@ -140,11 +140,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whichever select came first. It now also filters on `EntityCategory.CONFIG`, which
   needs no key exposed and is right by construction: a CONFIG entity declares the
   integration's belief and emits nothing, so it can never be the colour row. And
-  every segment carried `disabled` whenever the light read off, so the row rendered
-  normally and then refused every click — read, reasonably, as a read-only field.
-  The select accepts the change in that state and the more-info dialog performs it,
-  so the card was forbidding on its own what the integration allows. Neither defect
-  is specific to the new position counts.
+  every segment carried `disabled` whenever the *light* read off — a state the card
+  read off the lamp and decided for itself, while the colour select next to it
+  already declares the answer. The row now follows the entity instead of guessing:
+  available means fully usable whatever the lamp reads, and unavailable means
+  disabled, dimmed, and carrying the reason (`title` and `aria-disabled`) rather
+  than rendering as usual and swallowing the press. The select does go unavailable
+  with the lamp off, and it is right to — @elmr91 checked his remote and its colour
+  keys do nothing then either — but a control that ignores you in silence is what
+  makes a user go and check. Neither defect is specific to the new position counts.
 - **The bundled card could drive the wrong sibling entity** once an entry owned two
   selects or two buttons. It picked "the first select" and "the button that is not a
   timer", so a fan with relative brightness could have its colour row wired to the
