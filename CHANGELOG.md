@@ -23,6 +23,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundled card refuses every CONFIG select for its colour row, so it cannot be
   mistaken for one.
 
+### Changed
+
+- **The card's console banner is printed after the element is registered**, not at
+  the top of the file. It used to prove only that the module had *started*: on
+  [#44](https://github.com/dasimon135/ha-rf-fan/issues/44) @elmr91's console showed
+  the banner while his cards still rendered as errors, which left the question that
+  decides the diagnosis — did `customElements.define()` ever run? — unanswerable from
+  a screenshot. A banner now means the file finished loading.
+- **Regression tests for a partially loaded Home Assistant.** `hui-card` wraps
+  `element.hass = …` in a `try` and, on any exception, replaces the card with a bare
+  error card permanently and without a message (the frontend only renders an error
+  card's detail in editor preview). One throw on one early update is therefore
+  indistinguishable from a card that failed to load at all. The card is now held to
+  surviving a `hass` whose registry has arrived ahead of the state machine, one with
+  no states at all, and one with no registry — and to coming back when they turn up.
+
 ## [1.8.0] - 2026-08-28
 
 ### Added

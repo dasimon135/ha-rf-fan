@@ -231,8 +231,10 @@ An example automation **blueprint** (control the fan by temperature) is in
 
 ### The card looks like it did not update
 
-The console prints a banner on every load — `RF-FAN-CARD v1.8.0` — and that is the
-build you are actually looking at, whatever the integration reports. If it names an
+The console prints a banner — `RF-FAN-CARD v1.8.0` — as the card registers itself,
+and that is the build you are actually looking at, whatever the integration reports.
+It is printed *after* the registration, so a banner also means the file finished
+loading rather than merely starting to. If it names an
 older version after an upgrade, a stale copy is being served, and it is almost
 always a **dashboard resource you registered by hand**: the integration loads the
 card on its own, so a leftover manual entry is a second copy under a second URL.

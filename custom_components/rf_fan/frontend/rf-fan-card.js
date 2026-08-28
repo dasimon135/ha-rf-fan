@@ -14,8 +14,6 @@
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
 const VERSION = "1.8.0";
-// eslint-disable-next-line no-console
-console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
 // Everything interpolated into innerHTML goes through this: entity names are
 // user-editable, so an unescaped `<` in a friendly name would break the markup.
@@ -665,6 +663,14 @@ if (!alreadyRegistered) {
   // builds never set it, hence the fallback below.
   window.__rfFanCardVersion = VERSION;
   customElements.define("rf-fan-card", RfFanCard);
+  // The banner is printed HERE, after the definition, and that placement is the
+  // point. It used to sit at the top of the file, where it proved only that the
+  // module had started: @elmr91's console showed it while his cards still
+  // rendered as errors (#44), which left the one question that matters —
+  // did `define()` ever run? — unanswerable from a screenshot. Now the banner IS
+  // the answer, and a load that reaches the console has reached the registry.
+  // eslint-disable-next-line no-console
+  console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 } else if (window.__rfFanCardVersion !== VERSION) {
   // eslint-disable-next-line no-console
   console.warn(
