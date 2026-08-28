@@ -74,6 +74,7 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         self._is_on: bool | None = None
         self._event_unsub = None
         self._signal_unsub = None
+        self._state_unsub = None
 
         caps = caps_from_data(dict(config_entry.data))
         self._has_level: bool = caps["light_level"] == LIGHT_LEVEL_RELATIVE
@@ -117,6 +118,9 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
                     )
             async_dispatcher_send(self.hass, self._kelvin_signal())
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
+        self._state_unsub = async_dispatcher_connect(
+            self.hass, self._light_state_signal(), self._on_light_state_declared
+        )
         if self._has_level:
             self._signal_unsub = async_dispatcher_connect(
                 self.hass, self._level_signal(), self._on_level_changed
@@ -130,6 +134,9 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         if self._signal_unsub is not None:
             self._signal_unsub()
             self._signal_unsub = None
+        if self._state_unsub is not None:
+            self._state_unsub()
+            self._state_unsub = None
 
     @callback
     def _on_level_changed(self) -> None:
@@ -157,6 +164,23 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
     def _publish_light_state(self) -> None:
         """Share the assumed on/off state (so the color select can gate on it) and refresh."""
         self._runtime.light_on = self._is_on
+        async_dispatcher_send(self.hass, self._kelvin_signal())
+        async_dispatcher_send(self.hass, self._light_state_signal())
+        self.async_write_ha_state()
+
+    @callback
+    def _on_light_state_declared(self) -> None:
+        """Adopt a state declared elsewhere, without pressing anything.
+
+        The declaration select writes the shared belief and says so; this is the
+        light entity agreeing with it. Guarded because the light announces on the
+        same signal when it moves the belief itself, and re-adopting its own value
+        would be a write for nothing.
+        """
+        declared = self._runtime.light_on
+        if declared is self._is_on:
+            return
+        self._is_on = declared
         async_dispatcher_send(self.hass, self._kelvin_signal())
         self.async_write_ha_state()
 

@@ -100,6 +100,12 @@ they are deliberately different:
 | **"Assumed brightness position"** select | Declares where the lamp is. Emits nothing. | Silent and instant, but only as good as what you tell it. |
 | **"Resynchronise brightness"** button | Walks the lamp into its bottom stop (N−1 presses). | Physically true, but audible and slow — and on many remotes stepping below the lowest level switches the lamp off. |
 
+The lamp's own on/off state has the same pair, for the same reason: pressing **off**
+on a lamp Home Assistant already believes is off still sends the key, which puts a
+lit lamp out and realigns the two — while the **"Assumed light state"** select simply
+declares which state it is in, and sends nothing. Use the first when you are in
+front of the lamp, the second when you are not.
+
 ### Direction without a reverse button
 
 Some remotes have no direction code at all: an internal switch selects winter or

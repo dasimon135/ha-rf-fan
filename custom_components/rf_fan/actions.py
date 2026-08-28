@@ -337,6 +337,7 @@ def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:
     # light.py defaults `has_light` to True for entries predating the flag.
     if data.get("has_light", True):
         ids.add(f"{entry_id}_light")
+        ids.add(f"{entry_id}_light_state")
     if caps["color_control"] != COLOR_CONTROL_NONE:
         ids.add(f"{entry_id}_color_temp")
         ids.add(f"{entry_id}_kelvin_calibrate")

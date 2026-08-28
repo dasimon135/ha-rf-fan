@@ -5,6 +5,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **An "Assumed light state" select** ([#45](https://github.com/dasimon135/ha-rf-fan/issues/45),
+  asked for by @elmr91). A lamp driven by a single toggle key never reports back, so
+  Home Assistant's belief and the lamp can drift apart. Pressing **off** on a lamp
+  already believed off realigns them by *moving the hardware* -- which works when you
+  are in front of a lit lamp, and not at all otherwise. This is the other way, and it
+  is the one the colour and brightness positions already had: it declares which state
+  the lamp is in and transmits nothing.
+
+  A select rather than a button, and absolute rather than a flip: a control that
+  inverts a belief is only as good as the belief, which is exactly what is in doubt
+  when you reach for it. `EntityCategory.CONFIG`, like its two siblings -- and the
+  bundled card refuses every CONFIG select for its colour row, so it cannot be
+  mistaken for one.
+
 ## [1.8.0] - 2026-08-28
 
 ### Added
