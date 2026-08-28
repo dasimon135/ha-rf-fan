@@ -62,6 +62,22 @@ async def _light_on(hass: HomeAssistant, light_id: str, calls: list) -> None:
     calls.clear()
 
 
+async def _press_toggle_on_the_remote(hass: HomeAssistant, entry) -> None:
+    """Simulate one press of the remote's light key, clear of echo and de-bounce.
+
+    The window both mechanisms measure is `hass.loop.time()`, which no test clock
+    moves, so the records are aged rather than the clock advanced -- the same
+    statement as waiting between two deliberate presses (see `test_receive_debounce`).
+    """
+    entry.runtime_data.echo_codes.clear()
+    seen = entry.runtime_data.receive_seen
+    for code in seen:
+        seen[code] -= 10.0
+    hass.bus.async_fire(
+        EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "r_lt", "action": "sniff"}
+    )
+    await hass.async_block_till_done()
+
 # --- Brightness ---------------------------------------------------------------
 
 
@@ -273,7 +289,12 @@ async def test_colour_relative_can_walk_backwards(
     await _light_on(hass, light_id, calls)
 
     select_id = _id_by(hass, entry, "select", "_color_temp")
-    # The OFF->ON transition bumped the assumed position to 1 (Neutre).
+    # Powering on moves nothing here (#38), so a press on the remote's "cooler"
+    # key is what puts the assumed position somewhere it can walk back from.
+    hass.bus.async_fire(
+        EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "r_ku", "action": "sniff"}
+    )
+    await hass.async_block_till_done()
     assert hass.states.get(select_id).state == "Neutre"
 
     # Neutre(1) -> Chaud(0) is one step back, not two forward.
@@ -286,10 +307,10 @@ async def test_colour_relative_can_walk_backwards(
     assert hass.states.get(select_id).state == "Chaud"
 
 
-async def test_colour_relative_goes_up_when_that_is_shorter(
+async def test_colour_relative_walks_up_one_press_per_step(
     hass: HomeAssistant, no_gap: list
 ) -> None:
-    """Neutre(1) -> Froid(2) is one step forward."""
+    """Chaud(0) -> Froid(2) is two presses of the "cooler" key, and nothing else."""
     entry, calls = await _setup_relative(hass)
     light_id = _one_id(hass, "light")
     await _light_on(hass, light_id, calls)
@@ -300,7 +321,8 @@ async def test_colour_relative_goes_up_when_that_is_shorter(
     )
     await hass.async_block_till_done()
 
-    assert _actions_sent(calls) == ["light_kelvin_up"]
+    assert _actions_sent(calls) == ["light_kelvin_up", "light_kelvin_up"]
+    assert hass.states.get(select_id).state == "Froid"
 
 
 async def test_colour_relative_follows_both_remote_keys(hass: HomeAssistant) -> None:
@@ -310,6 +332,12 @@ async def test_colour_relative_follows_both_remote_keys(hass: HomeAssistant) -> 
     await _light_on(hass, light_id, calls)
 
     select_id = _id_by(hass, entry, "select", "_color_temp")
+    assert hass.states.get(select_id).state == "Chaud"
+
+    hass.bus.async_fire(
+        EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "r_ku", "action": "sniff"}
+    )
+    await hass.async_block_till_done()
     assert hass.states.get(select_id).state == "Neutre"
 
     hass.bus.async_fire(
@@ -318,11 +346,55 @@ async def test_colour_relative_follows_both_remote_keys(hass: HomeAssistant) -> 
     await hass.async_block_till_done()
     assert hass.states.get(select_id).state == "Chaud"
 
-    hass.bus.async_fire(
-        EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "r_ku", "action": "sniff"}
-    )
-    await hass.async_block_till_done()
-    assert hass.states.get(select_id).state == "Neutre"
+
+async def test_power_on_leaves_a_relative_colour_position_alone(
+    hass: HomeAssistant,
+) -> None:
+    """Only a cycling key advances on power-on; a +/- pair has no reason to (#38).
+
+    The bump models a real property of the reference lamp: one colour key, and a
+    fixture that walks it forward every time it is powered. Nothing says a remote
+    with two dedicated keys does that, and nobody has measured one that does.
+
+    With the ends clamping (#32) the spurious increments no longer roll around --
+    they pile up against the top stop until the assumed position pins there while
+    the lamp has not moved at all.
+    """
+    entry, calls = await _setup_relative(hass)
+    light_id = _one_id(hass, "light")
+    select_id = _id_by(hass, entry, "select", "_color_temp")
+    assert hass.states.get(select_id).state == "Chaud"
+
+    # Four power cycles, left on at the end: the select reads as unavailable while
+    # the lamp is known to be off.
+    for _ in range(4):
+        await _light_on(hass, light_id, calls)
+        await hass.services.async_call(
+            "light", "turn_off", {"entity_id": light_id}, blocking=True
+        )
+        await hass.async_block_till_done()
+    await _light_on(hass, light_id, calls)
+
+    assert hass.states.get(select_id).state == "Chaud"
+
+
+async def test_a_sniffed_power_on_leaves_a_relative_colour_position_alone(
+    hass: HomeAssistant,
+) -> None:
+    """The same holds for a press on the physical remote, which took the same path."""
+    entry, calls = await _setup_relative(hass)
+    light_id = _one_id(hass, "light")
+    select_id = _id_by(hass, entry, "select", "_color_temp")
+    # A toggle only follows the remote once the state is known, and commanding it
+    # is the only way to establish that from a test.
+    await _light_on(hass, light_id, calls)
+
+    for _ in range(4):
+        await _press_toggle_on_the_remote(hass, entry)
+
+    # Four presses from ON leaves it OFF, so power it back on to read the select.
+    await _light_on(hass, light_id, calls)
+    assert hass.states.get(select_id).state == "Chaud"
 
 
 # --- Direction as a dimension of the speed code set ---------------------------
@@ -511,11 +583,11 @@ async def test_walks_on_different_axes_do_not_cancel_each_other(
         "light", "turn_on", {"entity_id": light_id, "brightness": 255}, blocking=True
     )
     await hass.services.async_call(
-        "select", "select_option", {"entity_id": select_id, "option": "Chaud"}, blocking=True
+        "select", "select_option", {"entity_id": select_id, "option": "Neutre"}, blocking=True
     )
     await hass.async_block_till_done()
 
     assert len([c for c in calls if c.get("action") == "light_bright_up"]) == 9
-    assert len([c for c in calls if c.get("action") == "light_kelvin_down"]) == 1
+    assert len([c for c in calls if c.get("action") == "light_kelvin_up"]) == 1
     assert hass.states.get(light_id).attributes["brightness"] == 255
-    assert hass.states.get(select_id).state == "Chaud"
+    assert hass.states.get(select_id).state == "Neutre"
