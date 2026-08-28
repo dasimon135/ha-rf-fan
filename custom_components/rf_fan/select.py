@@ -1,4 +1,4 @@
-"""Select platform for RF Fan (color temperature, assumed brightness position)."""
+"""Select platform for RF Fan (colour temperature, assumed brightness, assumed light state)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
+from homeassistant.const import STATE_OFF, STATE_ON, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -20,6 +20,7 @@ from .const import (
     AXIS_COLOR,
     COLOR_CONTROL_NONE,
     COLOR_CONTROL_RELATIVE,
+    CONF_HAS_LIGHT,
     EVENT_RF_FAN_RECEIVED,
     LIGHT_LEVEL_RELATIVE,
 )
@@ -39,6 +40,10 @@ async def async_setup_entry(
         entities.append(RfFanColorTempSelect(hass, config_entry))
     if caps["light_level"] == LIGHT_LEVEL_RELATIVE:
         entities.append(RfFanBrightnessPositionSelect(hass, config_entry))
+    # Same default as the light platform: entries created before the flag existed
+    # have a light.
+    if config_entry.data.get(CONF_HAS_LIGHT, True):
+        entities.append(RfFanLightStateSelect(hass, config_entry))
 
     if entities:
         async_add_entities(entities)
@@ -208,4 +213,67 @@ class RfFanBrightnessPositionSelect(RfFanBaseEntity, RestoreEntity, SelectEntity
     @callback
     def _on_level_changed(self) -> None:
         """Refresh when the light walks the brightness position."""
+        self.async_write_ha_state()
+
+
+class RfFanLightStateSelect(RfFanBaseEntity, SelectEntity):
+    """Assumed light state -- declares whether the lamp is lit, emits nothing.
+
+    A lamp driven by a single toggle key never reports back, so the belief and the
+    lamp can drift apart: someone used the remote out of range of the gateway, or
+    the lamp was already on before Home Assistant ever saw it. Pressing OFF fixes
+    that by moving the hardware, which only works with the lamp in front of you.
+    This is the other way, asked for by @elmr91 (#45) and named after the two that
+    already existed: declare the truth, touch nothing.
+
+    Absolute rather than a flip -- you say which state the lamp is in. A control
+    that inverts a belief is only as good as the belief, which is exactly what is
+    in doubt when you reach for it.
+
+    Nothing is restored here: the light entity restores its own state and announces
+    it, and one belief with two owners is one too many.
+
+    `EntityCategory.CONFIG`: it configures the integration's belief, not the fan.
+    """
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = [STATE_ON, STATE_OFF]
+
+    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+        """Initialize the light state select."""
+        super().__init__(hass, config_entry)
+        self._attr_unique_id = f"{config_entry.entry_id}_light_state"
+        self._attr_translation_key = "light_state"
+        self._signal_unsub = None
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the assumed light state, or None while nothing is known."""
+        light_on = self._runtime.light_on
+        return None if light_on is None else (STATE_ON if light_on else STATE_OFF)
+
+    async def async_select_option(self, option: str) -> None:
+        """Declare the state without touching the lamp."""
+        self._runtime.light_on = option == STATE_ON
+        async_dispatcher_send(self.hass, self._light_state_signal())
+        # The colour select gates on this belief, so it has to hear about it too.
+        async_dispatcher_send(self.hass, self._kelvin_signal())
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Follow the belief, whoever moved it."""
+        self._signal_unsub = async_dispatcher_connect(
+            self.hass, self._light_state_signal(), self._on_light_state_changed
+        )
+        self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe the callbacks."""
+        if self._signal_unsub is not None:
+            self._signal_unsub()
+            self._signal_unsub = None
+
+    @callback
+    def _on_light_state_changed(self) -> None:
+        """Refresh when the light entity establishes or changes its own state."""
         self.async_write_ha_state()

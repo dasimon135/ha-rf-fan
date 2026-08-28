@@ -275,8 +275,12 @@ def test_expected_unique_ids_minimal_entry():
 
 
 def test_expected_unique_ids_light_is_on_by_default():
-    """`has_light` defaults to True, matching light.py's own default."""
-    assert expected_unique_ids("e1", {}) == {"e1_fan", "e1_light"}
+    """`has_light` defaults to True, matching light.py's own default.
+
+    A light brings two rows: the entity itself, and the select that declares what
+    state it is believed to be in (#45).
+    """
+    assert expected_unique_ids("e1", {}) == {"e1_fan", "e1_light", "e1_light_state"}
 
 
 def test_expected_unique_ids_color_temp_adds_select_and_calibrate():
@@ -452,6 +456,7 @@ def test_expected_unique_ids_brightness_adds_position_and_calibrate():
     assert ids == {
         "e1_fan",
         "e1_light",
+        "e1_light_state",
         "e1_brightness_position",
         "e1_brightness_calibrate",
     }

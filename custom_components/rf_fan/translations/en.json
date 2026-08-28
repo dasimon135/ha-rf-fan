@@ -231,6 +231,13 @@
       }
     },
     "select": {
+      "light_state": {
+        "name": "Assumed light state",
+        "state": {
+          "on": "On",
+          "off": "Off"
+        }
+      },
       "color_temperature": {
         "name": "Colour temperature"
       },

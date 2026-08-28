@@ -231,6 +231,13 @@
       }
     },
     "select": {
+      "light_state": {
+        "name": "État supposé de la lampe",
+        "state": {
+          "on": "Allumée",
+          "off": "Éteinte"
+        }
+      },
       "color_temperature": {
         "name": "Température couleur"
       },

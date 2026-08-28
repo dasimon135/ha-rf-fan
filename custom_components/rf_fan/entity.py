@@ -369,6 +369,15 @@ class RfFanBaseEntity(Entity):
         """Dispatcher signal name for the brightness position, specific to the entry."""
         return f"{DOMAIN}_{self._config_entry.entry_id}_level"
 
+    def _light_state_signal(self) -> str:
+        """Dispatcher signal name for the assumed light state, specific to the entry.
+
+        Two entities hold one belief -- the light entity, which moves it by pressing
+        keys, and the declaration select, which moves it by being told. Whichever
+        changes it announces it here so the other follows.
+        """
+        return f"{DOMAIN}_{self._config_entry.entry_id}_light_state"
+
     def _advance_kelvin_position(self, delta: int = 1) -> int:
         """Move the color position by `delta` steps and return it.
 
