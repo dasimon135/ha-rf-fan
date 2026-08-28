@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.8.0b8";
+const VERSION = "1.8.0b9";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
@@ -205,6 +205,9 @@ class RfFanCard extends HTMLElement {
       on: fr ? "Marche" : "On",
       off: fr ? "Arrêt" : "Off",
       recalibrate: fr ? "Recaler la couleur" : "Recalibrate colour",
+      colorNeedsLamp: fr
+        ? "Allumez la lampe pour changer la couleur"
+        : "Switch the lamp on to change the colour",
       fan: fr ? "Ventilateur" : "Fan",
       lower: fr ? "Diminuer" : "Lower",
       raise: fr ? "Augmenter" : "Raise",
@@ -325,18 +328,20 @@ class RfFanCard extends HTMLElement {
       const c = this._hass.states[ent.color];
       const opts = (c && c.attributes.options) || [];
       const cur = c && c.state;
-      // Nothing here is ever disabled, including while the lamp reads off. The
-      // select entity accepts the change in that state — the standard more-info
-      // dialog proves it — so a card that refuses it forbids on its own what the
-      // integration allows, and looks broken rather than protective (#29).
+      // The select declares itself unavailable while the lamp is off, and it is
+      // right to: @elmr91 measured his remote doing the same thing — pressing a
+      // colour key with the lamp off changes nothing (#29). So the row says so,
+      // rather than rendering as usual and swallowing every press in silence. The
+      // card does not decide this for itself; it repeats what the entity declares.
+      const inert = !c || cur === "unavailable";
       const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
       const segsC = opts
-        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}" style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}">${esc(L.color(o))}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}"${inert ? " disabled" : ""} style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}">${esc(L.color(o))}</button>`)
         .join("");
       // Three named positions was the only case this row was ever drawn for. Past
       // four, the labels are bare numbers and the segments have to give up padding
       // to stay on one line in a half-width dashboard column.
-      const csegs = `<div class="csegs${opts.length > 4 ? " many" : ""}">${segsC}</div>`;
+      const csegs = `<div class="csegs${opts.length > 4 ? " many" : ""}${inert ? " inert" : ""}"${inert ? ` title="${esc(L.colorNeedsLamp)}" aria-disabled="true"` : ""}>${segsC}</div>`;
       colorRow = `<div class="crow"><ha-icon icon="mdi:thermometer-lines"></ha-icon>${csegs}${ent.calibrate ? `<button class="mini" data-act="calibrate" title="${L.recalibrate}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button>` : ""}</div>`;
     }
 
@@ -545,7 +550,13 @@ class RfFanCard extends HTMLElement {
       this._call("fan", "set_percentage", { entity_id: ent.fan, percentage: Math.round(Number(t.dataset.speed) * step) });
     } else if (t.dataset.act === "light" && ent.light) this._call("light", "toggle", { entity_id: ent.light });
     else if (t.dataset.act === "sound" && ent.sound) this._call("switch", "toggle", { entity_id: ent.sound });
-    else if (t.dataset.color && ent.color) this._call("select", "select_option", { entity_id: ent.color, option: t.dataset.color });
+    else if (t.dataset.color && ent.color) {
+      // `disabled` covers a real browser; this covers everything else that can
+      // reach the handler, and states the rule once where it is decided.
+      const c = this._hass.states[ent.color];
+      if (c && c.state !== "unavailable")
+        this._call("select", "select_option", { entity_id: ent.color, option: t.dataset.color });
+    }
     else if (t.dataset.act === "calibrate" && ent.calibrate) this._call("button", "press", { entity_id: ent.calibrate });
     else if (t.dataset.dir) this._call("fan", "set_direction", { entity_id: ent.fan, direction: t.dataset.dir });
     else if (t.dataset.preset) this._call("fan", "set_preset_mode", { entity_id: ent.fan, preset_mode: t.dataset.preset });
@@ -623,6 +634,9 @@ class RfFanCard extends HTMLElement {
       .cseg:last-child { border-right:none; }
       .cseg.active { background: var(--primary-color); color: var(--text-primary-color,#fff); }
       .csegs.many .cseg { padding:8px 1px; font-size:.75rem; }
+      .csegs.inert .cseg { opacity:.45; cursor:not-allowed; }
+      .csegs.inert .cseg:hover { filter:none; }
+      .csegs.inert .cseg:active { transform:none; }
       .mini { border:none; background: var(--divider-color); border-radius:10px; padding:8px; cursor:pointer; color: var(--secondary-text-color); }
       .timers { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
       .timers .chip { flex:1; justify-content:center; }

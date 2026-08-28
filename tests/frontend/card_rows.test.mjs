@@ -94,7 +94,7 @@ describe("brightness row", () => {
 });
 
 describe("colour row", () => {
-  it("stays usable while the lamp is off (#29)", () => {
+  it("stays usable as long as the select is available (#29)", () => {
     const { hass } = makeHass({
       light: "off",
       selects: COLOR(["1", "2", "3", "4", "5", "6", "7", "8"], "3"),
@@ -102,7 +102,48 @@ describe("colour row", () => {
     const { html } = render(RfFanCard, FULL, hass);
 
     assert.match(html, /data-color="8"/, "the eight positions were not drawn");
-    assert.doesNotMatch(html, /disabled/, "the row refuses what the select entity accepts");
+    assert.doesNotMatch(html, /disabled/, "the row refuses what the entity accepts");
+  });
+
+  // The select goes unavailable while the lamp is off, and it is right to: the
+  // hardware ignores the colour keys then, which @elmr91 confirmed on his own
+  // remote. What was wrong is that the row said nothing about it -- it rendered as
+  // usual, greyed only because no segment was current, and ate every press.
+  it("says why it is inert once the select goes unavailable (#29)", () => {
+    const { hass } = makeHass({
+      light: "off",
+      selects: COLOR(["Chaud", "Neutre", "Froid"], "unavailable"),
+    });
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.match(html, /data-color="Neutre"/, "the positions stopped being drawn at all");
+    assert.match(html, /class="csegs inert"/, "the row is not marked inert");
+    assert.match(html, /aria-disabled="true"/, "a screen reader is told nothing");
+    assert.match(html, /Switch the lamp on to change the colour/, "no reason is given");
+    assert.match(html, /disabled/, "the segments still take clicks");
+  });
+
+  it("gives the reason in French too", () => {
+    const { hass } = makeHass({
+      light: "off",
+      language: "fr",
+      selects: COLOR(["Chaud", "Neutre", "Froid"], "unavailable"),
+    });
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.match(html, /Allumez la lampe pour changer la couleur/);
+  });
+
+  it("calls nothing when an inert segment is clicked", () => {
+    const { hass, calls } = makeHass({
+      light: "off",
+      selects: COLOR(["Chaud", "Neutre", "Froid"], "unavailable"),
+    });
+    const { card } = render(RfFanCard, FULL, hass);
+
+    card._onClick({ target: { closest: () => ({ dataset: { color: "Froid" } }) } });
+
+    assert.deepEqual(calls, [], "a press the hardware would ignore went out anyway");
   });
 
   it("selects the position that was clicked", () => {
