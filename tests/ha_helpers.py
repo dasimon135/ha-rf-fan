@@ -147,6 +147,7 @@ def relative_entry(
     color_temp_steps: int | None = None,
     light_level_steps: int | None = None,
     natural_preset: bool = False,
+    natural_control: str | None = None,
 ) -> MockConfigEntry:
     """Create an entry whose remote steps its values (issue #18 shape).
 
@@ -163,14 +164,19 @@ def relative_entry(
             "light_control": "toggle",
             "has_fan_on": False,
             "direction_control": "per_speed",
-            "has_natural_preset": natural_preset,
+            **(
+                {"has_natural_preset": natural_preset}
+                if natural_control is None
+                else {"natural_control": natural_control}
+            ),
             "color_control": "relative",
             "light_level": "relative",
             "has_timers": False,
             "has_sound": False,
             "has_light": True,
             "repeat_count": repeat_count,
-            "codes": dict(RELATIVE_CODES) | (NATURAL_CODES if natural_preset else {}),
+            "codes": dict(RELATIVE_CODES)
+            | (NATURAL_CODES if (natural_preset or natural_control not in (None, "none")) else {}),
             **({} if color_temp_steps is None else {"color_temp_steps": color_temp_steps}),
             **({} if light_level_steps is None else {"light_level_steps": light_level_steps}),
         },
@@ -186,6 +192,7 @@ async def setup_relative(
     color_temp_steps: int | None = None,
     light_level_steps: int | None = None,
     natural_preset: bool = False,
+    natural_control: str | None = None,
 ):
     """Register the stub, set up a stepped-control entry, and return (entry, calls)."""
     calls = register_stub(hass)
@@ -195,6 +202,7 @@ async def setup_relative(
         color_temp_steps=color_temp_steps,
         light_level_steps=light_level_steps,
         natural_preset=natural_preset,
+        natural_control=natural_control,
     )
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

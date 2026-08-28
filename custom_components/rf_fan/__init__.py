@@ -23,11 +23,15 @@ from .const import (
     CONF_GATEWAY_SERVICE,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_DIRECTION,
+    CONF_HAS_NATURAL_PRESET,
     CONF_LIGHT_LEVEL,
+    CONF_NATURAL_CONTROL,
     DIRECTION_CONTROL_NONE,
     DIRECTION_CONTROL_TOGGLE,
     DOMAIN,
     LIGHT_LEVEL_NONE,
+    NATURAL_CONTROL_NONE,
+    NATURAL_CONTROL_TOGGLE,
 )
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
@@ -140,8 +144,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     CONF_COLOR_CONTROL), and brightness appears as a third. NO LEARNED CODE IS
     INVALIDATED: every existing action key keeps its exact name, so nobody has to
     relearn a button they already taught.
+
+    v3 -> v4: the natural-airflow preset becomes a selector for the same reason
+    (const.CONF_NATURAL_CONTROL). Every existing entry was set up against a key
+    assumed to toggle, so that is what they migrate to — `dedicated` is a claim
+    about the hardware that only its owner can make.
     """
-    if entry.version > 3:
+    if entry.version > 4:
         # Entry created by a newer version of the integration: cannot downgrade.
         return False
     if entry.version < 2:
@@ -177,6 +186,20 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data.pop(CONF_HAS_COLOR_TEMP, None)
         hass.config_entries.async_update_entry(entry, data=data, version=3)
         _LOGGER.debug("Migrated config entry %s to version 3", entry.entry_id)
+    if entry.version < 4:
+        data = dict(entry.data)
+        # Same rule as the selectors above: an explicit answer outranks the boolean
+        # it replaced, and the boolean is dropped rather than left to disagree with
+        # it later. No code changes name, so nothing is relearned.
+        data.setdefault(
+            CONF_NATURAL_CONTROL,
+            NATURAL_CONTROL_TOGGLE
+            if data.get(CONF_HAS_NATURAL_PRESET, False)
+            else NATURAL_CONTROL_NONE,
+        )
+        data.pop(CONF_HAS_NATURAL_PRESET, None)
+        hass.config_entries.async_update_entry(entry, data=data, version=4)
+        _LOGGER.debug("Migrated config entry %s to version 4", entry.entry_id)
     return True
 
 

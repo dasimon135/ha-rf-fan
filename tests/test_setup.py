@@ -88,13 +88,13 @@ async def test_migrate_v1_entry_derives_the_gateway_service(hass: HomeAssistant)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.version == 3
+    assert entry.version == 4
     assert entry.data["gateway_service"] == "esp32_test"
 
 
 async def test_entry_from_a_newer_version_is_refused(hass: HomeAssistant) -> None:
     """An entry written by a future release must not be silently downgraded."""
-    entry = MockConfigEntry(domain=DOMAIN, version=4, title="Future", data={})
+    entry = MockConfigEntry(domain=DOMAIN, version=5, title="Future", data={})
     entry.add_to_hass(hass)
 
     assert not await hass.config_entries.async_setup(entry.entry_id)
@@ -132,7 +132,7 @@ async def test_migrate_v2_entry_turns_the_booleans_into_selectors(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.version == 3
+    assert entry.version == 4
     assert entry.data["direction_control"] == "toggle"
     assert entry.data["color_control"] == "cycle"
     assert entry.data["light_level"] == "none"
@@ -169,3 +169,72 @@ async def test_migrate_v2_entry_without_capabilities_lands_on_none(
     assert entry.data["direction_control"] == "none"
     assert entry.data["color_control"] == "none"
     assert entry.data["light_level"] == "none"
+async def test_migrate_v3_entry_turns_the_natural_boolean_into_a_selector(
+    hass: HomeAssistant,
+) -> None:
+    """A boolean can only describe one shape of airflow key, and it described `toggle`.
+
+    Every existing entry was configured against a key assumed to flip the preset, so
+    that is what they land on. `dedicated` is a claim about the hardware that only
+    its owner can make, and it is never inferred here.
+    """
+    register_stub(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=3,
+        title="Breeze",
+        data={
+            "esphome_device": DEVICE,
+            "gateway_service": "esp32_test",
+            "fan_name": "Breeze",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_light": True,
+            "direction_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "has_natural_preset": True,
+            "codes": dict(CODES),
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.version == 4
+    assert entry.data["natural_control"] == "toggle"
+    # Dropped rather than left behind: two answers to "does this fan have a breeze
+    # key?" is how they drift apart.
+    assert "has_natural_preset" not in entry.data
+    assert entry.data["codes"] == dict(CODES)
+
+
+async def test_migrate_v3_entry_without_the_boolean_lands_on_none(
+    hass: HomeAssistant,
+) -> None:
+    """An absent boolean means the capability was declined, not unknown."""
+    register_stub(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=3,
+        title="Plain",
+        data={
+            "esphome_device": DEVICE,
+            "gateway_service": "esp32_test",
+            "fan_name": "Plain",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_light": True,
+            "direction_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "codes": dict(CODES),
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.data["natural_control"] == "none"

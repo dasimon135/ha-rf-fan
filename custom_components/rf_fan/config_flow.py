@@ -37,12 +37,12 @@ from .const import (
     CONF_GATEWAY_SERVICE,
     CONF_HAS_FAN_ON,
     CONF_HAS_LIGHT,
-    CONF_HAS_NATURAL_PRESET,
     CONF_HAS_SOUND,
     CONF_HAS_TIMERS,
     CONF_LIGHT_CONTROL,
     CONF_LIGHT_LEVEL,
     CONF_LIGHT_LEVEL_STEPS,
+    CONF_NATURAL_CONTROL,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
     DEFAULT_COLOR_TEMP_STEPS,
@@ -60,6 +60,7 @@ from .const import (
     MAX_STEP_COUNT,
     MIN_SPEED_COUNT,
     MIN_STEP_COUNT,
+    NATURAL_CONTROL_OPTIONS,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -71,7 +72,7 @@ LEARN_COLLECT_SEC = 1.2
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
-    VERSION = 3
+    VERSION = 4
 
     @staticmethod
     @callback
@@ -174,6 +175,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         # selector above it would need a second step to be filled in at all.
         for capability, options, step_key, step_default in (
             (CONF_DIRECTION_CONTROL, DIRECTION_CONTROL_OPTIONS, None, 0),
+            (CONF_NATURAL_CONTROL, NATURAL_CONTROL_OPTIONS, None, 0),
             (
                 CONF_COLOR_CONTROL,
                 COLOR_CONTROL_OPTIONS,
@@ -197,7 +199,6 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(step_key, default=self._steps.get(step_key, step_default))
                 ] = vol.In(list(range(MIN_STEP_COUNT, MAX_STEP_COUNT + 1)))
         for capability in (
-            CONF_HAS_NATURAL_PRESET,
             CONF_HAS_TIMERS,
             CONF_HAS_SOUND,
         ):

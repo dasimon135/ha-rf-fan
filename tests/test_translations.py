@@ -35,6 +35,7 @@ FILES = {
 # remotes the integration claims to support rather than a sample of it.
 LIGHT_CONTROL = ("none", "toggle", "on_off")
 DIRECTION_CONTROL = ("none", "toggle", "per_speed")
+NATURAL_CONTROL = ("none", "toggle", "dedicated")
 COLOR_CONTROL = ("none", "cycle", "relative")
 LIGHT_LEVEL = ("none", "relative")
 # 2 and 12 are the bounds; 6 was the old cap, and the range either side of it is
@@ -53,7 +54,7 @@ def _every_reachable_action() -> set[str]:
         for light, direction, natural, color, level, timers, sound, fan_on in itertools.product(
             LIGHT_CONTROL,
             DIRECTION_CONTROL,
-            (False, True),
+            NATURAL_CONTROL,
             COLOR_CONTROL,
             LIGHT_LEVEL,
             (False, True),
@@ -65,7 +66,7 @@ def _every_reachable_action() -> set[str]:
                 light,
                 has_fan_on=fan_on,
                 direction_control=direction,
-                has_natural_preset=natural,
+                natural_control=natural,
                 color_control=color,
                 light_level=level,
                 has_timers=timers,

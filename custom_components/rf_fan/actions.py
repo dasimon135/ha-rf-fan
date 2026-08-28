@@ -35,6 +35,8 @@ try:  # Home Assistant runtime: relative import within the package
         LIGHT_LEVEL_RELATIVE,
         MAX_STEP_COUNT,
         MIN_STEP_COUNT,
+        NATURAL_CONTROL_NONE,
+        NATURAL_CONTROL_TOGGLE,
         STEP_DOWN,
         STEP_UP,
         TIMER_HOURS,
@@ -75,6 +77,8 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         LIGHT_LEVEL_RELATIVE,
         MAX_STEP_COUNT,
         MIN_STEP_COUNT,
+        NATURAL_CONTROL_NONE,
+        NATURAL_CONTROL_TOGGLE,
         STEP_DOWN,
         STEP_UP,
         TIMER_HOURS,
@@ -90,7 +94,7 @@ def split_actions(
     *,
     has_fan_on: bool = False,
     direction_control: str = DIRECTION_CONTROL_NONE,
-    has_natural_preset: bool = False,
+    natural_control: str = NATURAL_CONTROL_NONE,
     color_control: str = COLOR_CONTROL_NONE,
     light_level: str = LIGHT_LEVEL_NONE,
     has_timers: bool = False,
@@ -105,7 +109,7 @@ def split_actions(
     (direction, natural airflow, colour, brightness, timers, sound).
     No optional action: the returned list is always empty.
 
-    Three capabilities are selectors rather than booleans, because the remote can
+    Four capabilities are selectors rather than booleans, because the remote can
     express them in more than one shape:
 
     - `direction_control: per_speed` has NO direction key at all. The remote stores
@@ -114,6 +118,9 @@ def split_actions(
       the fan also has the preset, `fan_natural_reverse` beside `fan_natural`.
     - `color_control: relative` and `light_level: relative` have two dedicated keys
       instead of one cycling key, so they take an up/down pair.
+    - `natural_control` changes no code at all: `toggle` and `dedicated` learn the
+      same keys, and differ only in what a press means (#34). It is a selector
+      because the entity behaviour cannot be derived from the codes.
     """
     required = [ACTION_FAN_OFF]
     required.extend(speed_action(index) for index in range(1, speed_count + 1))
@@ -131,7 +138,7 @@ def split_actions(
         required.extend([ACTION_LIGHT_ON, ACTION_LIGHT_OFF])
     if direction_control == DIRECTION_CONTROL_TOGGLE:
         required.append(ACTION_FAN_REVERSE)
-    if has_natural_preset:
+    if natural_control != NATURAL_CONTROL_NONE:
         required.append(ACTION_FAN_NATURAL)
         # Same reasoning as the reverse speeds, and the same combination: a remote
         # that has no direction key gives its natural-airflow key a code per
@@ -234,7 +241,6 @@ def walk_steps(
 
 
 CAPABILITY_FLAGS = (
-    "has_natural_preset",
     "has_timers",
     "has_sound",
 )
@@ -246,6 +252,12 @@ CAPABILITY_SELECTORS = (
     ("direction_control", DIRECTION_CONTROL_NONE, "has_direction", DIRECTION_CONTROL_TOGGLE),
     ("color_control", COLOR_CONTROL_NONE, "has_color_temp", COLOR_CONTROL_CYCLE),
     ("light_level", LIGHT_LEVEL_NONE, None, None),
+    (
+        "natural_control",
+        NATURAL_CONTROL_NONE,
+        "has_natural_preset",
+        NATURAL_CONTROL_TOGGLE,
+    ),
 )
 
 

@@ -55,9 +55,9 @@ async def _face(hass: HomeAssistant, fan: str, direction: str) -> None:
 
 def test_the_winter_code_is_learned_only_where_it_exists() -> None:
     """One extra key, and only for the combination that produces it."""
-    both = _required(direction_control="per_speed", has_natural_preset=True)
-    no_preset = _required(direction_control="per_speed", has_natural_preset=False)
-    keyed_direction = _required(direction_control="toggle", has_natural_preset=True)
+    both = _required(direction_control="per_speed", natural_control="toggle")
+    no_preset = _required(direction_control="per_speed", natural_control="none")
+    keyed_direction = _required(direction_control="toggle", natural_control="toggle")
 
     assert ACTION_FAN_NATURAL_REVERSE in both
     assert ACTION_FAN_NATURAL_REVERSE not in no_preset

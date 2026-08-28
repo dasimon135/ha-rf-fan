@@ -116,6 +116,30 @@ to know which way the fan was turning to begin with. Here the code itself carrie
 direction: setting it re-sends the current speed from the other set, and one frame
 sniffed from the physical remote reports the speed and the direction together.
 
+### Natural airflow that selects instead of toggling
+
+On most remotes the breeze key is a switch: press it to go in, press it again to
+come out. On others it behaves like a speed — it **selects** the mode, a second
+press changes nothing, and what takes the fan out of it is pressing a speed key.
+Same button, same code, opposite meaning for anyone trying to leave.
+
+Declare which one you have with `natural_control`:
+
+| | What a press means | Leaving the preset |
+| --- | --- | --- |
+| `toggle` | Flips the preset | The same key again |
+| `dedicated` | Sets the preset | The current speed, re-sent |
+
+Nothing extra is learned — both shapes use the one `fan_natural` code (plus
+`fan_natural_reverse` on a `per_speed` remote). With `dedicated`, choosing a speed
+in Home Assistant or on the remote takes the fan out of the preset, because that is
+what the hardware does.
+
+One consequence worth knowing: a `dedicated` breeze key is **deaf while the fan is
+off** — the mode only exists while it is running. Asking for the preset with the fan
+stopped therefore transmits nothing; it is remembered, and pressed for you on the
+next start, right after the speed code that gets the fan going.
+
 ## Requirements
 
 - Home Assistant **2026.5+**.
@@ -201,7 +225,7 @@ An example automation **blueprint** (control the fan by temperature) is in
 
 ### The card looks like it did not update
 
-The console prints a banner on every load — `RF-FAN-CARD v1.8.0b6` — and that is the
+The console prints a banner on every load — `RF-FAN-CARD v1.8.0b7` — and that is the
 build you are actually looking at, whatever the integration reports. If it names an
 older version after an upgrade, a stale copy is being served, and it is almost
 always a **dashboard resource you registered by hand**: the integration loads the

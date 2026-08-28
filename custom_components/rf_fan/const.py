@@ -46,15 +46,33 @@ ACTION_LIGHT_OFF: Final = "light_off"
 ACTION_LIGHT_TOGGLE: Final = "light_toggle"
 
 # Capabilities (config flow)
-CONF_HAS_NATURAL_PRESET: Final = "has_natural_preset"
 CONF_HAS_TIMERS: Final = "has_timers"
 CONF_HAS_SOUND: Final = "has_sound"
 
-# Legacy booleans, replaced by the selectors below in entry version 3. Kept because
-# the migration still has to read them, and because `caps_from_data` falls back to
-# them for any dict that has not been through the migration (tests, diagnostics).
+# Legacy booleans, replaced by the selectors below (versions 3 and 4 of the config
+# entry). Kept because the migrations still have to read them, and because
+# `caps_from_data` falls back to them for any dict that has not been through the
+# migration (tests, diagnostics).
 CONF_HAS_DIRECTION: Final = "has_direction"
 CONF_HAS_COLOR_TEMP: Final = "has_color_temp"
+CONF_HAS_NATURAL_PRESET: Final = "has_natural_preset"
+
+# How the remote controls the natural-airflow preset.
+#   none      - no airflow key
+#   toggle    - one key that flips the preset on and off (dead-reckoned)
+#   dedicated - a key that SETS the preset, like a speed key. Pressing it twice
+#               changes nothing, and a speed key is what leaves the preset. It
+#               cannot start the fan, so it is not a member of the speed set
+#               either. Measured by @elmr91 on issue #34.
+CONF_NATURAL_CONTROL: Final = "natural_control"
+NATURAL_CONTROL_NONE: Final = "none"
+NATURAL_CONTROL_TOGGLE: Final = "toggle"
+NATURAL_CONTROL_DEDICATED: Final = "dedicated"
+NATURAL_CONTROL_OPTIONS: Final = [
+    NATURAL_CONTROL_NONE,
+    NATURAL_CONTROL_TOGGLE,
+    NATURAL_CONTROL_DEDICATED,
+]
 
 # How the remote controls the rotation direction.
 #   none      - no direction control at all
