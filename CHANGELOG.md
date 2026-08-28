@@ -179,6 +179,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that the effect is global, and the README says the same in its troubleshooting
   section. The behaviour itself is unchanged: one opt-out still disables the
   auto-load everywhere, which is what a single frontend registration can express.
+- **`natural_control`, for remotes whose breeze key selects a mode instead of
+  toggling one** ([#34](https://github.com/dasimon135/ha-rf-fan/issues/34), measured
+  by @elmr91 over three corrections on `v1.8.0b2`). `has_natural_preset` becomes the
+  fourth capability to stop being a boolean, and for the same reason as the other
+  three: it could only describe one shape of remote.
+  - `toggle` -- what every existing entry is migrated to, and unchanged in every
+    respect.
+  - `dedicated` -- the key **sets** the preset. Pressing it again does nothing on the
+    hardware, so Home Assistant leaves the preset the way the remote does: by
+    re-sending the current speed. Until now it pressed the breeze key a second time,
+    which meant Home Assistant could put such a fan into the preset and never take it
+    out. A received breeze frame now sets the preset rather than flipping it, and any
+    speed -- commanded or sniffed from the remote -- clears it.
+  - A `dedicated` key is deaf while the fan is stopped, so a preset asked for then is
+    recorded and pressed on the next start, after the speed code. The same shape as
+    the direction a `per_speed` remote records with the fan off.
+  - No code changes name and nothing is relearned; `toggle` and `dedicated` learn the
+    same `fan_natural` (and `fan_natural_reverse` on a `per_speed` remote).
 
 ## [1.7.0] - 2026-08-23
 

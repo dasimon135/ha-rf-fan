@@ -23,11 +23,12 @@ from .const import (
     ACTION_FAN_OFF,
     ACTION_FAN_ON,
     ACTION_FAN_REVERSE,
-    CONF_HAS_NATURAL_PRESET,
     CONF_SPEED_COUNT,
     DIRECTION_CONTROL_NONE,
     DIRECTION_CONTROL_PER_SPEED,
     EVENT_RF_FAN_RECEIVED,
+    NATURAL_CONTROL_DEDICATED,
+    NATURAL_CONTROL_NONE,
     PRESET_NATURAL,
     PRESET_NORMAL,
     speed_action,
@@ -60,14 +61,17 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         self._event_unsub = None
 
         # Optional capabilities (config flow)
-        self._direction_control: str = caps_from_data(dict(config_entry.data))[
-            "direction_control"
-        ]
+        caps = caps_from_data(dict(config_entry.data))
+        self._direction_control: str = caps["direction_control"]
         self._has_direction: bool = self._direction_control != DIRECTION_CONTROL_NONE
         self._per_speed_direction: bool = (
             self._direction_control == DIRECTION_CONTROL_PER_SPEED
         )
-        self._has_preset: bool = config_entry.data.get(CONF_HAS_NATURAL_PRESET, False)
+        self._natural_control: str = caps["natural_control"]
+        self._has_preset: bool = self._natural_control != NATURAL_CONTROL_NONE
+        self._dedicated_preset: bool = (
+            self._natural_control == NATURAL_CONTROL_DEDICATED
+        )
 
         # Supported features computed per instance based on the capabilities
         features = (
@@ -87,6 +91,9 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         # Assumed state of the optional capabilities
         self._direction: str | None = None
         self._preset: str | None = None
+        # A `dedicated` airflow key is deaf while the fan is stopped, so a preset
+        # asked for then is remembered and pressed once the fan is running.
+        self._pending_preset: str | None = None
 
     @property
     def is_on(self) -> bool | None:
@@ -167,6 +174,10 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         # the fan has to be running for it to take effect.
         if preset_mode is not None:
             await self.async_set_preset_mode(preset_mode)
+        elif self._pending_preset is not None:
+            # Asked for while the fan was stopped, where the key does nothing. The
+            # fan is running now, so this is the first moment it can be heard.
+            await self.async_set_preset_mode(self._pending_preset)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the fan."""
@@ -224,6 +235,9 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if sent:
             self._is_on = True
             self._percentage = round(speed_index * (100 / self._speed_count))
+            # A speed key is how a `dedicated` remote leaves the preset -- measured,
+            # and the reason this shape exists (#34).
+            self._leave_dedicated_preset()
             if self._per_speed_direction and self._direction is None:
                 # The forward set is what just went on the air, so the direction is
                 # no longer a guess.
@@ -266,12 +280,68 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             self._direction = direction
             self.async_write_ha_state()
 
+    def _leave_dedicated_preset(self) -> None:
+        """Record that a speed took the fan out of the airflow preset.
+
+        Only for a `dedicated` remote: there a speed key genuinely ends the preset.
+        A `toggle` remote has never been measured doing that, and inventing it
+        would desynchronise the one shape that works today.
+        """
+        if self._dedicated_preset and self._preset == PRESET_NATURAL:
+            self._preset = PRESET_NORMAL
+
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Toggle the natural airflow preset (single-toggle remote)."""
-        if self._preset == preset_mode:
+        """Enter or leave the natural airflow preset.
+
+        The two shapes leave it by pressing different keys, because they are
+        different keys:
+
+        - `toggle`: one key that flips. Entering and leaving are the same press,
+          which is why nothing else here has to know the current preset.
+        - `dedicated`: the key SETS the preset, so pressing it again changes
+          nothing. What leaves the preset is a speed key -- the current speed,
+          re-sent, so the fan carries on at the speed Home Assistant already shows
+          (#34, measured by @elmr91). Entering while the fan is stopped is deferred
+          rather than transmitted: the key is deaf then, and a press that cannot
+          land must not be recorded as one.
+        """
+        # `_pending_preset` is what keeps this from swallowing the deferred press:
+        # the preset was recorded when the fan was stopped, so the assumed state
+        # already says natural while the key has never been pressed.
+        if self._preset == preset_mode and self._pending_preset is None:
             return
-        sent = await self._async_transmit_action(self._natural_action_for())
-        if sent:
+
+        if not self._dedicated_preset:
+            sent = await self._async_transmit_action(self._natural_action_for())
+            if sent:
+                self._preset = preset_mode
+                self.async_write_ha_state()
+            return
+
+        if preset_mode == PRESET_NATURAL:
+            if not (self._is_on and self._percentage):
+                # Deferred, and shown: the fan is stopped, so the next start is what
+                # carries it. Mirrors how `per_speed` records a direction with the
+                # fan off, for the same reason -- the code that acts on it comes later.
+                self._preset = preset_mode
+                self._pending_preset = preset_mode
+                self.async_write_ha_state()
+                return
+            if await self._async_transmit_action(self._natural_action_for()):
+                self._preset = preset_mode
+                self._pending_preset = None
+                self.async_write_ha_state()
+            return
+
+        # Leaving: send the speed the fan is already assumed to be running at. With
+        # the fan stopped there is no speed to send, and nothing to leave.
+        self._pending_preset = None
+        if not (self._is_on and self._percentage):
+            self._preset = preset_mode
+            self.async_write_ha_state()
+            return
+        index = self._speed_index(self._percentage)
+        if await self._async_transmit_action(self._speed_action_for(index)):
             self._preset = preset_mode
             self.async_write_ha_state()
 
@@ -311,9 +381,15 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             return
 
         if action in (ACTION_FAN_NATURAL, ACTION_FAN_NATURAL_REVERSE):
+            # A `dedicated` key SETS the preset: following it as a flip drifts by
+            # one press every time the fan is already in the preset, which on this
+            # shape of remote is exactly when it gets pressed again.
             self._preset = (
-                PRESET_NORMAL if self._preset == PRESET_NATURAL else PRESET_NATURAL
+                PRESET_NATURAL
+                if self._dedicated_preset
+                else (PRESET_NORMAL if self._preset == PRESET_NATURAL else PRESET_NATURAL)
             )
+            self._pending_preset = None
             # Like a reverse speed code, the winter natural code says which
             # direction the remote is in as well as which preset was pressed. The
             # guard matters: on a `toggle` remote the direction is dead-reckoned
@@ -336,6 +412,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                     self._is_on = True
                     self._percentage = round(index * (100 / self._speed_count))
                     self._direction = DIRECTION_REVERSE
+                    self._leave_dedicated_preset()
                     self.async_write_ha_state()
                     return
 
@@ -345,5 +422,6 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                 self._percentage = round(idx * (100 / self._speed_count))
                 if self._per_speed_direction:
                     self._direction = DIRECTION_FORWARD
+                self._leave_dedicated_preset()
                 self.async_write_ha_state()
                 return

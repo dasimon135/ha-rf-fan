@@ -100,9 +100,19 @@ def test_split_actions_capabilities_off_by_default():
 
 def test_split_actions_direction_and_preset_required_when_enabled():
     required, _ = split_actions(6, light_control="none", direction_control="toggle",
-                                has_natural_preset=True)
+                                natural_control="toggle")
     assert ACTION_FAN_REVERSE in required
     assert ACTION_FAN_NATURAL in required
+
+
+def test_split_actions_asks_for_the_airflow_key_whatever_the_shape():
+    """`toggle` and `dedicated` press the same key; they differ in what a press means."""
+    for shape in ("toggle", "dedicated"):
+        required, _ = split_actions(6, light_control="none", natural_control=shape)
+        assert ACTION_FAN_NATURAL in required
+
+    required, _ = split_actions(6, light_control="none", natural_control="none")
+    assert ACTION_FAN_NATURAL not in required
 
 
 def test_split_actions_color_temp_and_sound_required_when_enabled():
@@ -120,13 +130,14 @@ def test_split_actions_timers_add_four_actions():
 
 def test_caps_from_data_defaults_off():
     assert caps_from_data({}) == {
-        "has_natural_preset": False, "has_timers": False, "has_sound": False,
+        "has_timers": False, "has_sound": False,
         "direction_control": "none", "color_control": "none", "light_level": "none",
+        "natural_control": "none",
     }
 
 
 def test_caps_from_data_reads_true():
-    assert caps_from_data({"has_natural_preset": True})["has_natural_preset"] is True
+    assert caps_from_data({"has_timers": True})["has_timers"] is True
 
 
 def test_caps_from_data_reads_the_selectors():
