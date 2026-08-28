@@ -168,6 +168,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moved. The bump is now gated on `color_control: cycle`, which is the shape it
   describes. Should a `relative` lamp ever be measured advancing on power-on, that
   becomes a capability of its own rather than something inferred.
+- **A card that never loaded, and a log that would not say why.** The option
+  *Disable automatic dashboard card loading* sits on a config entry, but the card is
+  registered once for the whole frontend -- so one fan opting out silences the card
+  for every fan. @elmr91 lost it on every dashboard because a single entry, set up
+  under an earlier release, still had the box ticked
+  ([#29](https://github.com/dasimon135/ha-rf-fan/issues/29)); the frontend showed a
+  missing card, and the integration mentioned the opt-out at `INFO` without naming
+  anybody. It is now a `WARNING` that lists the fans still holding the option, says
+  that the effect is global, and the README says the same in its troubleshooting
+  section. The behaviour itself is unchanged: one opt-out still disables the
+  auto-load everywhere, which is what a single frontend registration can express.
 
 ## [1.7.0] - 2026-08-23
 

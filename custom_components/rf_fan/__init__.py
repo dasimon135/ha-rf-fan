@@ -84,14 +84,26 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
     # Opt-out (integration options): keep serving the file so a manually
     # managed dashboard resource still works, but skip the auto-load.
-    if any(
-        entry.options.get(CONF_DISABLE_CARD, False)
+    #
+    # The option sits on a config entry but the card is registered once for the
+    # whole frontend, so one fan opting out silences it for every fan. Naming the
+    # entries is the whole value of this message: the card disappears from every
+    # dashboard at once, the frontend says nothing about why, and the checkbox to
+    # clear may be on a fan nobody has opened in months (#29). At INFO and
+    # anonymous it was unfindable.
+    opted_out = [
+        entry.title
         for entry in hass.config_entries.async_entries(DOMAIN)
-    ):
-        _LOGGER.info(
-            "RF Fan: automatic loading of the bundled card is disabled in the "
-            "integration options; the card file remains served at %s for "
-            "manual resource management",
+        if entry.options.get(CONF_DISABLE_CARD, False)
+    ]
+    if opted_out:
+        _LOGGER.warning(
+            "RF Fan: the bundled card will NOT load automatically for any fan, "
+            "because 'Disable automatic dashboard card loading' is set on: %s. "
+            "The option is per fan but its effect is global — clear it on every "
+            "fan listed and restart Home Assistant to get the card back. The card "
+            "file stays served at %s for manual resource management",
+            ", ".join(opted_out),
             CARD_URL,
         )
         return

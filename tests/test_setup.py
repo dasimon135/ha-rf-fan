@@ -12,8 +12,8 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rf_fan.const import DOMAIN
-from tests.ha_helpers import CODES, DEVICE, register_stub, setup_full
+from custom_components.rf_fan.const import CONF_DISABLE_CARD, DOMAIN
+from tests.ha_helpers import CODES, DEVICE, full_entry, register_stub, setup_full
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +37,35 @@ async def test_setup_does_not_error_when_the_frontend_is_absent(
 
     assert "failed to register the bundled Lovelace card" not in caplog.text
 
+
+async def test_the_card_opt_out_says_which_fan_switched_it_off(
+    hass: HomeAssistant, caplog
+) -> None:
+    """The checkbox is per fan; its effect is global. The log has to name whose.
+
+    @elmr91 lost the card on every dashboard because one of several fans still had
+    the option set from an earlier install ([#29](https://github.com/dasimon135/ha-rf-fan/issues/29)).
+    Nothing in the frontend says why a card is missing, and the entry to look at may
+    be one nobody has opened in months -- so the one place that can answer is the
+    log, and it was whispering it at INFO without naming anybody.
+    """
+    register_stub(hass)
+    living = full_entry(hass)
+    hass.config_entries.async_update_entry(living, title="Living room")
+    bedroom = full_entry(hass)
+    hass.config_entries.async_update_entry(
+        bedroom, title="Bedroom", options={CONF_DISABLE_CARD: True}
+    )
+
+    assert await hass.config_entries.async_setup(living.entry_id)
+    await hass.async_block_till_done()
+
+    named = [
+        record
+        for record in caplog.records
+        if record.levelname == "WARNING" and "Bedroom" in record.getMessage()
+    ]
+    assert named, "the fan holding the option open must be named, loudly enough to be seen"
 
 async def test_migrate_v1_entry_derives_the_gateway_service(hass: HomeAssistant) -> None:
     """A pre-v2 entry is brought all the way forward, one cumulative step at a time."""

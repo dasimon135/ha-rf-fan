@@ -201,7 +201,7 @@ An example automation **blueprint** (control the fan by temperature) is in
 
 ### The card looks like it did not update
 
-The console prints a banner on every load — `RF-FAN-CARD v1.8.0b5` — and that is the
+The console prints a banner on every load — `RF-FAN-CARD v1.8.0b6` — and that is the
 build you are actually looking at, whatever the integration reports. If it names an
 older version after an upgrade, a stale copy is being served, and it is almost
 always a **dashboard resource you registered by hand**: the integration loads the
@@ -222,6 +222,13 @@ enable **Disable automatic dashboard card loading** in the integration options
 (**Settings → Devices & services → RF Fan → Configure**) and restart Home
 Assistant. The setting is global: enabling it on any RF fan entry disables the
 auto-load for all of them.
+
+**If the card does not load at all**, this is the first thing to check, and with
+several fans it is easy to miss: the checkbox lives on each fan but silences the
+card for every one of them, so a box ticked on a fan you set up months ago is
+enough. The integration says so at startup — search the log for `RF Fan: the
+bundled card will NOT load` and it names the fans still holding the option. Clear
+it on all of them and restart.
 
 The card file remains served at `/rf_fan_frontend/rf-fan-card.js`, so you can
 still register it manually under **Settings → Dashboards → ⋮ → Resources** (type

@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.8.0b5";
+const VERSION = "1.8.0b6";
 // eslint-disable-next-line no-console
 console.info(`%c RF-FAN-CARD %c v${VERSION} `, "background:#2e6be6;color:#fff;border-radius:3px 0 0 3px", "background:#2bb0c6;color:#fff;border-radius:0 3px 3px 0");
 
