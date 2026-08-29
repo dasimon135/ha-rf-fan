@@ -146,6 +146,31 @@ off** — the mode only exists while it is running. Asking for the preset with t
 stopped therefore transmits nothing; it is remembered, and pressed for you on the
 next start, right after the speed code that gets the fan going.
 
+### Keys this integration has no concept of
+
+Some remotes carry a button nobody can describe — a memory key, an ioniser, a
+"comfort" mode that does something proprietary. There is nothing to model behind
+those, and pretending otherwise would be worse than saying so.
+
+Declare how many you have (**Extra buttons**, up to 8) and name them on the step
+that follows. Each becomes a Home Assistant button that transmits its code when
+pressed, under the name you gave it, and the bundled card shows them as chips at
+the bottom.
+
+That is the whole feature. There is no state behind an extra key, assumed or
+otherwise: a switch saying "memory on" would display a belief that nothing can
+establish and nothing can correct.
+
+**Renaming is free** — the code is stored against a stable index, your label lives
+beside it, and nothing is relearned. Reducing the count forgets the *last* key
+rather than renumbering the others: a learned code is never reassigned to a
+different button.
+
+Anything Home Assistant *does* have a concept of stays typed — speed, direction,
+colour, brightness, the airflow preset. A typed entity works in scenes, in voice
+assistants and in every native card; a labelled button works only for a human
+reading the label. This layer is for what is left, not a replacement for the rest.
+
 ## Requirements
 
 - Home Assistant **2026.5+**.

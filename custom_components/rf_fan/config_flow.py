@@ -20,6 +20,8 @@ from .actions import (
     caps_from_data,
     classify_reconfigure_actions,
     color_temp_steps,
+    extra_button_count,
+    extra_names,
     light_level_steps,
     pick_best_code,
     split_actions,
@@ -33,6 +35,8 @@ from .const import (
     CONF_DIRECTION_CONTROL,
     CONF_DISABLE_CARD,
     CONF_ESPHOME_DEVICE,
+    CONF_EXTRA_COUNT,
+    CONF_EXTRA_NAMES,
     CONF_FAN_NAME,
     CONF_GATEWAY_SERVICE,
     CONF_HAS_FAN_ON,
@@ -56,11 +60,14 @@ from .const import (
     LIGHT_CONTROL_OPTIONS,
     LIGHT_CONTROL_TOGGLE,
     LIGHT_LEVEL_OPTIONS,
+    MAX_EXTRA_COUNT,
     MAX_SPEED_COUNT,
     MAX_STEP_COUNT,
     MIN_SPEED_COUNT,
     MIN_STEP_COUNT,
     NATURAL_CONTROL_OPTIONS,
+    extra_action,
+    extra_default_name,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -90,6 +97,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._has_fan_on: bool = False
         self._has_light: bool = True
         self._caps: dict[str, object] = {}
+        self._extra_count: int = 0
+        self._extra_names: dict[str, str] = {}
         # How many positions the stepped controls model. Kept beside the
         # capabilities rather than inside them: `caps_from_data` feeds
         # `split_actions`, which decides which codes to learn, and neither count
@@ -203,6 +212,12 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_HAS_SOUND,
         ):
             fields[vol.Required(capability, default=bool(self._caps.get(capability, False)))] = bool
+        # Free-form keys: a count here, the names on the step that follows. A
+        # dropdown for the same reason as the speed count -- every one of these is a
+        # button somebody has to teach, so an accidental 40 is an expensive typo.
+        fields[vol.Required(CONF_EXTRA_COUNT, default=self._extra_count)] = vol.In(
+            list(range(0, MAX_EXTRA_COUNT + 1))
+        )
         return vol.Schema(fields)
 
     async def async_step_user(
@@ -241,6 +256,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
                     CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
                 }
+                self._extra_count = extra_button_count(dict(user_input))
+                if self._extra_count:
+                    return await self.async_step_extra_names()
+                self._extra_names = {}
                 return await self.async_step_method()
 
         return self.async_show_form(
@@ -250,6 +269,47 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 "detected": ", ".join(available_devices) if available_devices else "none",
             },
             errors=errors,
+        )
+
+    async def async_step_extra_names(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Name the free-form keys, once their number is known.
+
+        A separate step because the count decides how many fields there are, and a
+        config-flow schema is built before it can read the answer to a field on its
+        own form.
+
+        A blank name is accepted and falls back to a generic one: the label is
+        presentation, and no configuration should be blocked over one.
+        """
+        if user_input is not None:
+            self._extra_names = {}
+            for index in range(1, self._extra_count + 1):
+                action = extra_action(index)
+                label = str(user_input.get(action, "")).strip()
+                self._extra_names[action] = label or extra_default_name(index)
+            return await self.async_step_method()
+
+        fields: dict[Any, Any] = {}
+        for index in range(1, self._extra_count + 1):
+            action = extra_action(index)
+            fields[vol.Optional(action, default=self._extra_names.get(action, ""))] = str
+
+        return self.async_show_form(
+            step_id="extra_names", data_schema=vol.Schema(fields)
+        )
+
+    def _extra_names_summary(self) -> str:
+        """"1 = Memory - 2 = Ionisation", for a step description.
+
+        The learning screen labels each field from the translation keyed by its
+        action name, and Home Assistant has no per-field placeholder to slip a
+        user's label into. The mapping goes above the form instead.
+        """
+        return " - ".join(
+            f"{index} = {self._extra_names.get(extra_action(index)) or extra_default_name(index)}"
+            for index in range(1, self._extra_count + 1)
         )
 
     async def async_step_method(
@@ -316,7 +376,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         if self._pending_actions is not None:
             return self._pending_actions
         required_actions, optional_actions = split_actions(
-            self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
+            self._speed_count,
+            self._light_control,
+            has_fan_on=self._has_fan_on,
+            extra_count=self._extra_count,
+            **self._caps,
         )
         return required_actions + optional_actions
 
@@ -483,6 +547,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_HAS_LIGHT: self._has_light,
             **self._caps,
             **self._steps,
+            CONF_EXTRA_COUNT: self._extra_count,
+            CONF_EXTRA_NAMES: dict(self._extra_names),
             CONF_REPEAT_COUNT: self._repeat_count,
             CONF_CODES: codes,
         }
@@ -524,6 +590,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._steps = {
             CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(data)),
             CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(data)),
+        }
+        self._extra_count = extra_button_count(dict(data))
+        self._extra_names = {
+            action: label or extra_default_name(index)
+            for index, (action, label) in enumerate(extra_names(dict(data)).items(), start=1)
         }
         self._existing_codes = dict(data.get(CONF_CODES, {}))
         self._repeat_count = int(

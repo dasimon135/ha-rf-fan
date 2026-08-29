@@ -23,6 +23,8 @@ try:  # Home Assistant runtime: relative import within the package
         COLOR_CONTROL_RELATIVE,
         COLOR_TEMP_NAMED,
         CONF_COLOR_TEMP_STEPS,
+        CONF_EXTRA_COUNT,
+        CONF_EXTRA_NAMES,
         CONF_LIGHT_LEVEL_STEPS,
         DEFAULT_COLOR_TEMP_STEPS,
         DEFAULT_LIGHT_LEVEL_STEPS,
@@ -33,6 +35,7 @@ try:  # Home Assistant runtime: relative import within the package
         LIGHT_CONTROL_TOGGLE,
         LIGHT_LEVEL_NONE,
         LIGHT_LEVEL_RELATIVE,
+        MAX_EXTRA_COUNT,
         MAX_STEP_COUNT,
         MIN_STEP_COUNT,
         NATURAL_CONTROL_NONE,
@@ -41,6 +44,7 @@ try:  # Home Assistant runtime: relative import within the package
         STEP_UP,
         TIMER_HOURS,
         TOGGLE_ACTIONS,
+        extra_action,
         speed_action,
         timer_action,
     )
@@ -65,6 +69,8 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         COLOR_CONTROL_RELATIVE,
         COLOR_TEMP_NAMED,
         CONF_COLOR_TEMP_STEPS,
+        CONF_EXTRA_COUNT,
+        CONF_EXTRA_NAMES,
         CONF_LIGHT_LEVEL_STEPS,
         DEFAULT_COLOR_TEMP_STEPS,
         DEFAULT_LIGHT_LEVEL_STEPS,
@@ -75,6 +81,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         LIGHT_CONTROL_TOGGLE,
         LIGHT_LEVEL_NONE,
         LIGHT_LEVEL_RELATIVE,
+        MAX_EXTRA_COUNT,
         MAX_STEP_COUNT,
         MIN_STEP_COUNT,
         NATURAL_CONTROL_NONE,
@@ -83,6 +90,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         STEP_UP,
         TIMER_HOURS,
         TOGGLE_ACTIONS,
+        extra_action,
         speed_action,
         timer_action,
     )
@@ -99,6 +107,7 @@ def split_actions(
     light_level: str = LIGHT_LEVEL_NONE,
     has_timers: bool = False,
     has_sound: bool = False,
+    extra_count: int = 0,
 ) -> tuple[list[str], list[str]]:
     """Required actions based on the control style and the declared capabilities.
 
@@ -155,6 +164,8 @@ def split_actions(
         required.extend(timer_action(hours) for hours in TIMER_HOURS)
     if has_sound:
         required.append(ACTION_SOUND_TOGGLE)
+    # Last, and deliberately: these are the keys nothing above could describe.
+    required.extend(extra_action(index) for index in range(1, extra_count + 1))
     return required, []
 
 
@@ -283,6 +294,37 @@ def caps_from_data(data: dict[str, object]) -> dict[str, object]:
     return caps
 
 
+def extra_button_count(data: dict[str, object]) -> int:
+    """Number of free-form buttons declared for this fan, clamped on read.
+
+    Clamped rather than trusted, like the step counts: the value reaches here from
+    stored entry data, which outlives the dropdown that validated it. Anything
+    unreadable means none -- a fan with no extra keys is the normal case, and
+    inventing one would ask for a code nobody can teach.
+    """
+    try:
+        count = int(data.get(CONF_EXTRA_COUNT, 0))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(MAX_EXTRA_COUNT, count))
+
+
+def extra_names(data: dict[str, object]) -> dict[str, str]:
+    """Labels for the declared free-form buttons, keyed by action.
+
+    Only the declared ones: a name left behind by a count that shrank describes a
+    button that no longer exists.
+    """
+    stored = data.get(CONF_EXTRA_NAMES)
+    stored = stored if isinstance(stored, dict) else {}
+    names: dict[str, str] = {}
+    for index in range(1, extra_button_count(data) + 1):
+        action = extra_action(index)
+        label = stored.get(action)
+        names[action] = label.strip() if isinstance(label, str) and label.strip() else ""
+    return names
+
+
 def _step_count(data: dict[str, object], key: str, default: int) -> int:
     """Read one declared step count, clamped into the supported range.
 
@@ -334,6 +376,10 @@ def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:
     """
     caps = caps_from_data(data)
     ids = {f"{entry_id}_fan"}
+    ids.update(
+        f"{entry_id}_{extra_action(index)}"
+        for index in range(1, extra_button_count(data) + 1)
+    )
     # light.py defaults `has_light` to True for entries predating the flag.
     if data.get("has_light", True):
         ids.add(f"{entry_id}_light")

@@ -41,6 +41,9 @@ LIGHT_LEVEL = ("none", "relative")
 # 2 and 12 are the bounds; 6 was the old cap, and the range either side of it is
 # where the missing speed labels hid.
 SPEED_COUNTS = (2, 6, 12)
+# 0 and the cap: an extra key exists or it does not, and the cap is what makes the
+# label guarantee keepable at all.
+EXTRA_COUNTS = (0, 8)
 
 
 def _loaded(name: str) -> dict:
@@ -51,7 +54,17 @@ def _every_reachable_action() -> set[str]:
     """The union of what `split_actions` asks for across every capability combination."""
     actions: set[str] = set()
     for speed_count in SPEED_COUNTS:
-        for light, direction, natural, color, level, timers, sound, fan_on in itertools.product(
+        for (
+            light,
+            direction,
+            natural,
+            color,
+            level,
+            timers,
+            sound,
+            fan_on,
+            extras,
+        ) in itertools.product(
             LIGHT_CONTROL,
             DIRECTION_CONTROL,
             NATURAL_CONTROL,
@@ -60,6 +73,7 @@ def _every_reachable_action() -> set[str]:
             (False, True),
             (False, True),
             (False, True),
+            EXTRA_COUNTS,
         ):
             required, _optional = split_actions(
                 speed_count,
@@ -71,6 +85,7 @@ def _every_reachable_action() -> set[str]:
                 light_level=level,
                 has_timers=timers,
                 has_sound=sound,
+                extra_count=extras,
             )
             actions.update(required)
     return actions

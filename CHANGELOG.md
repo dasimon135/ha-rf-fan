@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Free-form extra buttons** ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18),
+  asked for by @elmr91 for the "memory" key on his remote). Declare up to eight keys
+  this integration has no concept of, name them, and each becomes a button that
+  transmits its code — shown in the bundled card as a chip carrying your own label.
+
+  Nothing is modelled behind one: no state, no position, no meaning. A switch saying
+  "memory on" would display a belief that nothing could establish and nothing could
+  correct. And no `±` pair either: past the typed colour and brightness controls, a
+  pair on a value Home Assistant has no concept of is a press counter nothing can
+  read.
+
+  The code is stored against a stable index (`extra_1`) with the label beside it, so
+  renaming is free and relearns nothing, and reducing the count forgets the *last*
+  key rather than renumbering — a learned code is never reassigned to a different
+  button. Counted as a toggle when repeating, because its effect is unknowable and
+  the two mistakes are not symmetric: an absolute code sent an odd number of times
+  lands where an even number would, while a real toggle sent an even number of times
+  nets zero flips and the button appears dead.
+
+  What Home Assistant *has* a concept of stays typed. A typed entity works in scenes,
+  in voice assistants and in every native card; a labelled button works only for a
+  human reading the label. The design is in
+  [`docs/plans/2026-08-29-extra-buttons-design.md`](docs/plans/2026-08-29-extra-buttons-design.md).
 - **An "Assumed light state" select** ([#45](https://github.com/dasimon135/ha-rf-fan/issues/45),
   asked for by @elmr91). A lamp driven by a single toggle key never reports back, so
   Home Assistant's belief and the lamp can drift apart. Pressing **off** on a lamp
