@@ -281,6 +281,109 @@ def _basic_entry(hass: HomeAssistant) -> MockConfigEntry:
     return entry
 
 
+async def test_reconfigure_can_add_an_extra_key(hass: HomeAssistant) -> None:
+    """Adding a free-form key to an existing fan (#18, reported by @elmr91 on b1).
+
+    The declaration form carries the count on both paths, and only the first one
+    read it: reconfiguring asked for no new code and stored nothing, so the count
+    silently returned to what it had been. A capability that can only be declared
+    when the fan is first created is not a capability, it is a trap for anyone who
+    already owns one.
+    """
+    entry = _basic_entry(hass)
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+        )
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Recon",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "direction_control": "none",
+                "natural_control": "none",
+                "color_control": "none",
+                "light_level": "none",
+                "has_timers": False,
+                "has_sound": False,
+                "extra_count": 1,
+            },
+        )
+
+        assert result["step_id"] == "extra_names", "the naming step was skipped"
+
+        result = await flow.async_configure(result["flow_id"], {"extra_1": "Mémoire"})
+        assert result["step_id"] == "reconfigure_review"
+
+        result = await flow.async_configure(result["flow_id"], {})
+        result = await flow.async_configure(result["flow_id"], {"method": "manual"})
+
+        assert result["step_id"] == "codes"
+        assert set(result["data_schema"].schema) == {"extra_1"}, (
+            "the new key was not the only code left to learn"
+        )
+
+        result = await flow.async_configure(result["flow_id"], {"extra_1": "C_mem"})
+
+    assert entry.data["extra_count"] == 1
+    assert entry.data["extra_names"] == {"extra_1": "Mémoire"}
+    assert entry.data["codes"]["extra_1"] == "C_mem"
+
+
+async def test_reconfigure_can_take_an_extra_key_away(hass: HomeAssistant) -> None:
+    """And the way back: the count returns to zero and the code is forgotten."""
+    entry = _basic_entry(hass)
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            **entry.data,
+            "extra_count": 1,
+            "extra_names": {"extra_1": "Mémoire"},
+            "codes": {**entry.data["codes"], "extra_1": "C_mem"},
+        },
+    )
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+        )
+        result = await flow.async_configure(
+            result["flow_id"],
+            {
+                "fan_name": "Recon",
+                "speed_count": 3,
+                "light_control": "toggle",
+                "has_fan_on": False,
+                "direction_control": "none",
+                "natural_control": "none",
+                "color_control": "none",
+                "light_level": "none",
+                "has_timers": False,
+                "has_sound": False,
+                "extra_count": 0,
+            },
+        )
+
+        assert result["step_id"] == "reconfigure_review", "a naming step for no keys"
+        result = await flow.async_configure(result["flow_id"], {})
+
+    assert entry.data["extra_count"] == 0
+    assert "extra_1" not in entry.data["codes"]
+
+
 async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
     """Reconfigure by enabling the timers: only the delta is requested, codes merged."""
     entry = _basic_entry(hass)

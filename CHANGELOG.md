@@ -82,6 +82,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the old mechanism: that resource list is the user's file, not this integration's
   to write to.
 
+### Fixed
+
+- **Free-form keys could not be added to a fan that already existed**
+  ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18), found by @elmr91 on
+  `v1.8.1b1`). The declaration form carries the count on both paths and only the
+  creation path read it, so reconfiguring asked for no new code and stored nothing —
+  the count silently returned to what it had been. The same omission had a second
+  home: the reconfigure recap computed the required actions without the count, so
+  even a count that survived would never have asked for the key's code.
+
+  Both call sites now go through one `_required_actions()`, because that is the
+  shape of the bug: a capability added to one of two identical calls, and nothing
+  to see at the other. A capability that can only be declared when the fan is first
+  created is not a capability, it is a trap for anyone who already owns one.
+
 ## [1.8.0] - 2026-08-28
 
 ### Added

@@ -289,6 +289,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 action = extra_action(index)
                 label = str(user_input.get(action, "")).strip()
                 self._extra_names[action] = label or extra_default_name(index)
+            # Reconfiguring rejoins its own recap, which is where a kept code is
+            # offered for re-learning and a forgotten one is dropped.
+            if self._reconfigure:
+                return await self.async_step_reconfigure_review()
             return await self.async_step_method()
 
         fields: dict[Any, Any] = {}
@@ -371,18 +375,29 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    def _actions_to_process(self) -> list[str]:
-        """List the actions to process, in order."""
-        if self._pending_actions is not None:
-            return self._pending_actions
-        required_actions, optional_actions = split_actions(
+    def _required_actions(self) -> list[str]:
+        """Every action the declared fan needs a code for, in learning order.
+
+        One place, deliberately. This used to be spelled out at each call site, and
+        a capability added to one of them was simply missing from the other: the
+        reconfigure recap never asked for a free-form key's code, so the key could
+        be declared and never learned (#18, found by @elmr91 on 1.8.1b1). A second
+        caller that forgets an argument is not a mistake anyone can see.
+        """
+        required_actions, _ = split_actions(
             self._speed_count,
             self._light_control,
             has_fan_on=self._has_fan_on,
             extra_count=self._extra_count,
             **self._caps,
         )
-        return required_actions + optional_actions
+        return required_actions
+
+    def _actions_to_process(self) -> list[str]:
+        """List the actions to process, in order."""
+        if self._pending_actions is not None:
+            return self._pending_actions
+        return self._required_actions()
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
@@ -659,15 +674,20 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
             CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
         }
+        # The same form carries the count on both paths, and only the creation path
+        # used to read it: reconfiguring asked for no new code and stored nothing,
+        # so the count silently returned to what it had been (#18, on 1.8.1b1).
+        self._extra_count = extra_button_count(dict(user_input))
+        if self._extra_count:
+            return await self.async_step_extra_names()
+        self._extra_names = {}
         return await self.async_step_reconfigure_review()
 
     async def async_step_reconfigure_review(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Recap: to learn / kept (re-learn?) / forgotten, then capture."""
-        required_actions, _ = split_actions(
-            self._speed_count, self._light_control, has_fan_on=self._has_fan_on, **self._caps
-        )
+        required_actions = self._required_actions()
         to_learn, kept, forgotten = classify_reconfigure_actions(
             required_actions, self._existing_codes
         )
