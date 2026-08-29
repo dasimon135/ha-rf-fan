@@ -2,7 +2,8 @@
   "domain": "rf_fan",
   "name": "RF Fan",
   "after_dependencies": [
-    "frontend"
+    "frontend",
+    "lovelace"
   ],
   "codeowners": [
     "@dasimon135"

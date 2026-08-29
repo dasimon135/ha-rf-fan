@@ -271,6 +271,22 @@ naming both versions in the console.
 Remove the resource under **Settings → Dashboards → ⋮ → Resources**, or bump its
 `?v=` suffix, then hard-reload (and clear the app cache on the companion app).
 
+### How the card is loaded
+
+The integration registers the card as a **Lovelace resource** — the same mechanism
+HACS uses for every custom card it installs. That matters for one reason: Lovelace
+loads its own resources and *waits* for them before rendering a card, so the card
+is always defined by the time your dashboard draws it.
+
+You do not need to add a resource by hand, and if you already have one pointing at
+`/rf_fan_frontend/rf-fan-card.js` it is adopted rather than duplicated: its URL is
+moved to the current version on every upgrade. Removing the last RF Fan takes the
+resource with it.
+
+Where a resource cannot be created — a Lovelace configuration in YAML mode, whose
+resource list is your file and not the integration's to write — the card falls back
+to the frontend's module list, which is how it was loaded before.
+
 ### Disabling automatic card loading
 
 The card is auto-loaded for the whole frontend when the integration starts. If you

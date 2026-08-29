@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.core import CoreState, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
@@ -69,8 +70,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the card file and add it as a frontend module."""
-    from homeassistant.components import frontend
+    """Serve the card file, then get the browser to load it.
+
+    Two mechanisms, and they are not equivalent. A Lovelace resource is loaded by
+    Lovelace itself, which waits for it before rendering any card; a frontend
+    module URL is handed to the shell and nothing waits for it. The second is what
+    the integration used to do, and what lost @elmr91 the card on about one hard
+    reload in three (#44).
+    """
     from homeassistant.components.http import StaticPathConfig
     from homeassistant.loader import async_get_integration
 
@@ -112,20 +119,87 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         )
         return
 
-    # `after_dependencies` only ORDERS the setup when the frontend is set up at
-    # all; it does not guarantee it exists. Without it there is no module list to
-    # add the card to — expected on a headless install, not an error.
+    integration = await async_get_integration(hass, DOMAIN)
+    # Cache-bust with the integration version from manifest.json: single source of
+    # truth, so the browser refetches the card on every release.
+    url = f"{CARD_URL}?v={integration.version}"
+
+    if await _async_register_resource(hass, url):
+        return
+
+    # Lovelace is not up yet, or is not there at all. Try once more when Home
+    # Assistant has finished starting, and only fall back if that fails too --
+    # doing both would put two copies of the card in the same page, and the loser
+    # of that race cannot be replaced.
+    if hass.state is CoreState.running:
+        _async_add_module_url(hass, url)
+        return
+
+    async def _retry(_event: Any) -> None:
+        if not await _async_register_resource(hass, url):
+            _async_add_module_url(hass, url)
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _retry)
+
+
+async def _async_register_resource(hass: HomeAssistant, url: str) -> bool:
+    """Register the card as a Lovelace resource. True when it is registered.
+
+    This is how HACS delivers every custom card, and the difference is not
+    cosmetic: Lovelace loads its own resources and WAITS for them before it renders
+    a card, while nothing waits for a frontend module URL. @elmr91 lost the card on
+    about one hard reload in three through the module list, and never once through
+    a resource he had registered by hand (#44).
+
+    Storage mode only. In YAML mode the resource list is the user's file and this
+    integration has no business writing to it, so the caller falls back.
+    """
+    try:
+        from homeassistant.components.lovelace.const import (
+            LOVELACE_DATA,
+            MODE_STORAGE,
+        )
+    except ImportError:  # pragma: no cover - lovelace is a core component
+        return False
+
+    data = hass.data.get(LOVELACE_DATA)
+    if data is None or data.resource_mode != MODE_STORAGE:
+        return False
+
+    resources = data.resources
+    # Matched on the PATH, not the whole URL: the version query changes with every
+    # release, and a copy the user registered by hand carries a different one (or
+    # none). Adopting that copy is what keeps a hand-registered entry from becoming
+    # a second, stale card -- the exact failure of issue #29.
+    for item in resources.async_items():
+        if str(item.get("url", "")).split("?")[0] != CARD_URL:
+            continue
+        if item.get("url") != url:
+            await resources.async_update_item(item["id"], {"url": url})
+            _LOGGER.debug("Updated the card resource to %s", url)
+        return True
+
+    await resources.async_create_item({"res_type": "module", "url": url})
+    _LOGGER.debug("Registered the card as a Lovelace resource: %s", url)
+    return True
+
+
+def _async_add_module_url(hass: HomeAssistant, url: str) -> None:
+    """Fall back to the frontend's extra module list.
+
+    `after_dependencies` only ORDERS the setup when the frontend is set up at all;
+    it does not guarantee it exists. Without it there is no module list to add the
+    card to -- expected on a headless install, not an error.
+    """
+    from homeassistant.components import frontend
+
     if "frontend" not in hass.config.components:
         _LOGGER.debug(
             "Frontend not loaded: the card stays served at %s but is not auto-loaded",
             CARD_URL,
         )
         return
-
-    # Cache-bust with the integration version from manifest.json: single
-    # source of truth, so the browser refetches the card on every release.
-    integration = await async_get_integration(hass, DOMAIN)
-    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")
+    frontend.add_extra_js_url(hass, url)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -227,6 +301,41 @@ async def async_setup_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> boo
     _async_remove_stale_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Take the card's Lovelace resource with the last fan that needed it.
+
+    A resource is persistent and outlives the integration that created it. Left
+    behind, it points at a file nothing serves any more, and Home Assistant reports
+    that on every dashboard — to a user who has just uninstalled the thing
+    responsible and has no way to connect the two.
+
+    Only when the last entry goes: one registration serves every fan.
+    """
+    if [
+        other
+        for other in hass.config_entries.async_entries(DOMAIN)
+        if other.entry_id != entry.entry_id
+    ]:
+        return
+
+    try:
+        from homeassistant.components.lovelace.const import (
+            LOVELACE_DATA,
+            MODE_STORAGE,
+        )
+    except ImportError:  # pragma: no cover - lovelace is a core component
+        return
+
+    data = hass.data.get(LOVELACE_DATA)
+    if data is None or data.resource_mode != MODE_STORAGE:
+        return
+
+    for item in list(data.resources.async_items()):
+        if str(item.get("url", "")).split("?")[0] == CARD_URL:
+            await data.resources.async_delete_item(item["id"])
+            _LOGGER.debug("Removed the card resource with the last RF Fan entry")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:

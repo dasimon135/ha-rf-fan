@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surviving a `hass` whose registry has arrived ahead of the state machine, one with
   no states at all, and one with no registry — and to coming back when they turn up.
 
+### Changed
+
+- **The card is delivered as a Lovelace resource** rather than a frontend module
+  URL ([#44](https://github.com/dasimon135/ha-rf-fan/issues/44), reported and
+  narrowed by @elmr91, who lost the card on about one hard reload in three). Each of
+  his measurements removed a suspect: not the cache, not the `?v=` cache-busting,
+  not his Nginx (he reproduced it over direct HTTP), and not the card failing on a
+  half-loaded Home Assistant. What was left was the loader itself, and the
+  difference there is structural — Lovelace loads its own resources and **waits**
+  for them before rendering a card, while nothing waits for a frontend module URL.
+  It is also what HACS does for every custom card, and what worked on his install
+  every single time.
+
+  An existing resource for the same path is adopted rather than duplicated, and
+  moved to the current version on upgrade — so a copy registered by hand stops being
+  a second, stale card. Removing the last fan takes the resource with it, rather
+  than leaving a 404 on every dashboard. A Lovelace configuration in YAML mode keeps
+  the old mechanism: that resource list is the user's file, not this integration's
+  to write to.
+
 ## [1.8.0] - 2026-08-28
 
 ### Added
