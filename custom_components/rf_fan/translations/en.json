@@ -7,6 +7,7 @@
         "data": {
           "esphome_device": "ESPHome device name",
           "fan_name": "Fan display name",
+          "extra_count": "Keys this integration has no concept of - a memory button, an ioniser, anything the fan does that Home Assistant cannot name. Each becomes a button you name yourself, and the names are asked for next.",
           "speed_count": "Number of discrete speeds",
           "light_control": "Light control",
           "has_fan_on": "Fan has a dedicated on button",
@@ -16,8 +17,23 @@
           "color_temp_steps": "Number of colour positions",
           "light_level": "Light brightness",
           "light_level_steps": "Number of brightness steps",
+          "extra_count": "Extra buttons",
           "has_timers": "Sleep timers (1h/2h/4h/8h)",
           "has_sound": "Sound (beep)"
+        }
+      },
+      "extra_names": {
+        "title": "RF Fan - Name the extra buttons",
+        "description": "One name per key, as it will appear in Home Assistant. Leave a name blank to accept the generic one.",
+        "data": {
+          "extra_1": "Extra key 1",
+          "extra_2": "Extra key 2",
+          "extra_3": "Extra key 3",
+          "extra_4": "Extra key 4",
+          "extra_5": "Extra key 5",
+          "extra_6": "Extra key 6",
+          "extra_7": "Extra key 7",
+          "extra_8": "Extra key 8"
         }
       },
       "method": {
@@ -91,7 +107,15 @@
           "timer_2h": "Code for 2h timer",
           "timer_4h": "Code for 4h timer",
           "timer_8h": "Code for 8h timer",
-          "sound_toggle": "Code for sound toggle"
+          "sound_toggle": "Code for sound toggle",
+          "extra_1": "Code for extra key 1",
+          "extra_2": "Code for extra key 2",
+          "extra_3": "Code for extra key 3",
+          "extra_4": "Code for extra key 4",
+          "extra_5": "Code for extra key 5",
+          "extra_6": "Code for extra key 6",
+          "extra_7": "Code for extra key 7",
+          "extra_8": "Code for extra key 8"
         }
       },
       "reconfigure_review": {
@@ -139,7 +163,15 @@
           "relearn_timer_2h": "Re-learn: 2h timer",
           "relearn_timer_4h": "Re-learn: 4h timer",
           "relearn_timer_8h": "Re-learn: 8h timer",
-          "relearn_sound_toggle": "Re-learn: sound"
+          "relearn_sound_toggle": "Re-learn: sound",
+          "relearn_extra_1": "Re-learn: extra key 1",
+          "relearn_extra_2": "Re-learn: extra key 2",
+          "relearn_extra_3": "Re-learn: extra key 3",
+          "relearn_extra_4": "Re-learn: extra key 4",
+          "relearn_extra_5": "Re-learn: extra key 5",
+          "relearn_extra_6": "Re-learn: extra key 6",
+          "relearn_extra_7": "Re-learn: extra key 7",
+          "relearn_extra_8": "Re-learn: extra key 8"
         }
       },
       "reconfigure": {
@@ -220,6 +252,30 @@
       },
       "recalibrate_color": {
         "name": "Recalibrate colour (to the first position)"
+      },
+      "extra_1": {
+        "name": "Extra key 1"
+      },
+      "extra_2": {
+        "name": "Extra key 2"
+      },
+      "extra_3": {
+        "name": "Extra key 3"
+      },
+      "extra_4": {
+        "name": "Extra key 4"
+      },
+      "extra_5": {
+        "name": "Extra key 5"
+      },
+      "extra_6": {
+        "name": "Extra key 6"
+      },
+      "extra_7": {
+        "name": "Extra key 7"
+      },
+      "extra_8": {
+        "name": "Extra key 8"
       },
       "resync_brightness": {
         "name": "Resynchronise brightness (to the lowest step)"

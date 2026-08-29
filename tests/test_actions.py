@@ -4,8 +4,10 @@ from actions import (
     color_temp_options,
     color_temp_steps,
     expected_unique_ids,
+    extra_button_count,
     light_level_steps,
     split_actions,
+    transmit_repeat_count,
     validate_codes,
     walk_steps,
 )
@@ -26,6 +28,7 @@ from const import (
     COLOR_TEMP_NAMED,
     DEFAULT_COLOR_TEMP_STEPS,
     DEFAULT_LIGHT_LEVEL_STEPS,
+    MAX_EXTRA_COUNT,
     MAX_STEP_COUNT,
     MIN_STEP_COUNT,
     STEP_DOWN,
@@ -120,6 +123,62 @@ def test_split_actions_color_temp_and_sound_required_when_enabled():
                                 has_sound=True)
     assert ACTION_LIGHT_KELVIN in required
     assert ACTION_SOUND_TOGGLE in required
+
+
+def test_an_extra_key_is_counted_as_a_toggle():
+    """Its effect is unknowable, and the two mistakes are not symmetric.
+
+    Odd repeats of an absolute code land where even repeats would. Even repeats of
+    a real toggle net zero flips, and the button looks dead with nothing to see.
+    """
+    assert transmit_repeat_count("extra_1", 4) == 3
+    assert transmit_repeat_count("extra_8", 2) == 1
+
+
+def test_split_actions_asks_for_one_code_per_extra_key():
+    """A free-form key is a code and a name; the code is all `split_actions` knows."""
+    required, _ = split_actions(3, light_control="none", extra_count=2)
+
+    assert "extra_1" in required
+    assert "extra_2" in required
+    assert "extra_3" not in required
+
+
+def test_split_actions_without_extra_keys_asks_for_none():
+    required, _ = split_actions(3, light_control="none", extra_count=0)
+
+    assert [action for action in required if action.startswith("extra_")] == []
+
+
+def test_extra_button_count_is_clamped_on_read():
+    """Stored data outlives the dropdown that validated it, so it is never trusted.
+
+    The cap is not only prudence: every reachable action must carry a label in
+    three translation files, which an unbounded count could not satisfy.
+    """
+    assert extra_button_count({"extra_count": 3}) == 3
+    assert extra_button_count({}) == 0
+    assert extra_button_count({"extra_count": 99}) == MAX_EXTRA_COUNT
+    assert extra_button_count({"extra_count": -1}) == 0
+    assert extra_button_count({"extra_count": "two"}) == 0
+
+
+def test_extra_keys_own_one_registry_row_each():
+    ids = expected_unique_ids("e1", {"has_light": False, "extra_count": 2})
+
+    assert ids == {"e1_fan", "e1_extra_1", "e1_extra_2"}
+
+
+def test_shrinking_the_count_gives_up_the_last_row_only():
+    """The count is a length, never a renumbering.
+
+    Reassigning a learned code to a different button is the worst defect this
+    feature could have, and nothing in the interface would report it.
+    """
+    three = expected_unique_ids("e1", {"has_light": False, "extra_count": 3})
+    two = expected_unique_ids("e1", {"has_light": False, "extra_count": 2})
+
+    assert three - two == {"e1_extra_3"}
 
 
 def test_split_actions_timers_add_four_actions():

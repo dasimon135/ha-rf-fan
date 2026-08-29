@@ -1,4 +1,4 @@
-"""Button platform for RF Fan (sleep timers)."""
+"""Button platform for RF Fan (sleep timers, calibration, free-form keys)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .actions import caps_from_data
+from .actions import caps_from_data, extra_button_count, extra_names
 from .const import (
     ACTION_LIGHT_BRIGHT_DOWN,
     COLOR_CONTROL_NONE,
@@ -20,6 +20,8 @@ from .const import (
     LIGHT_LEVEL_RELATIVE,
     STEP_GAP_SEC,
     TIMER_HOURS,
+    extra_action,
+    extra_default_name,
     timer_action,
 )
 from .entity import RfFanBaseEntity
@@ -44,6 +46,13 @@ async def async_setup_entry(
 
     if caps["light_level"] == LIGHT_LEVEL_RELATIVE:
         entities.append(RfFanBrightnessResyncButton(hass, config_entry))
+
+    data = dict(config_entry.data)
+    names = extra_names(data)
+    entities.extend(
+        RfFanExtraButton(hass, config_entry, index, names.get(extra_action(index), ""))
+        for index in range(1, extra_button_count(data) + 1)
+    )
 
     if entities:
         async_add_entities(entities)
@@ -122,3 +131,55 @@ class RfFanBrightnessResyncButton(RfFanBaseEntity, ButtonEntity):
             return
         self._runtime.level_position = 0
         async_dispatcher_send(self.hass, self._level_signal())
+
+
+class RfFanExtraButton(RfFanBaseEntity, ButtonEntity):
+    """A remote key this integration has no concept of, replayed under its owner's name.
+
+    Everything else here means something: a timer ends, a calibration declares a
+    position. This one means "send that code", and it is the honest shape for a key
+    whose effect nobody can describe -- @elmr91's remote has a "memory" button and
+    neither Home Assistant nor this integration knows what the fan does with it
+    (issue #18).
+
+    So there is no state, assumed or otherwise: a checkbox saying "memory on" would
+    display a belief that nothing can establish and nothing can correct.
+
+    The name is the user's; the `translation_key` stays set anyway, because the
+    bundled card identifies these by key rather than by elimination -- guessing a
+    button's role from what it is NOT is what once wired a colour row to the button
+    that walks the lamp down to its end stop (#29).
+
+    The key carries the INDEX (`extra_3`), not just the family. The frontend's
+    registry hands a card `translation_key`, `platform` and `entity_category` but
+    never the unique id, so the index in the key is the only thing that can put the
+    chips in the order of the keys on the remote rather than in alphabetical order
+    of whatever their owner called them.
+    """
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        index: int,
+        label: str,
+    ) -> None:
+        """Initialize one free-form button."""
+        super().__init__(hass, config_entry)
+        self._action = extra_action(index)
+        self._attr_unique_id = f"{config_entry.entry_id}_{self._action}"
+        self._attr_translation_key = self._action
+        # An explicit name outranks the translation key, which is what lets the
+        # entity carry the user's label while staying identifiable by that key.
+        self._attr_name = label or extra_default_name(index)
+
+    async def async_press(self) -> None:
+        """Transmit the learned code.
+
+        Counted as a toggle (`TOGGLE_ACTIONS`), which is the safe default for a key
+        whose effect is unknowable: the two mistakes are not symmetric. An absolute
+        code sent an odd number of times lands exactly where an even number would,
+        while a real toggle sent an even number of times nets zero flips and the
+        button appears dead -- with nothing to debug from the outside.
+        """
+        await self._async_transmit_action(self._action)

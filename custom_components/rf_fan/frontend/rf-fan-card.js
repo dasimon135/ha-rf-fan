@@ -121,6 +121,17 @@ class RfFanCard extends HTMLElement {
       return from(name) || from(e);
     };
 
+    // Free-form keys (#18). Matched on the key alone, never by elimination: the
+    // index lives in the key because the frontend registry never hands a card the
+    // unique id, and it is what puts the chips in the order of the keys on the
+    // remote instead of alphabetical order of whatever they were named. Where no
+    // key is exposed, nothing is drawn -- see the colour row above for what
+    // guessing a button's role costs.
+    const extras = buttons
+      .map((e) => ({ id: e, index: Number((/^extra_(\d+)$/.exec(keyOf(e) || "") || [])[1]) }))
+      .filter((x) => Number.isFinite(x.index))
+      .sort((a, b) => a.index - b.index);
+
     const timers = buttons
       .filter(isTimer)
       .map((e) => ({ id: e, h: hoursOf(e) }))
@@ -152,6 +163,7 @@ class RfFanCard extends HTMLElement {
       color: colorSelect,
       sound: firstOf("switch", cfg.sound_entity),
       timers,
+      extras,
       calibrate,
       timerSensor: siblings.find((e) => e.startsWith("sensor.")),
     };
@@ -360,6 +372,16 @@ class RfFanCard extends HTMLElement {
       );
     }
 
+    // One chip per free-form key, labelled with its own name -- which is the user's,
+    // so the card gains no string to translate.
+    const extraChips = (ent.extras || [])
+      .map((x) => {
+        const st = this._hass.states[x.id];
+        const label = (st && st.attributes && st.attributes.friendly_name) || x.id;
+        return `<button class="chip" data-extra="${esc(x.id)}">${esc(label)}</button>`;
+      })
+      .join("");
+
     let timerRow = "";
     if (ent.timers.length) {
       timerRow = `<div class="timers">` + ent.timers
@@ -400,6 +422,7 @@ class RfFanCard extends HTMLElement {
       ${compact ? "" : brightRow}
       ${compact ? "" : colorRow}
       ${compact || !modeChips.length ? "" : `<div class="chips">${modeChips.join("")}</div>`}
+      ${compact || !extraChips ? "" : `<div class="chips extras">${extraChips}</div>`}
       ${compact ? "" : timerLine}
       ${compact ? "" : timerRow}
     `;
@@ -534,10 +557,11 @@ class RfFanCard extends HTMLElement {
       this._held = false;
       return;
     }
-    const t = e.target.closest("[data-act],[data-speed],[data-color],[data-dir],[data-preset],[data-timer],[data-tspeed]");
+    const t = e.target.closest("[data-act],[data-speed],[data-color],[data-dir],[data-preset],[data-timer],[data-tspeed],[data-extra]");
     if (!t) return;
     const ent = this._discover();
-    if (t.dataset.act === "power") this._call("fan", "toggle", { entity_id: ent.fan });
+    if (t.dataset.extra) this._call("button", "press", { entity_id: t.dataset.extra });
+    else if (t.dataset.act === "power") this._call("fan", "toggle", { entity_id: ent.fan });
     else if (t.dataset.act === "tileinfo") this._onTileTap();
     else if (t.dataset.tspeed) {
       const { step, count, index } = this._speedInfo(this._hass.states[ent.fan]);
@@ -632,6 +656,8 @@ class RfFanCard extends HTMLElement {
       .cseg:last-child { border-right:none; }
       .cseg.active { background: var(--primary-color); color: var(--text-primary-color,#fff); }
       .csegs.many .cseg { padding:8px 1px; font-size:.75rem; }
+      .chips.extras { flex-wrap:wrap; }
+      .chips.extras .chip { flex:0 1 auto; }
       .csegs.inert .cseg { opacity:.45; cursor:not-allowed; }
       .csegs.inert .cseg:hover { filter:none; }
       .csegs.inert .cseg:active { transform:none; }

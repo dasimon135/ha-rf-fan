@@ -23,10 +23,21 @@ One `button` entity per extra key.
 
 - `unique_id = {entry_id}_extra_N`
 - displayed name = the user's label (`_attr_name`)
-- `translation_key = "extra"`, kept so the card can recognise them without guessing
-- pressing transmits `extra_N` at the configured `repeat_count`, as an **absolute**
-  code: nothing is known about whether the key toggles anything, and rounding the
-  count down to odd would be one more assumption.
+- `translation_key = "extra_N"` — the index, not just the family, kept so the
+  card can recognise them without guessing **and** order them. Corrected during
+  implementation: the frontend registry hands a card the translation key, the
+  platform and the entity category, but never the unique id, so nothing else
+  could put the chips in the order of the keys on the remote.
+- pressing transmits `extra_N` at the configured `repeat_count`, counted as a
+  **toggle**.
+
+**Corrected during implementation.** This first said "absolute, because nothing is
+known about whether the key toggles anything". `const.TOGGLE_ACTIONS` already
+carried the argument against it, written for the winter natural key: the two
+mistakes are not symmetric. An absolute code sent an odd number of times lands
+exactly where an even number would — harmless. A real toggle sent an even number of
+times nets zero flips, and the button appears dead with nothing to debug from the
+outside. Where the effect is unknowable *by definition*, that asymmetry decides it.
 
 No `switch`, no `number`, no restored state. A key whose effect is unknowable cannot
 have an assumed state — a "memory on" checkbox would display a belief nothing can

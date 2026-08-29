@@ -139,6 +139,34 @@ LIGHT_LEVEL_STEPS: Final = DEFAULT_LIGHT_LEVEL_STEPS
 MIN_STEP_COUNT: Final = 2
 MAX_STEP_COUNT: Final = 20
 
+# Free-form keys: a remote button this integration has no concept of, learned and
+# replayed under a name its owner chooses (issue #18 -- @elmr91's "memory" key).
+# Nothing is modelled behind it: no state, no position, no meaning. What Home
+# Assistant HAS a concept of stays typed, because a typed entity works in scenes,
+# in voice assistants and in every native card, where a labelled button works only
+# for a human reading the label.
+CONF_EXTRA_COUNT: Final = "extra_count"
+CONF_EXTRA_NAMES: Final = "extra_names"
+# Capped, and not only to keep the form sane: every reachable action must carry a
+# label in all three translation files, which an unbounded count could not satisfy.
+MAX_EXTRA_COUNT: Final = 8
+
+
+def extra_action(index: int) -> str:
+    """Action key for the nth free-form button (1-based).
+
+    The index is what the learned code is stored against, so it never moves: the
+    label lives beside it and renaming is free. Reducing the count forgets the
+    LAST key rather than renumbering -- reassigning a learned code to a different
+    button would make it emit the wrong one, silently.
+    """
+    return f"extra_{index}"
+
+
+def extra_default_name(index: int) -> str:
+    """Fallback label for a key whose name was left blank."""
+    return f"Extra key {index}"
+
 # New actions
 ACTION_FAN_REVERSE: Final = "fan_reverse"
 ACTION_FAN_NATURAL: Final = "fan_natural"
@@ -202,6 +230,12 @@ TOGGLE_ACTIONS: Final = frozenset(
         # and the key does nothing at all. So the safe default is in here.
         ACTION_FAN_NATURAL_REVERSE,
     }
+    # The free-form keys, for the same reason and with more force: their effect is
+    # unknowable BY DEFINITION, so the asymmetry above is the whole argument. An
+    # absolute code sent an odd number of times lands where an even number would;
+    # a real toggle sent an even number of times nets zero flips and the button
+    # looks dead. Nobody could debug that from the outside.
+    | {extra_action(index) for index in range(1, MAX_EXTRA_COUNT + 1)}
 )
 
 # Natural airflow preset

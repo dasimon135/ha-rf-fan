@@ -108,6 +108,95 @@ async def test_learn_flow_advances_and_creates_entry(hass: HomeAssistant) -> Non
     assert codes["fan_speed_3"] == "C_fan_speed_3"
 
 
+async def test_extra_keys_are_named_then_learned(hass: HomeAssistant) -> None:
+    """A count on the declaration form, the names on a step of their own (#18).
+
+    Two screens rather than one because a config-flow schema is built before it can
+    read the answer to a field on its own form: the number of name fields is not
+    known until the count has been submitted.
+    """
+    hass.services.async_register(
+        "esphome", "esp32_test_transmit_rf_fan", lambda call: None
+    )
+    await hass.async_block_till_done()
+    flow = hass.config_entries.flow
+    result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "esphome_device": DEVICE,
+            "fan_name": "Extras",
+            "speed_count": 3,
+            "light_control": "none",
+            "has_fan_on": False,
+            "direction_control": "none",
+            "natural_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "has_timers": False,
+            "has_sound": False,
+            "extra_count": 2,
+        },
+    )
+
+    assert result["step_id"] == "extra_names", "the naming step was skipped"
+
+    # The second name is left blank: a label must never block a configuration.
+    result = await flow.async_configure(
+        result["flow_id"], {"extra_1": "Mémoire", "extra_2": ""}
+    )
+    result = await flow.async_configure(result["flow_id"], {"method": "manual"})
+    assert result["step_id"] == "codes"
+
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "fan_off": "C_off",
+            "fan_speed_1": "C_s1",
+            "fan_speed_2": "C_s2",
+            "fan_speed_3": "C_s3",
+            "extra_1": "C_x1",
+            "extra_2": "C_x2",
+        },
+    )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    data = result["data"]
+    assert data["extra_count"] == 2
+    assert data["extra_names"] == {"extra_1": "Mémoire", "extra_2": "Extra key 2"}
+    assert data["codes"]["extra_1"] == "C_x1"
+    assert data["codes"]["extra_2"] == "C_x2"
+
+
+async def test_no_extra_keys_skips_the_naming_step(hass: HomeAssistant) -> None:
+    """The normal case sees exactly the flow it saw before this existed."""
+    hass.services.async_register(
+        "esphome", "esp32_test_transmit_rf_fan", lambda call: None
+    )
+    await hass.async_block_till_done()
+    flow = hass.config_entries.flow
+    result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "esphome_device": DEVICE,
+            "fan_name": "Plain",
+            "speed_count": 3,
+            "light_control": "none",
+            "has_fan_on": False,
+            "direction_control": "none",
+            "natural_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "has_timers": False,
+            "has_sound": False,
+            "extra_count": 0,
+        },
+    )
+
+    assert result["step_id"] == "method"
+
+
 async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
     """Manual with all capabilities: the action list and the entry are complete."""
     hass.services.async_register(
