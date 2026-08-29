@@ -166,6 +166,19 @@ beside it, and nothing is relearned. Reducing the count forgets the *last* key
 rather than renumbering the others: a learned code is never reassigned to a
 different button.
 
+**A free-form key can still move things this integration tracks.** @elmr91's remote
+has a memory key: held for three seconds it *stores* the fan's whole state, pressed
+briefly it *recalls* it — speed, light, brightness and colour, all at once. The
+integration sends the code and learns nothing back, so after a recall its assumed
+state can be wrong in every dimension simultaneously, and nothing about the press
+tells it so.
+
+That is not a reason to avoid such a key — two codes, one for store and one for
+recall, work perfectly well as two extra buttons. It is a reason to know what
+follows: after a recall, either drive the fan once from Home Assistant, or use the
+declaration controls ("Assumed light state", "Assumed brightness position", the
+colour select) to say where things actually are.
+
 Anything Home Assistant *does* have a concept of stays typed — speed, direction,
 colour, brightness, the airflow preset. A typed entity works in scenes, in voice
 assistants and in every native card; a labelled button works only for a human
@@ -256,7 +269,7 @@ An example automation **blueprint** (control the fan by temperature) is in
 
 ### The card looks like it did not update
 
-The console prints a banner — `RF-FAN-CARD v1.8.1b1` — as the card registers itself,
+The console prints a banner — `RF-FAN-CARD v1.8.1b2` — as the card registers itself,
 and that is the build you are actually looking at, whatever the integration reports.
 It is printed *after* the registration, so a banner also means the file finished
 loading rather than merely starting to. If it names an
