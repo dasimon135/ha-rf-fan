@@ -146,3 +146,53 @@ async def test_the_resource_stays_while_another_fan_needs_it(
 
     ours = [item for item in _resources(hass) if item["url"].startswith(CARD_URL)]
     assert len(ours) == 1, "the card stopped loading for a fan that still exists"
+
+
+async def test_a_store_not_yet_read_is_not_mistaken_for_an_empty_one(
+    hass: HomeAssistant, hass_storage
+) -> None:
+    """The duplicate @elmr91 woke up to, twice in one day (#44).
+
+    `async_items()` does not read the store; only `async_create_item()` does. So on
+    a start where Lovelace has not yet loaded its resources, the collection answers
+    "empty", the registration believes nothing is there, and the create — which
+    loads first — appends a second copy of what was already registered. One more
+    per restart, all identical, and the card then races itself.
+
+    Seeded through the store rather than the collection, because that is the whole
+    point: on disk, and not yet in memory.
+    """
+    hass_storage["lovelace_resources"] = {
+        "version": 1,
+        "key": "lovelace_resources",
+        "data": {
+            "items": [
+                {"id": "seeded", "type": "module", "url": f"{CARD_URL}?v=1.8.1b1"}
+            ]
+        },
+    }
+    assert await async_setup_component(hass, "lovelace", {})
+
+    await _setup_full(hass)
+
+    ours = [item for item in _resources(hass) if item["url"].startswith(CARD_URL)]
+    assert len(ours) == 1, f"the store was read as empty and duplicated: {ours}"
+
+
+async def test_copies_that_already_exist_are_cleaned_up(hass: HomeAssistant) -> None:
+    """Anyone who restarted twice on 1.8.1b1 has two, and cannot know why.
+
+    Fixing the cause leaves them there, so the registration removes the extras it
+    finds rather than making them somebody's manual chore.
+    """
+    assert await async_setup_component(hass, "lovelace", {})
+    resources = hass.data[LOVELACE_DATA].resources
+    for _ in range(3):
+        await resources.async_create_item(
+            {"res_type": "module", "url": f"{CARD_URL}?v=1.8.1b1"}
+        )
+
+    await _setup_full(hass)
+
+    ours = [item for item in _resources(hass) if item["url"].startswith(CARD_URL)]
+    assert len(ours) == 1, f"the extra copies were left behind: {ours}"

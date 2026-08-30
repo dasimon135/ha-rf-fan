@@ -84,6 +84,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The card could be registered twice, and once more on every restart**
+  ([#44](https://github.com/dasimon135/ha-rf-fan/issues/44), found by @elmr91 on
+  `v1.8.1b1`, who woke up to two identical entries). Lovelace's resource collection
+  reads its store lazily: `async_items()` does not read it, while
+  `async_create_item()` does. On a start where the resources had not been read yet,
+  the lookup answered "empty", the registration concluded nothing was there, and the
+  create -- which loads first -- appended a second copy of what was already
+  registered. The count grew by one per restart, and two copies of a card race to
+  define the same element, where the loser cannot be replaced and the older build
+  wins.
+
+  The store is now read before the lookup, and any duplicates found are removed --
+  fixing the cause alone would have left everyone who restarted on `b1` with a
+  manual chore they had no way to understand.
 - **Free-form keys could not be added to a fan that already existed**
   ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18), found by @elmr91 on
   `v1.8.1b1`). The declaration form carries the count on both paths and only the
