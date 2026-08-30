@@ -269,7 +269,7 @@ An example automation **blueprint** (control the fan by temperature) is in
 
 ### The card looks like it did not update
 
-The console prints a banner — `RF-FAN-CARD v1.8.1b2` — as the card registers itself,
+The console prints a banner — `RF-FAN-CARD v1.8.1b3` — as the card registers itself,
 and that is the build you are actually looking at, whatever the integration reports.
 It is printed *after* the registration, so a banner also means the file finished
 loading rather than merely starting to. If it names an

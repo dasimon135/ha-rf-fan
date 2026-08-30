@@ -167,20 +167,43 @@ async def _async_register_resource(hass: HomeAssistant, url: str) -> bool:
         return False
 
     resources = data.resources
+    # `async_items()` does NOT read the store, while `async_create_item()` does. So
+    # on a start where Lovelace has not read its resources yet, the collection
+    # answers "empty", this decides nothing is registered, and the create -- which
+    # loads first -- appends a second copy of what was already there. One more per
+    # restart, all identical, and the card then races itself (#44, @elmr91 woke up
+    # to two). `async_get_info()` is the public way to make sure it has been read.
+    await resources.async_get_info()
+
     # Matched on the PATH, not the whole URL: the version query changes with every
     # release, and a copy the user registered by hand carries a different one (or
     # none). Adopting that copy is what keeps a hand-registered entry from becoming
     # a second, stale card -- the exact failure of issue #29.
-    for item in resources.async_items():
-        if str(item.get("url", "")).split("?")[0] != CARD_URL:
-            continue
-        if item.get("url") != url:
-            await resources.async_update_item(item["id"], {"url": url})
-            _LOGGER.debug("Updated the card resource to %s", url)
+    ours = [
+        item
+        for item in resources.async_items()
+        if str(item.get("url", "")).split("?")[0] == CARD_URL
+    ]
+
+    if not ours:
+        await resources.async_create_item({"res_type": "module", "url": url})
+        _LOGGER.debug("Registered the card as a Lovelace resource: %s", url)
         return True
 
-    await resources.async_create_item({"res_type": "module", "url": url})
-    _LOGGER.debug("Registered the card as a Lovelace resource: %s", url)
+    keep, *extras = ours
+    if keep.get("url") != url:
+        await resources.async_update_item(keep["id"], {"url": url})
+        _LOGGER.debug("Updated the card resource to %s", url)
+    # Duplicates left by the defect above, or by anything else. Fixing the cause
+    # would otherwise leave them as somebody's manual chore, on an install where
+    # two copies of the card race and the loser cannot be replaced.
+    for extra in extras:
+        await resources.async_delete_item(extra["id"])
+        _LOGGER.warning(
+            "Removed a duplicate registration of the RF Fan card (%s); "
+            "two copies race to define the same element and the older one wins",
+            extra.get("url"),
+        )
     return True
 
 
