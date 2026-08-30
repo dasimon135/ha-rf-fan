@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.8.1b2";
+const VERSION = "1.8.1b3";
 
 // Everything interpolated into innerHTML goes through this: entity names are
 // user-editable, so an unescaped `<` in a friendly name would break the markup.
