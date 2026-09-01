@@ -54,6 +54,36 @@ to show the run did something.
 Continue only when the issue is genuinely awaiting a first response, or when the
 reporter has asked something new that the maintainer has not answered.
 
+### Then read the history with this person, not just this thread
+
+One issue is rarely someone's first contact. Before drafting anything, find out
+what this reporter has already been told:
+
+    gh issue list --repo dasimon135/ha-rf-fan --state all --limit 50 \
+      --json number,title,author --jq '.[] | select(.author.login=="<login>")'
+
+Read the related ones in full, and follow any thread they link to — the public
+threads on `community.home-assistant.io` and `forum.hacf.fr` are where most
+reporters first appear, and long diagnostic exchanges live there rather than on
+GitHub.
+
+This is not optional politeness, it is correctness. Two failure modes come from
+skipping it, and both cost more than the reading:
+
+- **Repeating advice they have already acted on.** They did the thing, it did not
+  work, and the reply reads as if nobody looked.
+- **Repeating a diagnosis they have already disproved.** The new report is often
+  precisely the rebuttal to the last answer. This is exactly where #59 came
+  from: Ltek was told twice in one week — once on forum post #40, once by the
+  automated triage reply on #58 — that his capture must be a mis-capture. He had
+  re-measured and proved it was not. Both wrong calls came from reading one
+  thread in isolation.
+
+When the report contradicts something they were told before — by the maintainer
+or by an earlier triage reply — **open by conceding it plainly**, name where it
+was said, and only then answer. A correction the reporter had to fight for is
+worth acknowledging before anything technical.
+
 ## 2. Read the real code before you answer
 
 The README is a summary and it can lag behind the source. **Never state
