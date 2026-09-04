@@ -42,13 +42,14 @@ from .const import (
     CONF_HAS_FAN_ON,
     CONF_HAS_LIGHT,
     CONF_HAS_SOUND,
-    CONF_HAS_TIMERS,
+    CONF_HAS_TIMER_OFF,
     CONF_LIGHT_CONTROL,
     CONF_LIGHT_LEVEL,
     CONF_LIGHT_LEVEL_STEPS,
     CONF_NATURAL_CONTROL,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
+    CONF_TIMER_HOURS,
     DEFAULT_COLOR_TEMP_STEPS,
     DEFAULT_LIGHT_LEVEL_STEPS,
     DEFAULT_REPEAT_COUNT,
@@ -66,6 +67,7 @@ from .const import (
     MIN_SPEED_COUNT,
     MIN_STEP_COUNT,
     NATURAL_CONTROL_OPTIONS,
+    TIMER_HOURS,
     extra_action,
     extra_default_name,
 )
@@ -79,7 +81,7 @@ LEARN_COLLECT_SEC = 1.2
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
-    VERSION = 4
+    VERSION = 5
 
     @staticmethod
     @callback
@@ -207,8 +209,24 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 fields[
                     vol.Required(step_key, default=self._steps.get(step_key, step_default))
                 ] = vol.In(list(range(MIN_STEP_COUNT, MAX_STEP_COUNT + 1)))
+        # Sleep timers: a multi-select, not a boolean. Demanding all four durations
+        # is what stopped a remote with off/2/4/8 declaring timers at all (#59), and
+        # which durations a remote has is not derivable from anything else.
+        # `vol.Optional`, because "no timers" is simply the empty selection.
+        fields[
+            vol.Optional(
+                CONF_TIMER_HOURS,
+                default=[str(hours) for hours in self._caps.get(CONF_TIMER_HOURS, ())],
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=[str(hours) for hours in TIMER_HOURS],
+                multiple=True,
+                translation_key="timer_hours",
+            )
+        )
         for capability in (
-            CONF_HAS_TIMERS,
+            CONF_HAS_TIMER_OFF,
             CONF_HAS_SOUND,
         ):
             fields[vol.Required(capability, default=bool(self._caps.get(capability, False)))] = bool
@@ -361,13 +379,17 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     if str(user_input.get(action, "")).strip()
                 }
             )
-            errors = validate_codes(codes, actions)
+            errors = validate_codes(codes, actions, optional=self._optional_actions())
             if not errors:
                 return self._finish(codes)
 
         schema_fields: dict[Any, Any] = {}
+        optional = set(self._optional_actions())
         for action in actions:
-            schema_fields[vol.Required(action)] = str
+            if action in optional:
+                schema_fields[vol.Optional(action)] = str
+            else:
+                schema_fields[vol.Required(action)] = str
 
         return self.async_show_form(
             step_id="codes",
@@ -375,29 +397,46 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    def _required_actions(self) -> list[str]:
-        """Every action the declared fan needs a code for, in learning order.
-
-        One place, deliberately. This used to be spelled out at each call site, and
-        a capability added to one of them was simply missing from the other: the
-        reconfigure recap never asked for a free-form key's code, so the key could
-        be declared and never learned (#18, found by @elmr91 on 1.8.1b1). A second
-        caller that forgets an argument is not a mistake anyone can see.
-        """
-        required_actions, _ = split_actions(
+    def _split_actions(self) -> tuple[list[str], list[str]]:
+        """The (required, optional) pair for the fan as currently declared."""
+        return split_actions(
             self._speed_count,
             self._light_control,
             has_fan_on=self._has_fan_on,
             extra_count=self._extra_count,
             **self._caps,
         )
-        return required_actions
+
+    def _optional_actions(self) -> list[str]:
+        """Actions the flow offers but never demands.
+
+        Today this is `fan_off_reverse` and nothing else. It is passed to
+        `validate_codes` on every path, including the reconfigure subset, because a
+        remote that has no such key must still be able to finish the form.
+        """
+        return self._split_actions()[1]
+
+    def _all_actions(self) -> list[str]:
+        """Every action the flow offers for the declared fan, in learning order.
+
+        One place, deliberately. This used to be spelled out at each call site, and
+        a capability added to one of them was simply missing from the other: the
+        reconfigure recap never asked for a free-form key's code, so the key could
+        be declared and never learned (#18, found by @elmr91 on 1.8.1b1). A second
+        caller that forgets an argument is not a mistake anyone can see.
+
+        Required first, then optional. Which of its members may be left blank is
+        decided by `_optional_actions`, never by position -- the recap and the
+        manual form both walk this same list.
+        """
+        required, optional = self._split_actions()
+        return [*required, *optional]
 
     def _actions_to_process(self) -> list[str]:
         """List the actions to process, in order."""
         if self._pending_actions is not None:
             return self._pending_actions
-        return self._required_actions()
+        return self._all_actions()
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
@@ -687,16 +726,16 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Recap: to learn / kept (re-learn?) / forgotten, then capture."""
-        required_actions = self._required_actions()
+        recap_actions = self._all_actions()
         to_learn, kept, forgotten = classify_reconfigure_actions(
-            required_actions, self._existing_codes
+            recap_actions, self._existing_codes
         )
 
         if user_input is not None:
             relearn = [a for a in kept if bool(user_input.get(f"relearn_{a}"))]
             self._learn_codes = {a: self._existing_codes[a] for a in kept}
             self._pending_actions = [
-                a for a in required_actions if a in to_learn or a in relearn
+                a for a in recap_actions if a in to_learn or a in relearn
             ]
             if not self._pending_actions:
                 return self._finish(dict(self._learn_codes))

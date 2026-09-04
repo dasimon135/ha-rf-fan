@@ -31,7 +31,17 @@ CONF_CODES: Final = "codes"
 CONF_DISABLE_CARD: Final = "disable_card"
 
 DEFAULT_SPEED_COUNT: Final = 3
-DEFAULT_REPEAT_COUNT: Final = 2
+# Three, not two, and the toggle rounding is why. `transmit_repeat_count` rounds an
+# even count DOWN to odd for toggle actions, so a default of 2 gave every toggle
+# exactly ONE frame -- the lone frame that the same function's docstring says some
+# receivers drop outright (issue #15). The default contradicted its own reasoning.
+#
+# Confirmed on hardware by @Ltek (#59): his light obeyed a short burst but his fan
+# speeds needed three frames, and at the old default the speeds silently did nothing
+# -- no error is possible here, since nothing ever confirms an assumed-state command.
+# Three is the smallest value that is odd (so a toggle nets one flip either way) and
+# that satisfies the only fan anyone has actually measured.
+DEFAULT_REPEAT_COUNT: Final = 3
 
 # Speed-count bounds. The old cap of 6 had no technical reason behind it: a remote
 # with more speeds is only more tedious to learn, not harder to drive. Widened for
@@ -41,11 +51,25 @@ MAX_SPEED_COUNT: Final = 12
 
 ACTION_FAN_ON: Final = "fan_on"
 ACTION_FAN_OFF: Final = "fan_off"
+# Optional companion to `fan_off`, and the only optional action there is. A
+# `per_speed` remote encodes the direction in every frame it sends, INCLUDING its
+# off key, so stopping from reverse with the forward off code leaves the receiver
+# storing "forward" while Home Assistant still shows reverse. Optional because it
+# only exists on some remotes, and because every entry set up before it must keep
+# validating (@Ltek, #59).
+ACTION_FAN_OFF_REVERSE: Final = "fan_off_reverse"
 ACTION_LIGHT_ON: Final = "light_on"
 ACTION_LIGHT_OFF: Final = "light_off"
 ACTION_LIGHT_TOGGLE: Final = "light_toggle"
 
 # Capabilities (config flow)
+# Which sleep-timer durations this remote has a key for: a subset of TIMER_HOURS.
+CONF_TIMER_HOURS: Final = "timer_hours"
+# Whether it also has a dedicated key that CANCELS the timer.
+CONF_HAS_TIMER_OFF: Final = "has_timer_off"
+# Legacy boolean replaced by CONF_TIMER_HOURS (version 4 of the config entry): it
+# meant "all four durations". Kept because the migration reads it, and because
+# `timer_hours_from_data` falls back to it for any dict that has not been migrated.
 CONF_HAS_TIMERS: Final = "has_timers"
 CONF_HAS_SOUND: Final = "has_sound"
 
@@ -182,6 +206,15 @@ ACTION_LIGHT_KELVIN_DOWN: Final = "light_kelvin_down"
 ACTION_LIGHT_BRIGHT_UP: Final = "light_bright_up"
 ACTION_LIGHT_BRIGHT_DOWN: Final = "light_bright_down"
 ACTION_SOUND_TOGGLE: Final = "sound_toggle"
+# Cancels a running sleep timer. Absolute like `fan_off`, not a toggle: a dedicated
+# cancel key sets the timer to "none" rather than flipping it, so it is deliberately
+# NOT in TOGGLE_ACTIONS.
+ACTION_TIMER_OFF: Final = "timer_off"
+
+# The sleep-timer durations the flow OFFERS. Which of them a given remote actually
+# has is `CONF_TIMER_HOURS`; this tuple is the menu, and the canonical order.
+# It used to be the answer as well -- `has_timers` demanded all four, which meant a
+# remote with off/2/4/8 could not declare timers at all (@Ltek, #59).
 TIMER_HOURS: Final = (1, 2, 4, 8)
 
 # Walk directions returned by `actions.walk_steps`.

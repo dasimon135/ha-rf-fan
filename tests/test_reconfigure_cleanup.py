@@ -37,7 +37,7 @@ async def test_disabling_capabilities_removes_their_entities(hass: HomeAssistant
     assert f"{entry.entry_id}_sleep_timer" in before
 
     hass.config_entries.async_update_entry(
-        entry, data={**entry.data, "has_sound": False, "has_timers": False}
+        entry, data={**entry.data, "has_sound": False, "timer_hours": []}
     )
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()

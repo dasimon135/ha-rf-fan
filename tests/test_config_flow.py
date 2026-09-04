@@ -133,7 +133,8 @@ async def test_extra_keys_are_named_then_learned(hass: HomeAssistant) -> None:
             "natural_control": "none",
             "color_control": "none",
             "light_level": "none",
-            "has_timers": False,
+            "timer_hours": [],
+            "has_timer_off": False,
             "has_sound": False,
             "extra_count": 2,
         },
@@ -188,7 +189,8 @@ async def test_no_extra_keys_skips_the_naming_step(hass: HomeAssistant) -> None:
             "natural_control": "none",
             "color_control": "none",
             "light_level": "none",
-            "has_timers": False,
+            "timer_hours": [],
+            "has_timer_off": False,
             "has_sound": False,
             "extra_count": 0,
         },
@@ -217,7 +219,8 @@ async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
             "natural_control": "toggle",
             "color_control": "cycle",
             "light_level": "none",
-            "has_timers": True,
+            "timer_hours": ["1", "2", "4", "8"],
+            "has_timer_off": False,
             "has_sound": True,
         },
     )
@@ -264,7 +267,8 @@ def _basic_entry(hass: HomeAssistant) -> MockConfigEntry:
             "natural_control": "none",
             "color_control": "none",
             "light_level": "none",
-            "has_timers": False,
+            "timer_hours": [],
+            "has_timer_off": False,
             "has_sound": False,
             "has_light": True,
             "repeat_count": 2,
@@ -312,7 +316,8 @@ async def test_reconfigure_can_add_an_extra_key(hass: HomeAssistant) -> None:
                 "natural_control": "none",
                 "color_control": "none",
                 "light_level": "none",
-                "has_timers": False,
+                "timer_hours": [],
+            "has_timer_off": False,
                 "has_sound": False,
                 "extra_count": 1,
             },
@@ -371,7 +376,8 @@ async def test_reconfigure_can_take_an_extra_key_away(hass: HomeAssistant) -> No
                 "natural_control": "none",
                 "color_control": "none",
                 "light_level": "none",
-                "has_timers": False,
+                "timer_hours": [],
+            "has_timer_off": False,
                 "has_sound": False,
                 "extra_count": 0,
             },
@@ -416,7 +422,8 @@ async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
                 "natural_control": "none",
                 "color_control": "none",
             "light_level": "none",
-                "has_timers": True,
+                "timer_hours": ["1", "2", "4", "8"],
+            "has_timer_off": False,
                 "has_sound": False,
             },
         )
@@ -455,7 +462,7 @@ async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
         "timer_4h": "t4",
         "timer_8h": "t8",
     }
-    assert entry.data["has_timers"] is True
+    assert [int(h) for h in entry.data["timer_hours"]] == [1, 2, 4, 8]
 
 
 async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant) -> None:
@@ -485,7 +492,8 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
                 "natural_control": "none",
                 "color_control": "cycle",
             "light_level": "none",
-                "has_timers": False,
+                "timer_hours": [],
+            "has_timer_off": False,
                 "has_sound": False,
             },
         )
@@ -560,7 +568,8 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
                 "natural_control": "none",
                 "color_control": "none",
             "light_level": "none",
-                "has_timers": True,
+                "timer_hours": ["1", "2", "4", "8"],
+            "has_timer_off": False,
                 "has_sound": False,
             },
         )
@@ -601,7 +610,7 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
         "timer_4h": "t4",
         "timer_8h": "t8",
     }
-    assert entry.data["has_timers"] is True
+    assert [int(h) for h in entry.data["timer_hours"]] == [1, 2, 4, 8]
 
 
 async def test_learn_rejects_a_code_already_used_by_another_action(
@@ -672,7 +681,8 @@ async def test_reconfigure_rename_updates_the_title_and_unique_id(
                 "natural_control": "none",
                 "color_control": "none",
             "light_level": "none",
-                "has_timers": False,
+                "timer_hours": [],
+            "has_timer_off": False,
                 "has_sound": False,
             },
         )
@@ -721,7 +731,8 @@ async def test_reconfigure_refuses_a_name_already_used_on_the_same_gateway(
             "natural_control": "none",
             "color_control": "none",
             "light_level": "none",
-            "has_timers": False,
+            "timer_hours": [],
+            "has_timer_off": False,
             "has_sound": False,
         },
     )

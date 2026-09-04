@@ -18,7 +18,8 @@
           "light_level": "Light brightness",
           "light_level_steps": "Number of brightness steps",
           "extra_count": "Extra buttons",
-          "has_timers": "Sleep timers (1h/2h/4h/8h)",
+          "timer_hours": "Sleep timer durations",
+          "has_timer_off": "Dedicated timer-cancel key",
           "has_sound": "Sound (beep)"
         }
       },
@@ -68,6 +69,7 @@
         "data": {
           "fan_on": "Code for fan on",
           "fan_off": "Code for fan off",
+          "fan_off_reverse": "Code for fan off (reverse) - optional",
           "fan_speed_1": "Code for speed 1",
           "fan_speed_2": "Code for speed 2",
           "fan_speed_3": "Code for speed 3",
@@ -107,6 +109,7 @@
           "timer_2h": "Code for 2h timer",
           "timer_4h": "Code for 4h timer",
           "timer_8h": "Code for 8h timer",
+          "timer_off": "Code for the timer-cancel key",
           "sound_toggle": "Code for sound toggle",
           "extra_1": "Code for extra key 1",
           "extra_2": "Code for extra key 2",
@@ -123,6 +126,7 @@
         "description": "To learn: {to_learn}\nKept (tick to re-learn): {kept}\nRemoved: {forgotten}",
         "data": {
           "relearn_fan_off": "Re-learn: fan off",
+          "relearn_fan_off_reverse": "Re-learn: fan off (reverse)",
           "relearn_fan_on": "Re-learn: fan on",
           "relearn_fan_speed_1": "Re-learn: speed 1",
           "relearn_fan_speed_2": "Re-learn: speed 2",
@@ -163,6 +167,7 @@
           "relearn_timer_2h": "Re-learn: 2h timer",
           "relearn_timer_4h": "Re-learn: 4h timer",
           "relearn_timer_8h": "Re-learn: 8h timer",
+          "relearn_timer_off": "Re-learn: cancel timer",
           "relearn_sound_toggle": "Re-learn: sound",
           "relearn_extra_1": "Re-learn: extra key 1",
           "relearn_extra_2": "Re-learn: extra key 2",
@@ -195,7 +200,8 @@
           "color_temp_steps": "Number of colour positions",
           "light_level": "Light brightness",
           "light_level_steps": "Number of brightness steps",
-          "has_timers": "Sleep timers (1h/2h/4h/8h)",
+          "timer_hours": "Sleep timer durations",
+          "has_timer_off": "Dedicated timer-cancel key",
           "has_sound": "Sound (beep)"
         }
       }
@@ -249,6 +255,9 @@
     "button": {
       "timer": {
         "name": "{hours}h timer"
+      },
+      "timer_off": {
+        "name": "Cancel timer"
       },
       "recalibrate_color": {
         "name": "Recalibrate colour (to the first position)"
@@ -313,6 +322,14 @@
     }
   },
   "selector": {
+    "timer_hours": {
+      "options": {
+        "1": "1 hour",
+        "2": "2 hours",
+        "4": "4 hours",
+        "8": "8 hours"
+      }
+    },
     "light_control": {
       "options": {
         "none": "None",

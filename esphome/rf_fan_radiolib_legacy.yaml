@@ -58,6 +58,22 @@ api:
               const std::string raw = code;
               const size_t sep = raw.find(':');
               return sep == std::string::npos ? raw : raw.substr(sep + 1);
+            # NOTE: `protocol: N` transmits with protocol N's STOCK timings,
+            # which are often not your remote's. That the receiver above
+            # decodes protocol N proves nothing here — it runs at
+            # `tolerance: 50%` and your fan does not. If replays are ignored,
+            # replace this line with an inline block carrying your measured
+            # unit AND the protocol's own `inverted:` flag:
+            #
+            #   protocol:
+            #     pulse_length: 335
+            #     sync: [31, 1]
+            #     zero: [1, 2]
+            #     one: [2, 1]
+            #     inverted: true    # omitting this defaults to false
+            #
+            # See "The fan ignores a code that was learned correctly" in the
+            # README for how to read the flag off ESPHome's protocol table.
             protocol: ${rc_protocol}
             repeat:
               times: !lambda "return repeat_count;"

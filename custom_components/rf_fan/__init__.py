@@ -25,14 +25,18 @@ from .const import (
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_DIRECTION,
     CONF_HAS_NATURAL_PRESET,
+    CONF_HAS_TIMER_OFF,
+    CONF_HAS_TIMERS,
     CONF_LIGHT_LEVEL,
     CONF_NATURAL_CONTROL,
+    CONF_TIMER_HOURS,
     DIRECTION_CONTROL_NONE,
     DIRECTION_CONTROL_TOGGLE,
     DOMAIN,
     LIGHT_LEVEL_NONE,
     NATURAL_CONTROL_NONE,
     NATURAL_CONTROL_TOGGLE,
+    TIMER_HOURS,
 )
 from .data import RfFanConfigEntry, RfFanRuntimeData
 
@@ -246,8 +250,15 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     (const.CONF_NATURAL_CONTROL). Every existing entry was set up against a key
     assumed to toggle, so that is what they migrate to — `dedicated` is a claim
     about the hardware that only its owner can make.
+
+    v4 -> v5: `has_timers` becomes the list of durations the remote actually has
+    (const.CONF_TIMER_HOURS), because demanding all of 1/2/4/8 stopped a remote with
+    off/2/4/8 declaring timers at all (#59). An entry that had timers migrates to all
+    four — that is exactly what the boolean meant — so NO CODE CHANGES NAME and
+    nothing is relearned. The new `has_timer_off` is a claim about the hardware
+    nobody has been asked yet, so it starts False.
     """
-    if entry.version > 4:
+    if entry.version > 5:
         # Entry created by a newer version of the integration: cannot downgrade.
         return False
     if entry.version < 2:
@@ -297,6 +308,21 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data.pop(CONF_HAS_NATURAL_PRESET, None)
         hass.config_entries.async_update_entry(entry, data=data, version=4)
         _LOGGER.debug("Migrated config entry %s to version 4", entry.entry_id)
+    if entry.version < 5:
+        data = dict(entry.data)
+        # Same rule as every selector above: an explicit answer outranks the boolean
+        # it replaced. Stored as strings because that is what the multi-select
+        # submits, and `timer_hours_from_data` normalises either shape on read.
+        data.setdefault(
+            CONF_TIMER_HOURS,
+            [str(hours) for hours in TIMER_HOURS]
+            if data.get(CONF_HAS_TIMERS, False)
+            else [],
+        )
+        data.setdefault(CONF_HAS_TIMER_OFF, False)
+        data.pop(CONF_HAS_TIMERS, None)
+        hass.config_entries.async_update_entry(entry, data=data, version=5)
+        _LOGGER.debug("Migrated config entry %s to version 5", entry.entry_id)
     return True
 
 

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 try:  # Home Assistant runtime: relative import within the package
     from .const import (
         ACTION_FAN_NATURAL,
         ACTION_FAN_NATURAL_REVERSE,
         ACTION_FAN_OFF,
+        ACTION_FAN_OFF_REVERSE,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
         ACTION_LIGHT_BRIGHT_DOWN,
@@ -18,6 +21,7 @@ try:  # Home Assistant runtime: relative import within the package
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
+        ACTION_TIMER_OFF,
         COLOR_CONTROL_CYCLE,
         COLOR_CONTROL_NONE,
         COLOR_CONTROL_RELATIVE,
@@ -25,7 +29,10 @@ try:  # Home Assistant runtime: relative import within the package
         CONF_COLOR_TEMP_STEPS,
         CONF_EXTRA_COUNT,
         CONF_EXTRA_NAMES,
+        CONF_HAS_TIMER_OFF,
+        CONF_HAS_TIMERS,
         CONF_LIGHT_LEVEL_STEPS,
+        CONF_TIMER_HOURS,
         DEFAULT_COLOR_TEMP_STEPS,
         DEFAULT_LIGHT_LEVEL_STEPS,
         DIRECTION_CONTROL_NONE,
@@ -53,6 +60,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         ACTION_FAN_NATURAL,
         ACTION_FAN_NATURAL_REVERSE,
         ACTION_FAN_OFF,
+        ACTION_FAN_OFF_REVERSE,
         ACTION_FAN_ON,
         ACTION_FAN_REVERSE,
         ACTION_LIGHT_BRIGHT_DOWN,
@@ -64,6 +72,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         ACTION_LIGHT_ON,
         ACTION_LIGHT_TOGGLE,
         ACTION_SOUND_TOGGLE,
+        ACTION_TIMER_OFF,
         COLOR_CONTROL_CYCLE,
         COLOR_CONTROL_NONE,
         COLOR_CONTROL_RELATIVE,
@@ -71,7 +80,10 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         CONF_COLOR_TEMP_STEPS,
         CONF_EXTRA_COUNT,
         CONF_EXTRA_NAMES,
+        CONF_HAS_TIMER_OFF,
+        CONF_HAS_TIMERS,
         CONF_LIGHT_LEVEL_STEPS,
+        CONF_TIMER_HOURS,
         DEFAULT_COLOR_TEMP_STEPS,
         DEFAULT_LIGHT_LEVEL_STEPS,
         DIRECTION_CONTROL_NONE,
@@ -105,7 +117,8 @@ def split_actions(
     natural_control: str = NATURAL_CONTROL_NONE,
     color_control: str = COLOR_CONTROL_NONE,
     light_level: str = LIGHT_LEVEL_NONE,
-    has_timers: bool = False,
+    timer_hours: Iterable[int] = (),
+    has_timer_off: bool = False,
     has_sound: bool = False,
     extra_count: int = 0,
 ) -> tuple[list[str], list[str]]:
@@ -116,7 +129,11 @@ def split_actions(
     depending on `light_control` (`toggle` -> `light_toggle`; `on_off` -> `light_on`
     and `light_off`; `none` -> none), then the actions for the enabled capabilities
     (direction, natural airflow, colour, brightness, timers, sound).
-    No optional action: the returned list is always empty.
+
+    Exactly one action is optional, and only for a `per_speed` remote:
+    `fan_off_reverse`. See `const.ACTION_FAN_OFF_REVERSE` for why it exists and why
+    it cannot be required — every entry configured before it was added would stop
+    validating.
 
     Four capabilities are selectors rather than booleans, because the remote can
     express them in more than one shape:
@@ -135,10 +152,14 @@ def split_actions(
     required.extend(speed_action(index) for index in range(1, speed_count + 1))
     # Kept adjacent to the forward speeds: learning goes key by key down the remote,
     # and the reverse set is the same keys pressed with the internal switch flipped.
+    optional: list[str] = []
     if direction_control == DIRECTION_CONTROL_PER_SPEED:
         required.extend(
             speed_action(index, reverse=True) for index in range(1, speed_count + 1)
         )
+        # Offered right after the reverse speeds, which is where it sits on the
+        # remote: the same off key, pressed with the internal switch flipped.
+        optional.append(ACTION_FAN_OFF_REVERSE)
     if has_fan_on:
         required.append(ACTION_FAN_ON)
     if light_control == LIGHT_CONTROL_TOGGLE:
@@ -160,13 +181,18 @@ def split_actions(
         required.extend([ACTION_LIGHT_KELVIN_UP, ACTION_LIGHT_KELVIN_DOWN])
     if light_level == LIGHT_LEVEL_RELATIVE:
         required.extend([ACTION_LIGHT_BRIGHT_UP, ACTION_LIGHT_BRIGHT_DOWN])
-    if has_timers:
-        required.extend(timer_action(hours) for hours in TIMER_HOURS)
+    # Each duration stands alone. Demanding all four is what stopped a remote with
+    # off/2/4/8 from declaring timers at all (#59); the order comes from TIMER_HOURS
+    # so the form and the learning walk never depend on how the user ticked them.
+    wanted = set(timer_hours)
+    required.extend(timer_action(hours) for hours in TIMER_HOURS if hours in wanted)
+    if has_timer_off:
+        required.append(ACTION_TIMER_OFF)
     if has_sound:
         required.append(ACTION_SOUND_TOGGLE)
     # Last, and deliberately: these are the keys nothing above could describe.
     required.extend(extra_action(index) for index in range(1, extra_count + 1))
-    return required, []
+    return required, optional
 
 
 def transmit_repeat_count(action: str, configured: int) -> int:
@@ -192,20 +218,36 @@ def transmit_repeat_count(action: str, configured: int) -> int:
     return max(1, count)
 
 
-def validate_codes(codes: dict[str, str], required: list[str]) -> dict[str, str]:
+def validate_codes(
+    codes: dict[str, str],
+    required: list[str],
+    optional: Iterable[str] = (),
+) -> dict[str, str]:
     """Return {field: error_key}; empty dict if everything is valid.
 
     Besides missing codes, a code reused by two actions is rejected: the reverse
     lookup that maps a received frame back to an action compares codes, so a
     duplicate makes one of the two actions unreachable from the physical remote.
     The first action to claim a code keeps it; later ones are flagged.
+
+    An action listed in `optional` may be absent, but if it IS given it takes part
+    in the duplicate check like any other — an optional code that collides is worse
+    than a missing one, because it silently steals a frame from the action that
+    owns it. `required` is scanned first so a required action always wins a tie.
+
+    `required` may already contain the optional actions (the config flow builds one
+    combined list for the form); the scan is deduplicated so passing them twice does
+    not make an action collide with itself.
     """
+    optional_list = list(optional)
+    optional_set = set(optional_list)
     errors: dict[str, str] = {}
     seen: set[str] = set()
-    for action in required:
+    for action in dict.fromkeys([*required, *optional_list]):
         code = codes.get(action)
         if not code:
-            errors[action] = "required"
+            if action not in optional_set:
+                errors[action] = "required"
             continue
         if code in seen:
             errors[action] = "duplicate_code"
@@ -252,7 +294,7 @@ def walk_steps(
 
 
 CAPABILITY_FLAGS = (
-    "has_timers",
+    "has_timer_off",
     "has_sound",
 )
 
@@ -272,6 +314,32 @@ CAPABILITY_SELECTORS = (
 )
 
 
+def timer_hours_from_data(data: dict[str, object]) -> tuple[int, ...]:
+    """Sleep-timer durations this remote has a key for, in TIMER_HOURS order.
+
+    Normalised on read rather than trusted, like the step counts: the stored value
+    outlives the selector that produced it, and it arrives as strings from a
+    multi-select. Anything that is not one of the offered durations is dropped.
+
+    An absent value falls back to the legacy `has_timers` boolean, which meant all
+    four -- so an entry that has not been through the version-5 migration keeps the
+    timers it already had, and nobody relearns a key. An explicitly EMPTY list is a
+    real answer ("no timers") and is never overridden by the boolean.
+    """
+    raw = data.get(CONF_TIMER_HOURS)
+    if raw is None:
+        return TIMER_HOURS if bool(data.get(CONF_HAS_TIMERS, False)) else ()
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, Iterable):
+        return ()
+    wanted: set[int] = set()
+    for value in raw:
+        try:
+            wanted.add(int(value))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+    return tuple(hours for hours in TIMER_HOURS if hours in wanted)
+
+
 def caps_from_data(data: dict[str, object]) -> dict[str, object]:
     """Extract the capabilities from a config entry dict.
 
@@ -283,6 +351,7 @@ def caps_from_data(data: dict[str, object]) -> dict[str, object]:
     caps: dict[str, object] = {
         flag: bool(data.get(flag, False)) for flag in CAPABILITY_FLAGS
     }
+    caps[CONF_TIMER_HOURS] = timer_hours_from_data(data)
     for name, default, legacy_flag, legacy_value in CAPABILITY_SELECTORS:
         value = data.get(name)
         if isinstance(value, str) and value:
@@ -392,9 +461,12 @@ def expected_unique_ids(entry_id: str, data: dict[str, object]) -> set[str]:
         ids.add(f"{entry_id}_brightness_calibrate")
     if data.get("has_sound", False):
         ids.add(f"{entry_id}_sound")
-    if data.get("has_timers", False):
+    declared_hours = timer_hours_from_data(data)
+    if declared_hours:
         ids.add(f"{entry_id}_sleep_timer")
-        ids.update(f"{entry_id}_{timer_action(hours)}" for hours in TIMER_HOURS)
+        ids.update(f"{entry_id}_{timer_action(hours)}" for hours in declared_hours)
+    if data.get(CONF_HAS_TIMER_OFF, False):
+        ids.add(f"{entry_id}_{ACTION_TIMER_OFF}")
     return ids
 
 

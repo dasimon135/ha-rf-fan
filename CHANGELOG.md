@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Direction-aware off** ([#59](https://github.com/dasimon135/ha-rf-fan/issues/59),
+  measured by @Ltek). A remote with a speed code per direction puts the direction in
+  every frame it sends, its off key included — so stopping a reversed fan with the
+  forward off code stopped it while leaving the receiver storing "forward", and the
+  next speed code started it the wrong way round.
+
+  A `per_speed` fan can now be given an optional `fan_off_reverse` code, used when the
+  fan is assumed to be running in reverse. Optional is the whole design: an entry set
+  up before this existed has no such code, falls back to `fan_off`, and behaves
+  exactly as it did. It is also the first optional action the flow has ever had, so
+  the manual form and the reconfigure recap now distinguish "may be left blank" from
+  "missing" — a blank optional field validates, a colliding one still does not.
+
+  Hearing either off key from the physical remote is now an *absolute* reading of the
+  direction rather than a dead-reckoned one — but only when both are declared, since
+  `fan_off` alone carries no direction to read.
+
+- **Sleep-timer durations are individually optional**, and a **timer-cancel key**
+  ([#59](https://github.com/dasimon135/ha-rf-fan/issues/59)). `has_timers` demanded
+  all four of 1/2/4/8 h, so a remote with off/2/4/8 could not declare timers at all.
+  The capability is now a multi-select: tick the durations the remote actually has,
+  and get one button per tick.
+
+  An optional `timer_off` code can be declared beside them. Unlike the calibration
+  buttons it does emit — the fan is holding a countdown of its own and only a frame
+  calls it off — and it clears the assumed switch-off time once the code is on the
+  air, never before.
+
+  Config entries migrate to version 5: `has_timers: true` becomes all four durations,
+  which is exactly what it meant. **No action key changes name, so nothing is
+  relearned.**
+
 - **Free-form extra buttons** ([#18](https://github.com/dasimon135/ha-rf-fan/issues/18),
   asked for by @elmr91 for the "memory" key on his remote). Declare up to eight keys
   this integration has no concept of, name them, and each becomes a button that
@@ -48,6 +80,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The default RF repeat count is 3, not 2**
+  ([#59](https://github.com/dasimon135/ha-rf-fan/issues/59), measured by @Ltek). Two was
+  wrong twice over, and the second way was worse: `transmit_repeat_count` rounds an even
+  count DOWN to odd for toggle actions, so the shipped default gave every light, sound,
+  reverse, natural and free-form key exactly **one** frame — the lone frame that the same
+  function's docstring says some receivers drop outright (#15). The default contradicted
+  its own stated reasoning.
+
+  The first fan anyone has measured settles the other half: @Ltek's light obeyed a short
+  burst while his speeds needed three frames, and at the old default those speeds
+  silently did nothing. Silently is the point — nothing here is ever confirmed by the
+  fan, so a burst that falls short produces no error to debug. He lost days to it before
+  finding the setting.
+
+  Three is the smallest value that is odd and that satisfies the only measurement in
+  existence. A test now asserts the property rather than the number, so an even default
+  cannot come back. `entity.py` also had `2` hard-coded as its runtime fallback instead
+  of the constant every other call site uses — the two could have drifted apart, and
+  raising the constant alone would not have moved it.
+- **The replay troubleshooting section now covers `inverted:`, and says that
+  receiving a code proves nothing about transmitting it**
+  ([#59](https://github.com/dasimon135/ha-rf-fan/issues/59)). The receiver runs at
+  `tolerance: 50%`, so it happily decodes a remote whose unit is 25 % off the
+  protocol's nominal timings; the fan has no such tolerance. `inverted:` was
+  documented nowhere at all, and getting it wrong puts a bit-perfect, correctly
+  timed frame on the air inside out — with nothing in the receive log to warn you,
+  because receiving never exercises it. Both shipped gateway YAMLs now say so at the
+  `protocol:` line, and the README shows how to read the flag off ESPHome's own
+  protocol table, with @Ltek's hardware-validated protocol 6 case as the worked
+  example.
 - **The card's console banner is printed after the element is registered**, not at
   the top of the file. It used to prove only that the module had *started*: on
   [#44](https://github.com/dasimon135/ha-rf-fan/issues/44) @elmr91's console showed
