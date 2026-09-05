@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-09-05
+
+Everything below shipped through four pre-releases (`1.8.1b1` … `1.8.1b4`) between
+29 August and 5 September, measured on real remotes by @elmr91 and @Ltek. It is
+promoted here unchanged: a pre-release only reaches installations that opt into
+beta versions, and this content — the card that stopped loading, the repeat count
+that sent one frame instead of three — is owed to everyone.
+
 ### Added
 
 - **Direction-aware off** ([#59](https://github.com/dasimon135/ha-rf-fan/issues/59),
@@ -123,8 +131,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   indistinguishable from a card that failed to load at all. The card is now held to
   surviving a `hass` whose registry has arrived ahead of the state machine, one with
   no states at all, and one with no registry — and to coming back when they turn up.
-
-### Changed
 
 - **The card is delivered as a Lovelace resource** rather than a frontend module
   URL ([#44](https://github.com/dasimon135/ha-rf-fan/issues/44), reported and
