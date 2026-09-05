@@ -272,6 +272,12 @@ On the `tile` layout the light toggle only appears when the fan actually has a l
 and tapping the name opens the full card in a popup — set `tile_tap: more-info` to get
 Home Assistant's native more-info dialog instead.
 
+**Theming.** The card is a real `ha-card` and follows your theme's card surface, text
+and accent. A theme can also set (without the leading dashes): `rf-fan-accent`
+(active controls and hover borders — falls back to `primary-color`), `rf-fan-light`
+(the light button and the amber chip), `rf-fan-tint-low` and `rf-fan-tint-high`
+(the first and last segment of a multi-colour light).
+
 An example automation **blueprint** (control the fan by temperature) is in
 [`blueprints/automation/rf_fan/`](blueprints/automation/rf_fan/).
 

@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.8.1";
+const VERSION = "1.9.0";
 
 // Everything interpolated into innerHTML goes through this: entity names are
 // user-editable, so an unescaped `<` in a friendly name would break the markup.
@@ -344,9 +344,9 @@ class RfFanCard extends HTMLElement {
       // rather than rendering as usual and swallowing every press in silence. The
       // card does not decide this for itself; it repeats what the entity declares.
       const inert = !c || cur === "unavailable";
-      const tint = (i) => (i === 0 ? "#f5a623" : i === opts.length - 1 ? "#3391e6" : "var(--primary-color)");
+      const tint = (i) => (i === 0 ? "var(--rf-fan-tint-low, #f5a623)" : i === opts.length - 1 ? "var(--rf-fan-tint-high, #3391e6)" : "var(--rf-fan-accent, var(--primary-color))");
       const segsC = opts
-        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}"${inert ? " disabled" : ""} style="${o === cur ? `background:${tint(i)};color:#fff` : ""}" data-color="${esc(o)}">${esc(L.color(o))}</button>`)
+        .map((o, i) => `<button class="cseg ${o === cur ? "active" : ""}"${inert ? " disabled" : ""} style="${o === cur ? `background:${tint(i)};color:var(--text-primary-color, #fff)` : ""}" data-color="${esc(o)}">${esc(L.color(o))}</button>`)
         .join("");
       // Three named positions was the only case this row was ever drawn for. Past
       // four, the labels are bare numbers and the segments have to give up padding
@@ -407,8 +407,8 @@ class RfFanCard extends HTMLElement {
         <svg viewBox="0 0 100 100" class="fan ${on ? "on" : "off"} ${compact ? "compact" : ""}${spinBack ? " reverse" : ""}" style="--spin-dur:${spinDur}s" data-act="power" role="button" tabindex="0" aria-label="${esc(L.on)}/${esc(L.off)}">
           <defs>
             <radialGradient id="rfDisc" cx="50%" cy="42%" r="62%">
-              <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.22"/>
-              <stop offset="100%" stop-color="var(--primary-color)" stop-opacity="0.05"/>
+              <stop offset="0%" stop-color="var(--rf-fan-accent, var(--primary-color))" stop-opacity="0.22"/>
+              <stop offset="100%" stop-color="var(--rf-fan-accent, var(--primary-color))" stop-opacity="0.05"/>
             </radialGradient>
           </defs>
           <circle class="disc" cx="50" cy="50" r="48" fill="url(#rfDisc)"/>
@@ -593,58 +593,58 @@ class RfFanCard extends HTMLElement {
       .tile { display:flex; align-items:center; gap:12px; }
       .tdot { flex:0 0 auto; width:42px; height:42px; border-radius:50%; border:none; cursor:pointer;
               display:grid; place-items:center; padding:0; background: var(--divider-color); }
-      .tile:not(.off) .tdot { background: color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color));
-              box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 55%, transparent),
-                          0 0 14px 1px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+      .tile:not(.off) .tdot { background: color-mix(in srgb, var(--rf-fan-accent, var(--primary-color)) 22%, var(--card-background-color));
+              box-shadow: 0 0 0 2px color-mix(in srgb, var(--rf-fan-accent, var(--primary-color)) 55%, transparent),
+                          0 0 14px 1px color-mix(in srgb, var(--rf-fan-accent, var(--primary-color)) 45%, transparent); }
       .tfan { width:26px; height:26px; }
       .tfan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; }
       .tfan.off .blades { animation-play-state: paused; }
-      .tfan .blades ellipse { fill: var(--primary-color); }
+      .tfan .blades ellipse { fill: var(--rf-fan-accent, var(--primary-color)); }
       .tile.off .tfan .blades ellipse { fill: var(--disabled-text-color); }
       .tfan .hub { fill: var(--card-background-color); }
-      .tfan .hub2 { fill: var(--primary-color); }
+      .tfan .hub2 { fill: var(--rf-fan-accent, var(--primary-color)); }
       .tinfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px;
                cursor:pointer; border-radius:8px; outline:none; }
-      .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--primary-color); }
+      .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--rf-fan-accent, var(--primary-color)); }
       .tname { font-weight:600; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .tsub { font-size:.78rem; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .tctl { flex:0 0 auto; display:flex; gap:6px; }
       .tbtn { width:34px; height:34px; border-radius:9px; border:1px solid var(--divider-color);
               background: var(--card-background-color); color: var(--primary-text-color); font-size:1.1rem;
               cursor:pointer; transition: transform .12s, border-color .2s; }
-      .tbtn:hover { border-color: var(--primary-color); }
+      .tbtn:hover { border-color: var(--rf-fan-accent, var(--primary-color)); }
       .tbtn:active { transform: scale(.9); }
       .tlight { display:grid; place-items:center; color: var(--secondary-text-color); }
       .tlight ha-icon { --mdc-icon-size:20px; }
-      .tlight.active { background:#f5a623; border-color:#f5a623; color:#fff; }
+      .tlight.active { background:var(--rf-fan-light, #f5a623); border-color:var(--rf-fan-light, #f5a623); color:var(--text-primary-color, #fff); }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
       .title { font-size:1.15rem; font-weight:600; }
       .state { font-size:.85rem; color: var(--secondary-text-color); }
-      .state.on { color: var(--primary-color); }
+      .state.on { color: var(--rf-fan-accent, var(--primary-color)); }
       .hero { display:flex; justify-content:center; margin:6px 0 10px; }
       .fan { width:150px; height:150px; cursor:pointer; filter: drop-shadow(0 3px 8px rgba(0,0,0,.25)); transition: transform .3s ease; }
       .fan.off { transform: scale(.97); }
       .fan.compact { width:96px; height:96px; }
       .fan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; transition: opacity .4s ease; }
       .fan.off .blades { animation-play-state: paused; }
-      .fan .blades ellipse { fill: var(--primary-color); }
+      .fan .blades ellipse { fill: var(--rf-fan-accent, var(--primary-color)); }
       .fan.off .blades ellipse { fill: var(--disabled-text-color); }
       .fan .hub { fill: var(--card-background-color); }
-      .fan .hub2 { fill: var(--primary-color); }
+      .fan .hub2 { fill: var(--rf-fan-accent, var(--primary-color)); }
       /* One keyframe set, played backwards for the winter direction, so the two
          directions can never drift apart in duration or easing. */
       .fan.reverse .blades, .tfan.reverse .blades { animation-direction: reverse; }
       @keyframes rf-spin { from { transform:rotate(0); } to { transform:rotate(360deg); } }
       .speed { display:flex; gap:5px; margin:2px 0 12px; }
       .seg { flex:1; height:12px; border:none; border-radius:6px; background: var(--divider-color); cursor:pointer; padding:0; }
-      .seg.on { background: var(--primary-color); }
-      .slider { flex:1; accent-color: var(--primary-color); }
+      .seg.on { background: var(--rf-fan-accent, var(--primary-color)); }
+      .slider { flex:1; accent-color: var(--rf-fan-accent, var(--primary-color)); }
       .chips { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0; }
       .chip { display:inline-flex; align-items:center; gap:6px; border:none; border-radius:18px; padding:7px 12px;
               background: var(--divider-color); color: var(--primary-text-color); cursor:pointer; font-size:.85rem; }
       .chip ha-icon { --mdc-icon-size:20px; }
-      .chip.active { background: var(--primary-color); color: var(--text-primary-color, #fff); }
-      .chip.active.amber { background:#f5a623; }
+      .chip.active { background: var(--rf-fan-accent, var(--primary-color)); color: var(--text-primary-color, #fff); }
+      .chip.active.amber { background:var(--rf-fan-light, #f5a623); }
       .chip, .seg, .cseg, .mini { transition: filter .15s ease, transform .1s ease, background .2s ease; }
       .chip:hover, .seg:hover, .cseg:hover, .mini:hover { filter: brightness(1.12); }
       .chip:active, .seg:active, .cseg:active, .mini:active, .fan:active { transform: scale(.95); }
@@ -654,7 +654,7 @@ class RfFanCard extends HTMLElement {
       .cseg { flex:1; border:none; padding:8px 4px; background: var(--divider-color); color: var(--primary-text-color);
               cursor:pointer; font-size:.82rem; border-right:1px solid var(--card-background-color); }
       .cseg:last-child { border-right:none; }
-      .cseg.active { background: var(--primary-color); color: var(--text-primary-color,#fff); }
+      .cseg.active { background: var(--rf-fan-accent, var(--primary-color)); color: var(--text-primary-color,#fff); }
       .csegs.many .cseg { padding:8px 1px; font-size:.75rem; }
       .chips.extras { flex-wrap:wrap; }
       .chips.extras .chip { flex:0 1 auto; }
