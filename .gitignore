@@ -18,3 +18,6 @@ docs/*-codes-manual.md
 # `gh issue comment --body-file -` takes the text on stdin and needs no file.
 docs/reply-*.md
 docs/post-*.md
+
+# per-session git worktrees
+.worktrees/

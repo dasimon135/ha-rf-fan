@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-09-05
+
+### Added
+
+- The bundled card can be themed. Every colour of its own is now the fallback of a
+  CSS variable a theme can set — `--rf-fan-accent` (active controls, hover borders;
+  falls back to `--primary-color`), `--rf-fan-light` (the light button and the
+  amber chip) and `--rf-fan-tint-low` / `--rf-fan-tint-high` (the first and last
+  segment of a multi-colour light). Nothing changes when a theme sets none of them.
+  A test scans the shipped file so a literal colour cannot creep back in.
+  Card 1.9.0.
+
 ## [1.8.1] - 2026-09-05
 
 Everything below shipped through four pre-releases (`1.8.1b1` … `1.8.1b4`) between
