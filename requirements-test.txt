@@ -1,4 +1,6 @@
 pytest>=8
-# Pinned to the release that ships homeassistant==2026.5.4, matching the
-# HA target declared in hacs.json (requires Python >= 3.14).
-pytest-homeassistant-custom-component==0.13.357
+# Pinned to the release that ships homeassistant==2026.9.0 (stable). Dependabot
+# offered 0.13.362, which pins the 2026.9.0b6 BETA -- a test harness should never
+# run against a Home Assistant no user has. Check the pin on every bump:
+#   pip install --dry-run --no-deps --report - pytest-homeassistant-custom-component==X
+pytest-homeassistant-custom-component==0.13.363
