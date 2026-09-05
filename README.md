@@ -38,8 +38,15 @@ Cecotec fan is used as the reference example, but any RF fan works.
   - **Color temperature**: none / one cycling button / *two buttons* (warmer and
     cooler).
   - **Light brightness**: none / *two buttons* (brighter and dimmer).
-  - Optional **natural-airflow preset**, **sleep timers** (1/2/4/8 h), and **sound**
-    toggle.
+  - Optional **natural-airflow preset** and **sound** toggle.
+  - **Sleep timers**: tick only the durations your remote actually has, out of
+    1/2/4/8 h — they are independent, so a remote with off/2/4/8 declares three and
+    nothing is missing. A separate **timer-cancel key** can be declared alongside
+    them if the remote has one.
+  - **Direction-aware off**: on a remote with a speed code per direction, an optional
+    `fan_off_reverse` code stops the fan from reverse without leaving the receiver's
+    stored direction pointing the wrong way. Leave it blank and `fan_off` is used for
+    both, exactly as before.
 - **Reconfigure in place** — either relearn a single mis-captured button, or add and
   change capabilities and learn only the new ones, keeping the codes you already
   captured (see below).
@@ -59,8 +66,9 @@ Depending on the declared capabilities, a device exposes:
 | `button` calibrate | color ≠ none | resyncs the assumed color position — **emits nothing** |
 | `select` "assumed brightness position" | brightness = relative | declares where the lamp is — **emits nothing** |
 | `button` resync brightness | brightness = relative | walks the lamp down to its lowest step — **does emit** |
-| `button` timer ×4 | timers enabled | 1 h / 2 h / 4 h / 8 h |
-| `sensor` sleep timer | timers enabled | assumed switch-off time set by the timer buttons (clears itself when it elapses, or when the fan is turned off) |
+| `button` timer | one per declared duration | 1 h / 2 h / 4 h / 8 h, individually optional |
+| `button` cancel timer | timer-cancel key declared | **does emit**: calls off the fan's countdown and clears the assumed switch-off time |
+| `sensor` sleep timer | at least one timer declared | assumed switch-off time set by the timer buttons (clears itself when it elapses, when the timer is cancelled, or when the fan is turned off) |
 | `switch` sound | sound enabled | beep on/off |
 
 ### Color temperature (Kelvin)
@@ -269,7 +277,7 @@ An example automation **blueprint** (control the fan by temperature) is in
 
 ### The card looks like it did not update
 
-The console prints a banner — `RF-FAN-CARD v1.8.1b3` — as the card registers itself,
+The console prints a banner — `RF-FAN-CARD v1.8.1b4` — as the card registers itself,
 and that is the build you are actually looking at, whatever the integration reports.
 It is printed *after* the registration, so a banner also means the file finished
 loading rather than merely starting to. If it names an
@@ -513,21 +521,85 @@ Enabling debug logging for `custom_components.rf_fan` prints the same comparison
 
 ### The fan ignores a code that was learned correctly
 
-The frame is being replayed with the wrong *timings*, not the wrong bits. The default
-`protocol: 1` (650 µs pulses) does not fit every remote. Capture the original with
-`rtl_433 -A`, which prints the pulse/gap breakdown and a suggested decoder, then replace
-the protocol number in the YAML with the measured values:
+The bits are right and the *timings* are wrong. This is the most common failure after a
+successful capture, and the reason it is confusing is worth stating plainly:
+
+> **That the gateway decodes your remote does not mean it can replay to your fan.**
+> The receiver is configured with `tolerance: 50%`, so it happily reports
+> `protocol=6` for a remote whose pulses are 25 % off protocol 6's nominal timings.
+> Your fan has no such tolerance. Reception proves the *shape* of the code, never the
+> numbers.
+
+So `rc_protocol: "6"` in the YAML means "transmit using protocol 6's **stock** timings",
+which may be nothing like what your remote actually emits. Measure, then replace the
+protocol number with an inline block.
+
+Capture the original with `rtl_433 -A`, which prints the pulse/gap breakdown, or read the
+durations out of a `remote_receiver` raw dump. Then:
 
 ```yaml
 protocol:
-  pulse_length: 400   # rtl_433's short_width
+  pulse_length: 400   # the short pulse, in µs (rtl_433's short_width)
   sync: [1, 18]
   zero: [1, 3]
   one: [3, 1]
+  inverted: true      # SEE BELOW - omitting this defaults to false
 ```
 
-Repeat count and inter-frame gap matter too: some receivers ignore a frame that is
-bit-perfect but sent fewer times than the original remote sends it.
+**`inverted:` is the half everybody forgets.** It selects whether a bit is
+*pulse-then-gap* (`false`) or *gap-then-pulse* (`true`). Get it wrong and every frame goes
+out inside out: bit-perfect, correctly timed, and ignored by the fan. Nothing in the
+receive log warns you, because receiving never exercises it.
+
+The flag is **a property of the protocol you are replacing, not a free choice.** When you
+swap `rc_protocol: "N"` for an inline block you must carry over protocol N's own value.
+Read it off the last argument of the matching row in ESPHome's protocol table
+([`remote_base/rc_switch_protocol.h`](https://github.com/esphome/esphome/blob/dev/esphome/components/remote_base/rc_switch_protocol.h)) —
+for example protocol 6 is declared `RCSwitchBase(10350, 450, 450, 900, 900, 450, true)`,
+so an inline replacement for it needs `inverted: true`.
+
+<details>
+<summary>Worked example: a 9-speed Hampton Bay remote (issue #59)</summary>
+
+The gateway logged `protocol=6` and every replay was ignored. Two things were wrong at
+once, and each alone was enough to break it:
+
+- the remote's real unit is **335 µs**, not protocol 6's nominal 450 — measured over
+  1734 durations, which landed on 335 and 666 (ratio 1.99). Only `tolerance: 50%` on the
+  receiver made it decode at all;
+- the transmit block said `inverted: false`, while protocol 6 is `inverted: true`.
+
+The fix keeps protocol 6's ratios and flag and changes only the unit:
+
+```yaml
+protocol:
+  pulse_length: 335
+  sync: [31, 1]
+  zero: [1, 2]
+  one: [2, 1]
+  inverted: true
+```
+
+Confirmed on the reporter's hardware.
+</details>
+
+### The fan obeys Developer Tools but ignores the dashboard
+
+**Raise the repeat count** under **⋮ → Reconfigure**. This is the same code, correctly
+timed, simply not repeated enough — and it is invisible, because nothing here is ever
+confirmed by the fan, so a burst that falls on deaf ears produces no error anywhere.
+
+Some receivers ignore a frame that is bit-perfect but sent fewer times than the original
+remote sends it, and the threshold differs **between keys on one remote**: on the first
+remote anyone measured, the light obeyed a short burst while the speeds needed three
+frames (#59).
+
+The integration sends each frame `repeat_count` times, **default 3**. One subtlety if
+you tune it: a *toggle* action (light, sound, reverse, natural, any free-form key) is
+rounded **down to the nearest odd number**, so that the fan ends up flipped exactly once
+whichever way its receiver counts a burst. A configured `4` therefore sends four frames
+for a speed and three for a toggle — and a configured `2` sends a single frame for every
+toggle, which is why the default is not 2.
 
 A drifted colour position is resynced with the **calibrate** button (it emits nothing, it
 just resets the assumption to Warm). A button that was mis-captured is fixed with

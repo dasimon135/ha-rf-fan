@@ -28,6 +28,7 @@ from .const import (
     CONF_FAN_NAME,
     CONF_GATEWAY_SERVICE,
     CONF_REPEAT_COUNT,
+    DEFAULT_REPEAT_COUNT,
     DOMAIN,
     ECHO_SUPPRESS_SEC,
     RECEIVE_DEBOUNCE_SEC,
@@ -82,7 +83,9 @@ class RfFanBaseEntity(Entity):
         return int(
             self._config_entry.options.get(
                 CONF_REPEAT_COUNT,
-                self._config_entry.data.get(CONF_REPEAT_COUNT, 2),
+                self._config_entry.data.get(
+                    CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT
+                ),
             )
         )
 

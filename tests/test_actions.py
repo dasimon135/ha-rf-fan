@@ -7,6 +7,7 @@ from actions import (
     extra_button_count,
     light_level_steps,
     split_actions,
+    timer_hours_from_data,
     transmit_repeat_count,
     validate_codes,
     walk_steps,
@@ -14,6 +15,7 @@ from actions import (
 from const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_OFF,
+    ACTION_FAN_OFF_REVERSE,
     ACTION_FAN_ON,
     ACTION_FAN_REVERSE,
     ACTION_LIGHT_BRIGHT_DOWN,
@@ -25,6 +27,7 @@ from const import (
     ACTION_LIGHT_ON,
     ACTION_LIGHT_TOGGLE,
     ACTION_SOUND_TOGGLE,
+    ACTION_TIMER_OFF,
     COLOR_TEMP_NAMED,
     DEFAULT_COLOR_TEMP_STEPS,
     DEFAULT_LIGHT_LEVEL_STEPS,
@@ -60,6 +63,56 @@ def test_split_light_on_off_requires_on_and_off():
     required, _ = split_actions(6, light_control="on_off")
     assert ACTION_LIGHT_ON in required and ACTION_LIGHT_OFF in required
     assert ACTION_LIGHT_TOGGLE not in required
+
+
+def test_fan_off_reverse_is_optional_and_only_for_per_speed():
+    """The only optional action there is, and only on the remote that has one."""
+    for control in ("none", "toggle"):
+        required, optional = split_actions(
+            6, light_control="none", direction_control=control
+        )
+        assert ACTION_FAN_OFF_REVERSE not in required
+        assert ACTION_FAN_OFF_REVERSE not in optional
+
+    required, optional = split_actions(
+        6, light_control="none", direction_control="per_speed"
+    )
+    assert optional == [ACTION_FAN_OFF_REVERSE]
+    assert ACTION_FAN_OFF_REVERSE not in required
+
+
+def test_validate_codes_accepts_a_missing_optional_action():
+    """An entry configured before `fan_off_reverse` existed must still validate."""
+    required, optional = split_actions(
+        2, light_control="none", direction_control="per_speed"
+    )
+    codes = {action: f"c_{action}" for action in required}
+    assert validate_codes(codes, required, optional=optional) == {}
+    # ...and the flow passes one combined list, which must not make the optional
+    # action collide with itself.
+    assert validate_codes(codes, [*required, *optional], optional=optional) == {}
+
+
+def test_validate_codes_still_rejects_a_duplicate_optional_code():
+    """Optional means "may be absent", never "may steal another action's frame"."""
+    required, optional = split_actions(
+        2, light_control="none", direction_control="per_speed"
+    )
+    codes = {action: f"c_{action}" for action in required}
+    codes[ACTION_FAN_OFF_REVERSE] = codes[ACTION_FAN_OFF]
+    errors = validate_codes(codes, [*required, *optional], optional=optional)
+    assert errors == {ACTION_FAN_OFF_REVERSE: "duplicate_code"}
+
+
+def test_validate_codes_optional_defaults_to_none():
+    """Every existing caller passes two arguments and must keep its old meaning."""
+    required, optional = split_actions(
+        2, light_control="none", direction_control="per_speed"
+    )
+    codes = {action: f"c_{action}" for action in required}
+    assert validate_codes(codes, [*required, *optional]) == {
+        ACTION_FAN_OFF_REVERSE: "required"
+    }
 
 
 def test_split_fan_on_only_when_declared():
@@ -181,22 +234,76 @@ def test_shrinking_the_count_gives_up_the_last_row_only():
     assert three - two == {"e1_extra_3"}
 
 
-def test_split_actions_timers_add_four_actions():
-    required, _ = split_actions(6, light_control="none", has_timers=True)
+def test_split_actions_timers_add_one_action_per_declared_duration():
+    required, _ = split_actions(6, light_control="none", timer_hours=(1, 2, 4, 8))
     for hours in (1, 2, 4, 8):
         assert timer_action(hours) in required
 
 
+def test_split_actions_timers_are_individually_optional():
+    """A remote with off/2/4/8 could not declare timers at all before (#59)."""
+    required, _ = split_actions(6, light_control="none", timer_hours=(2, 4, 8))
+    assert timer_action(1) not in required
+    for hours in (2, 4, 8):
+        assert timer_action(hours) in required
+
+
+def test_split_actions_timer_order_follows_the_menu_not_the_selection():
+    """The learning walk must not depend on the order the boxes were ticked."""
+    required, _ = split_actions(6, light_control="none", timer_hours=[8, 1, 4])
+    timers = [a for a in required if a.startswith("timer_")]
+    assert timers == [timer_action(1), timer_action(4), timer_action(8)]
+
+
+def test_split_actions_timer_off_only_when_declared():
+    required, _ = split_actions(6, light_control="none", timer_hours=(2,))
+    assert ACTION_TIMER_OFF not in required
+    required, _ = split_actions(
+        6, light_control="none", timer_hours=(2,), has_timer_off=True
+    )
+    assert ACTION_TIMER_OFF in required
+
+
+def test_timer_hours_reads_the_legacy_boolean():
+    """`has_timers: True` meant all four; an unmigrated entry must keep them."""
+    assert timer_hours_from_data({"has_timers": True}) == (1, 2, 4, 8)
+    assert timer_hours_from_data({"has_timers": False}) == ()
+    assert timer_hours_from_data({}) == ()
+
+
+def test_timer_hours_explicit_empty_beats_the_legacy_boolean():
+    """An explicit answer outranks the boolean it replaced, even when empty."""
+    assert timer_hours_from_data({"timer_hours": [], "has_timers": True}) == ()
+
+
+def test_timer_hours_normalises_what_the_multi_select_stores():
+    """Strings from the selector, out of order, with an impossible value in it."""
+    assert timer_hours_from_data({"timer_hours": ["8", "2", "99"]}) == (2, 8)
+    assert timer_hours_from_data({"timer_hours": "nonsense"}) == ()
+    assert timer_hours_from_data({"timer_hours": 4}) == ()
+
+
 def test_caps_from_data_defaults_off():
     assert caps_from_data({}) == {
-        "has_timers": False, "has_sound": False,
+        "has_timer_off": False, "has_sound": False, "timer_hours": (),
         "direction_control": "none", "color_control": "none", "light_level": "none",
         "natural_control": "none",
     }
 
 
 def test_caps_from_data_reads_true():
-    assert caps_from_data({"has_timers": True})["has_timers"] is True
+    assert caps_from_data({"has_timer_off": True})["has_timer_off"] is True
+    # The legacy boolean still resolves, so an unmigrated entry keeps its timers.
+    assert caps_from_data({"has_timers": True})["timer_hours"] == (1, 2, 4, 8)
+
+
+def test_caps_feed_split_actions_directly():
+    """`split_actions(**caps)` is how the flow calls it: the keys must line up."""
+    caps = caps_from_data({"timer_hours": ["2", "8"], "has_timer_off": True})
+    required, _ = split_actions(2, light_control="none", **caps)
+    assert timer_action(2) in required and timer_action(8) in required
+    assert timer_action(1) not in required
+    assert ACTION_TIMER_OFF in required
 
 
 def test_caps_from_data_reads_the_selectors():
@@ -294,6 +401,7 @@ def test_toggle_actions_cover_flipping_actions_only():
     # which is repeated for reliability and gap-separated from the next.
     for absolute in (
         ACTION_FAN_OFF,
+    ACTION_FAN_OFF_REVERSE,
         ACTION_FAN_ON,
         speed_action(1),
         timer_action(4),
@@ -393,6 +501,25 @@ def test_validate_codes_accepts_all_distinct_codes():
     assert errors == {}
 
 
+def test_the_default_never_gives_a_toggle_a_lone_frame():
+    """The invariant the old default of 2 broke, in both directions.
+
+    `transmit_repeat_count` rounds an even count down to odd for toggles, so an even
+    default of 2 sent ONE frame — exactly what its own docstring says some receivers
+    drop outright (#15). And @Ltek's fan needed three (#59). Both are satisfied only
+    by an odd default of at least 3, so assert the property rather than the number:
+    changing DEFAULT_REPEAT_COUNT to something even would silently reintroduce this.
+    """
+    from const import ACTION_LIGHT_TOGGLE, DEFAULT_REPEAT_COUNT
+
+    toggle = transmit_repeat_count(ACTION_LIGHT_TOGGLE, DEFAULT_REPEAT_COUNT)
+    absolute = transmit_repeat_count(ACTION_FAN_OFF, DEFAULT_REPEAT_COUNT)
+
+    assert toggle % 2 == 1, "a toggle must net exactly one flip"
+    assert toggle >= 3, "a lone frame is what some receivers drop (#15)"
+    assert absolute >= 3, "the only fan ever measured needed three (#59)"
+
+
 def test_toggle_repeat_count_rounds_down_to_odd():
     """A toggle must end up actuated an odd number of times.
 
@@ -420,6 +547,7 @@ def test_absolute_repeat_count_is_untouched():
 
     for absolute in (
         ACTION_FAN_OFF,
+    ACTION_FAN_OFF_REVERSE,
         ACTION_FAN_ON,
         speed_action(1),
         timer_action(4),

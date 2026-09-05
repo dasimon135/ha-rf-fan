@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_HAS_TIMERS
+from .actions import timer_hours_from_data
 from .entity import RfFanBaseEntity
 
 
@@ -21,8 +21,8 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the sleep-timer sensor if the fan has timers."""
-    if not config_entry.data.get(CONF_HAS_TIMERS, False):
+    """Set up the sleep-timer sensor if the fan has at least one timer key."""
+    if not timer_hours_from_data(dict(config_entry.data)):
         return
 
     async_add_entities([RfFanTimerSensor(hass, config_entry)])

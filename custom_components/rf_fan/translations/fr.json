@@ -18,7 +18,8 @@
           "light_level": "Luminosité de la lampe",
           "light_level_steps": "Nombre de niveaux de luminosité",
           "extra_count": "Boutons supplémentaires",
-          "has_timers": "Minuteries (1h/2h/4h/8h)",
+          "timer_hours": "Durées de minuterie",
+          "has_timer_off": "Touche dédiée d'annulation de minuterie",
           "has_sound": "Son (bip)"
         }
       },
@@ -68,6 +69,7 @@
         "data": {
           "fan_on": "Code pour ventilateur ON",
           "fan_off": "Code pour ventilateur OFF",
+          "fan_off_reverse": "Code pour ventilateur OFF (sens inverse) - facultatif",
           "fan_speed_1": "Code vitesse 1",
           "fan_speed_2": "Code vitesse 2",
           "fan_speed_3": "Code vitesse 3",
@@ -107,6 +109,7 @@
           "timer_2h": "Code minuterie 2h",
           "timer_4h": "Code minuterie 4h",
           "timer_8h": "Code minuterie 8h",
+          "timer_off": "Code pour la touche d'annulation de minuterie",
           "sound_toggle": "Code son",
           "extra_1": "Code touche supplémentaire 1",
           "extra_2": "Code touche supplémentaire 2",
@@ -123,6 +126,7 @@
         "description": "À apprendre : {to_learn}\nGardées (cocher pour ré-apprendre) : {kept}\nRetirées : {forgotten}",
         "data": {
           "relearn_fan_off": "Ré-apprendre : ventilateur OFF",
+          "relearn_fan_off_reverse": "Ré-apprendre : ventilateur OFF (sens inverse)",
           "relearn_fan_on": "Ré-apprendre : ventilateur ON",
           "relearn_fan_speed_1": "Ré-apprendre : vitesse 1",
           "relearn_fan_speed_2": "Ré-apprendre : vitesse 2",
@@ -163,6 +167,7 @@
           "relearn_timer_2h": "Ré-apprendre : minuterie 2h",
           "relearn_timer_4h": "Ré-apprendre : minuterie 4h",
           "relearn_timer_8h": "Ré-apprendre : minuterie 8h",
+          "relearn_timer_off": "Ré-apprendre : annuler la minuterie",
           "relearn_sound_toggle": "Ré-apprendre : son",
           "relearn_extra_1": "Ré-apprendre : touche supplémentaire 1",
           "relearn_extra_2": "Ré-apprendre : touche supplémentaire 2",
@@ -195,7 +200,8 @@
           "color_temp_steps": "Nombre de positions de couleur",
           "light_level": "Luminosité de la lampe",
           "light_level_steps": "Nombre de niveaux de luminosité",
-          "has_timers": "Minuteries (1h/2h/4h/8h)",
+          "timer_hours": "Durées de minuterie",
+          "has_timer_off": "Touche dédiée d'annulation de minuterie",
           "has_sound": "Son (bip)"
         }
       }
@@ -249,6 +255,9 @@
     "button": {
       "timer": {
         "name": "Minuterie {hours}h"
+      },
+      "timer_off": {
+        "name": "Annuler la minuterie"
       },
       "recalibrate_color": {
         "name": "Recaler la couleur (sur la première position)"
@@ -313,6 +322,14 @@
     }
   },
   "selector": {
+    "timer_hours": {
+      "options": {
+        "1": "1 heure",
+        "2": "2 heures",
+        "4": "4 heures",
+        "8": "8 heures"
+      }
+    },
     "light_control": {
       "options": {
         "none": "Aucune",

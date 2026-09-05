@@ -88,13 +88,86 @@ async def test_migrate_v1_entry_derives_the_gateway_service(hass: HomeAssistant)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.version == 4
+    assert entry.version == 5
     assert entry.data["gateway_service"] == "esp32_test"
+
+
+async def test_migrate_v4_entry_turns_the_timer_boolean_into_a_list(
+    hass: HomeAssistant,
+) -> None:
+    """`has_timers: True` meant all four durations, so that is what it becomes.
+
+    No action key changes name, so nothing is relearned -- the codes must come
+    through untouched.
+    """
+    register_stub(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=4,
+        title="Timers",
+        data={
+            "esphome_device": DEVICE,
+            "gateway_service": "esp32_test",
+            "fan_name": "Timers",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_light": True,
+            "direction_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "natural_control": "none",
+            "has_timers": True,
+            "codes": dict(CODES),
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.version == 5
+    assert [int(h) for h in entry.data["timer_hours"]] == [1, 2, 4, 8]
+    assert entry.data["has_timer_off"] is False
+    # Dropped rather than left behind, like every boolean a selector replaced.
+    assert "has_timers" not in entry.data
+    assert entry.data["codes"] == dict(CODES)
+
+
+async def test_migrate_v4_entry_without_timers_lands_on_an_empty_list(
+    hass: HomeAssistant,
+) -> None:
+    """An absent boolean means the capability was declined, not unknown."""
+    register_stub(hass)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=4,
+        title="No timers",
+        data={
+            "esphome_device": DEVICE,
+            "gateway_service": "esp32_test",
+            "fan_name": "No timers",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_light": True,
+            "direction_control": "none",
+            "color_control": "none",
+            "light_level": "none",
+            "natural_control": "none",
+            "codes": dict(CODES),
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.version == 5
+    assert list(entry.data["timer_hours"]) == []
 
 
 async def test_entry_from_a_newer_version_is_refused(hass: HomeAssistant) -> None:
     """An entry written by a future release must not be silently downgraded."""
-    entry = MockConfigEntry(domain=DOMAIN, version=5, title="Future", data={})
+    entry = MockConfigEntry(domain=DOMAIN, version=6, title="Future", data={})
     entry.add_to_hass(hass)
 
     assert not await hass.config_entries.async_setup(entry.entry_id)
@@ -132,7 +205,7 @@ async def test_migrate_v2_entry_turns_the_booleans_into_selectors(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.version == 4
+    assert entry.version == 5
     assert entry.data["direction_control"] == "toggle"
     assert entry.data["color_control"] == "cycle"
     assert entry.data["light_level"] == "none"
@@ -202,7 +275,7 @@ async def test_migrate_v3_entry_turns_the_natural_boolean_into_a_selector(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.version == 4
+    assert entry.version == 5
     assert entry.data["natural_control"] == "toggle"
     # Dropped rather than left behind: two answers to "does this fan have a breeze
     # key?" is how they drift apart.

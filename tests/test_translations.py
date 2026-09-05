@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from custom_components.rf_fan.actions import split_actions
+from custom_components.rf_fan.const import TIMER_HOURS
 
 COMPONENT = Path(__file__).resolve().parent.parent / "custom_components" / "rf_fan"
 FILES = {
@@ -75,7 +76,7 @@ def _every_reachable_action() -> set[str]:
             (False, True),
             EXTRA_COUNTS,
         ):
-            required, _optional = split_actions(
+            required, optional = split_actions(
                 speed_count,
                 light,
                 has_fan_on=fan_on,
@@ -83,11 +84,18 @@ def _every_reachable_action() -> set[str]:
                 natural_control=natural,
                 color_control=color,
                 light_level=level,
-                has_timers=timers,
+                # All four durations plus the cancel key, or none of them: this axis
+                # exists to reach every timer LABEL, and which subset a real remote
+                # declares is `test_actions`'s business, not this file's.
+                timer_hours=TIMER_HOURS if timers else (),
+                has_timer_off=timers,
                 has_sound=sound,
                 extra_count=extras,
             )
+            # Optional actions are reachable too -- `fan_off_reverse` appears on the
+            # form like any other, so a missing label would be just as visible.
             actions.update(required)
+            actions.update(optional)
     return actions
 
 

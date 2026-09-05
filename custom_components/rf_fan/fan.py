@@ -21,6 +21,7 @@ from .const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_NATURAL_REVERSE,
     ACTION_FAN_OFF,
+    ACTION_FAN_OFF_REVERSE,
     ACTION_FAN_ON,
     ACTION_FAN_REVERSE,
     CONF_SPEED_COUNT,
@@ -180,8 +181,23 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             await self.async_set_preset_mode(self._pending_preset)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn off the fan."""
-        sent = await self._async_transmit_action(ACTION_FAN_OFF)
+        """Turn off the fan, in the direction it is actually running.
+
+        A `per_speed` remote encodes the direction in every frame it sends, its off
+        key included. Stopping a reversed fan with the forward off code does stop
+        it, but leaves the receiver storing "forward" while Home Assistant still
+        shows reverse -- so the next speed code starts it the wrong way round (#59,
+        measured by @Ltek).
+
+        `fan_off_reverse` is optional, and the fallback is the whole point: an entry
+        configured before this existed has no such code, gets `fan_off` exactly as
+        before, and never sees a failed transmission.
+        """
+        sent = False
+        if self._per_speed_direction and self._direction == DIRECTION_REVERSE:
+            sent = await self._async_transmit_action(ACTION_FAN_OFF_REVERSE)
+        if not sent:
+            sent = await self._async_transmit_action(ACTION_FAN_OFF)
         if sent:
             self._is_on = False
             self._percentage = 0
@@ -357,9 +373,20 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if action is None:
             return
 
-        if action == ACTION_FAN_OFF:
+        if action in (ACTION_FAN_OFF, ACTION_FAN_OFF_REVERSE):
             self._is_on = False
             self._percentage = 0
+            # Both off keys name their direction, so hearing one is an ABSOLUTE
+            # reading of a state that is otherwise dead-reckoned. Only trust it when
+            # the remote actually has the pair: with `fan_off` alone that key is
+            # direction-agnostic, and inferring "forward" from it would invent a
+            # fact the frame does not carry.
+            if self._per_speed_direction and ACTION_FAN_OFF_REVERSE in self._codes:
+                self._direction = (
+                    DIRECTION_REVERSE
+                    if action == ACTION_FAN_OFF_REVERSE
+                    else DIRECTION_FORWARD
+                )
             self._clear_timer()
             self.async_write_ha_state()
             return

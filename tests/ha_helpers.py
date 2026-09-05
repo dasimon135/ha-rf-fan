@@ -38,7 +38,13 @@ CODES = {
 }
 
 
-def full_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
+def full_entry(
+    hass: HomeAssistant,
+    repeat_count: int = 2,
+    *,
+    extra_codes: dict[str, str] | None = None,
+    extra_data: dict[str, Any] | None = None,
+) -> MockConfigEntry:
     """Create and register a full-capability entry (all flags + all codes)."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -53,11 +59,13 @@ def full_entry(hass: HomeAssistant, repeat_count: int = 2) -> MockConfigEntry:
             "has_natural_preset": True,
             "color_control": "cycle",
             "light_level": "none",
-            "has_timers": True,
+            "timer_hours": ["1", "2", "4", "8"],
+            "has_timer_off": False,
             "has_sound": True,
             "has_light": True,
             "repeat_count": repeat_count,
-            "codes": dict(CODES),
+            "codes": dict(CODES) | (extra_codes or {}),
+            **(extra_data or {}),
         },
     )
     entry.add_to_hass(hass)
@@ -83,10 +91,21 @@ def last_call(calls: list[dict[str, Any]], action: str) -> dict[str, Any] | None
     return None
 
 
-async def setup_full(hass: HomeAssistant, repeat_count: int = 2):
+async def setup_full(
+    hass: HomeAssistant,
+    repeat_count: int = 2,
+    *,
+    extra_codes: dict[str, str] | None = None,
+    extra_data: dict[str, Any] | None = None,
+):
     """Register the stub, set up a full entry, and return (entry, calls)."""
     calls = register_stub(hass)
-    entry = full_entry(hass, repeat_count=repeat_count)
+    entry = full_entry(
+        hass,
+        repeat_count=repeat_count,
+        extra_codes=extra_codes,
+        extra_data=extra_data,
+    )
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry, calls
@@ -148,6 +167,8 @@ def relative_entry(
     light_level_steps: int | None = None,
     natural_preset: bool = False,
     natural_control: str | None = None,
+    extra_codes: dict[str, str] | None = None,
+    extra_data: dict[str, Any] | None = None,
 ) -> MockConfigEntry:
     """Create an entry whose remote steps its values (issue #18 shape).
 
@@ -176,9 +197,11 @@ def relative_entry(
             "has_light": True,
             "repeat_count": repeat_count,
             "codes": dict(RELATIVE_CODES)
-            | (NATURAL_CODES if (natural_preset or natural_control not in (None, "none")) else {}),
+            | (NATURAL_CODES if (natural_preset or natural_control not in (None, "none")) else {})
+            | (extra_codes or {}),
             **({} if color_temp_steps is None else {"color_temp_steps": color_temp_steps}),
             **({} if light_level_steps is None else {"light_level_steps": light_level_steps}),
+            **(extra_data or {}),
         },
     )
     entry.add_to_hass(hass)
@@ -193,6 +216,8 @@ async def setup_relative(
     light_level_steps: int | None = None,
     natural_preset: bool = False,
     natural_control: str | None = None,
+    extra_codes: dict[str, str] | None = None,
+    extra_data: dict[str, Any] | None = None,
 ):
     """Register the stub, set up a stepped-control entry, and return (entry, calls)."""
     calls = register_stub(hass)
@@ -203,6 +228,8 @@ async def setup_relative(
         light_level_steps=light_level_steps,
         natural_preset=natural_preset,
         natural_control=natural_control,
+        extra_codes=extra_codes,
+        extra_data=extra_data,
     )
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
