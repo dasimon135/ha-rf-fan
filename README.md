@@ -1,8 +1,8 @@
 # RF Fan — Home Assistant integration
 
 [![Release](https://img.shields.io/github/v/release/dasimon135/ha-rf-fan)](https://github.com/dasimon135/ha-rf-fan/releases)
-[![Validate](https://github.com/dasimon135/ha-rf-fan/actions/workflows/validate.yml/badge.svg)](https://github.com/dasimon135/ha-rf-fan/actions/workflows/validate.yml)
 [![Tests](https://github.com/dasimon135/ha-rf-fan/actions/workflows/tests.yml/badge.svg)](https://github.com/dasimon135/ha-rf-fan/actions/workflows/tests.yml)
+[![Validate](https://github.com/dasimon135/ha-rf-fan/actions/workflows/validate.yml/badge.svg)](https://github.com/dasimon135/ha-rf-fan/actions/workflows/validate.yml)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License](https://img.shields.io/github/license/dasimon135/ha-rf-fan)](LICENSE)
 
@@ -258,7 +258,7 @@ your module already has a spring antenna or an SMA connector. A full working con
 [esphome/rf_fan_example.yaml](esphome/rf_fan_example.yaml). RX can be noisy depending on
 the local 433 MHz environment; TX is reliable.
 
-## Installation (HACS)
+## Installation
 
 1. Add this repository as a **custom repository** of type `Integration`.
 2. Install **RF Fan**.
@@ -636,6 +636,35 @@ toggle, which is why the default is not 2.
 A drifted colour position is resynced with the **calibrate** button (it emits nothing, it
 just resets the assumption to Warm). A button that was mis-captured is fixed with
 **⋮ → Reconfigure → Relearn RF codes**.
+
+## Support
+
+Open an issue here for anything about this integration — a bug, a question, or a
+feature request. Forum threads are for general discussion and user-to-user help;
+nothing raised there is tracked, and it can be lost. An issue cannot.
+
+Before you open one, read [Known limitations](#known-limitations) and
+[Troubleshooting](#troubleshooting). This integration replays codes it cannot
+verify, so a good share of reported problems are documented behaviour rather
+than defects.
+
+To get a useful answer on the first exchange, include:
+
+- your Home Assistant version and the version of this integration;
+- the gateway — board and CC1101 module, ESPHome version — and the fan or remote
+  model with its frequency;
+- the diagnostics download (Settings → Devices & services → RF Fan → **⋮** →
+  *Download diagnostics*), which dumps what the integration currently believes;
+- a debug log, plus what you did, what you expected, and what happened instead.
+
+### Staying informed
+
+New versions are announced here and nowhere else. To hear about one:
+
+- **HACS already offers you the update**, release notes included — nothing to do;
+- subscribe to `https://github.com/dasimon135/ha-rf-fan/releases.atom` in any RSS
+  reader, or inside Home Assistant through the `feedreader` integration;
+- or use **Watch → Custom → Releases** on this repository.
 
 ## Development
 
