@@ -603,11 +603,11 @@ class RfFanCard extends HTMLElement {
       .tile.off .tfan .blades ellipse { fill: var(--disabled-text-color); }
       .tfan .hub { fill: var(--card-background-color); }
       .tfan .hub2 { fill: var(--rf-fan-accent, var(--primary-color)); }
-      .tinfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px;
+      .tinfo { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:0;
                cursor:pointer; border-radius:8px; outline:none; }
       .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--rf-fan-accent, var(--primary-color)); }
-      .tname { font-weight:600; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .tsub { font-size:.78rem; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tname { font-weight:600; font-size:14px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tsub { font-size:12px; line-height:16px; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .tctl { flex:0 0 auto; display:flex; gap:6px; }
       .tbtn { width:34px; height:34px; border-radius:9px; border:1px solid var(--divider-color);
               background: var(--card-background-color); color: var(--primary-text-color); font-size:1.1rem;
