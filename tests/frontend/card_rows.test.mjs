@@ -299,3 +299,63 @@ describe("card i18n", () => {
     }
   });
 });
+
+describe("airflow preset chips", () => {
+  /** A remote whose airflow key comes in levels (#61, @Ltek's Breeze 1/2/3). */
+  const withPresets = (modes, current) => {
+    const made = makeHass();
+    Object.assign(made.hass.states["fan.x"].attributes, {
+      preset_modes: modes,
+      ...(current === undefined ? {} : { preset_mode: current }),
+    });
+    return made;
+  };
+
+  it("draws one chip per level, numbered", () => {
+    const { hass } = withPresets(["normal", "natural 1", "natural 2", "natural 3"], "natural 2");
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.match(html, /data-preset="natural 1"/);
+    assert.match(html, /data-preset="natural 3"/);
+    assert.match(html, /<span>Natural 2<\/span>/, "the level number is not on the chip");
+  });
+
+  it("marks the level the fan is assumed to be in", () => {
+    const { hass } = withPresets(["normal", "natural 1", "natural 2"], "natural 2");
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.match(html, /class="chip active" data-preset="natural 2"/);
+    assert.doesNotMatch(html, /class="chip active" data-preset="normal"/);
+  });
+
+  it("sets exactly the level that was clicked", () => {
+    const { hass, calls } = withPresets(["normal", "natural 1", "natural 2"], "normal");
+    const { card } = render(RfFanCard, FULL, hass);
+
+    card._onClick({ target: { closest: () => ({ dataset: { preset: "natural 2" } }) } });
+
+    assert.deepEqual(calls, [
+      {
+        domain: "fan",
+        service: "set_preset_mode",
+        data: { entity_id: "fan.x", preset_mode: "natural 2" },
+      },
+    ]);
+  });
+
+  it("keeps the historical pair for a remote with one airflow key", () => {
+    const { hass } = withPresets(["normal", "natural"], "natural");
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.match(html, /data-preset="natural"/);
+    assert.doesNotMatch(html, /data-preset="natural 1"/);
+    assert.match(html, /<span>Natural<\/span>/);
+  });
+
+  it("reads an unknown preset as normal, as the pair of chips always did", () => {
+    const { hass } = withPresets(["normal", "natural"], undefined);
+    const { html } = render(RfFanCard, FULL, hass);
+
+    assert.match(html, /class="chip active" data-preset="normal"/);
+  });
+});

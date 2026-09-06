@@ -23,6 +23,7 @@ from .actions import (
     extra_button_count,
     extra_names,
     light_level_steps,
+    natural_level_count,
     pick_best_code,
     split_actions,
     validate_codes,
@@ -47,6 +48,7 @@ from .const import (
     CONF_LIGHT_LEVEL,
     CONF_LIGHT_LEVEL_STEPS,
     CONF_NATURAL_CONTROL,
+    CONF_NATURAL_LEVELS,
     CONF_REPEAT_COUNT,
     CONF_SPEED_COUNT,
     CONF_TIMER_HOURS,
@@ -62,10 +64,13 @@ from .const import (
     LIGHT_CONTROL_TOGGLE,
     LIGHT_LEVEL_OPTIONS,
     MAX_EXTRA_COUNT,
+    MAX_NATURAL_LEVELS,
     MAX_SPEED_COUNT,
     MAX_STEP_COUNT,
+    MIN_NATURAL_LEVELS,
     MIN_SPEED_COUNT,
     MIN_STEP_COUNT,
+    NATURAL_CONTROL_DEDICATED,
     NATURAL_CONTROL_OPTIONS,
     TIMER_HOURS,
     extra_action,
@@ -81,7 +86,7 @@ LEARN_COLLECT_SEC = 1.2
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
-    VERSION = 5
+    VERSION = 6
 
     @staticmethod
     @callback
@@ -100,6 +105,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._has_light: bool = True
         self._caps: dict[str, object] = {}
         self._extra_count: int = 0
+        # How many natural-airflow levels the remote has keys for, 0 for the
+        # single-level shape. Kept beside `_extra_count` rather than in `_steps`,
+        # and the distinction is exactly the one `_steps` documents below: this
+        # count DOES decide which codes get learned.
+        self._natural_levels: int = 0
         self._extra_names: dict[str, str] = {}
         # How many positions the stepped controls model. Kept beside the
         # capabilities rather than inside them: `caps_from_data` feeds
@@ -184,20 +194,34 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         # Asked for unconditionally rather than only when the capability is enabled:
         # this is a single form, so a count that appeared and disappeared with the
         # selector above it would need a second step to be filled in at all.
-        for capability, options, step_key, step_default in (
-            (CONF_DIRECTION_CONTROL, DIRECTION_CONTROL_OPTIONS, None, 0),
-            (CONF_NATURAL_CONTROL, NATURAL_CONTROL_OPTIONS, None, 0),
+        # The menus those counts choose from. Airflow levels get their own, because
+        # zero is a real answer there -- it is the single-level remote this
+        # integration started with -- while a stepped control with no positions at
+        # all is not a thing anyone owns.
+        step_choices = list(range(MIN_STEP_COUNT, MAX_STEP_COUNT + 1))
+        level_choices = [0, *range(MIN_NATURAL_LEVELS, MAX_NATURAL_LEVELS + 1)]
+        for capability, options, count_key, count_default, count_choices in (
+            (CONF_DIRECTION_CONTROL, DIRECTION_CONTROL_OPTIONS, None, 0, ()),
+            (
+                CONF_NATURAL_CONTROL,
+                NATURAL_CONTROL_OPTIONS,
+                CONF_NATURAL_LEVELS,
+                self._natural_levels,
+                level_choices,
+            ),
             (
                 CONF_COLOR_CONTROL,
                 COLOR_CONTROL_OPTIONS,
                 CONF_COLOR_TEMP_STEPS,
-                DEFAULT_COLOR_TEMP_STEPS,
+                self._steps.get(CONF_COLOR_TEMP_STEPS, DEFAULT_COLOR_TEMP_STEPS),
+                step_choices,
             ),
             (
                 CONF_LIGHT_LEVEL,
                 LIGHT_LEVEL_OPTIONS,
                 CONF_LIGHT_LEVEL_STEPS,
-                DEFAULT_LIGHT_LEVEL_STEPS,
+                self._steps.get(CONF_LIGHT_LEVEL_STEPS, DEFAULT_LIGHT_LEVEL_STEPS),
+                step_choices,
             ),
         ):
             fields[
@@ -205,10 +229,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             ] = SelectSelector(
                 SelectSelectorConfig(options=options, translation_key=capability)
             )
-            if step_key is not None:
-                fields[
-                    vol.Required(step_key, default=self._steps.get(step_key, step_default))
-                ] = vol.In(list(range(MIN_STEP_COUNT, MAX_STEP_COUNT + 1)))
+            if count_key is not None:
+                fields[vol.Required(count_key, default=count_default)] = vol.In(
+                    list(count_choices)
+                )
         # Sleep timers: a multi-select, not a boolean. Demanding all four durations
         # is what stopped a remote with off/2/4/8 declaring timers at all (#59), and
         # which durations a remote has is not derivable from anything else.
@@ -274,11 +298,14 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
                     CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
                 }
-                self._extra_count = extra_button_count(dict(user_input))
-                if self._extra_count:
-                    return await self.async_step_extra_names()
-                self._extra_names = {}
-                return await self.async_step_method()
+                error = self._read_natural_levels(user_input)
+                if error is None:
+                    self._extra_count = extra_button_count(dict(user_input))
+                    if self._extra_count:
+                        return await self.async_step_extra_names()
+                    self._extra_names = {}
+                    return await self.async_step_method()
+                errors[CONF_NATURAL_LEVELS] = error
 
         return self.async_show_form(
             step_id="user",
@@ -397,6 +424,22 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    def _read_natural_levels(self, user_input: dict[str, Any]) -> str | None:
+        """Store the declared airflow-level count, or name why it cannot be stored.
+
+        Levels only mean something on a `dedicated` remote: a level IS a value, and
+        a key that merely flips carries none. Refused rather than quietly dropped --
+        the form would otherwise accept a remote nobody can model and go on to learn
+        the wrong keys for it, and which half of the answer was meant is not
+        guessable from the form.
+        """
+        levels = natural_level_count(dict(user_input))
+        if levels and self._caps.get(CONF_NATURAL_CONTROL) != NATURAL_CONTROL_DEDICATED:
+            self._natural_levels = 0
+            return "natural_levels_need_dedicated"
+        self._natural_levels = levels
+        return None
+
     def _split_actions(self) -> tuple[list[str], list[str]]:
         """The (required, optional) pair for the fan as currently declared."""
         return split_actions(
@@ -404,6 +447,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             self._light_control,
             has_fan_on=self._has_fan_on,
             extra_count=self._extra_count,
+            natural_levels=self._natural_levels,
             **self._caps,
         )
 
@@ -601,6 +645,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_HAS_LIGHT: self._has_light,
             **self._caps,
             **self._steps,
+            CONF_NATURAL_LEVELS: self._natural_levels,
             CONF_EXTRA_COUNT: self._extra_count,
             CONF_EXTRA_NAMES: dict(self._extra_names),
             CONF_REPEAT_COUNT: self._repeat_count,
@@ -645,6 +690,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(data)),
             CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(data)),
         }
+        self._natural_levels = natural_level_count(dict(data))
         self._extra_count = extra_button_count(dict(data))
         self._extra_names = {
             action: label or extra_default_name(index)
@@ -713,6 +759,13 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
             CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
         }
+        error = self._read_natural_levels(user_input)
+        if error is not None:
+            return self.async_show_form(
+                step_id="reconfigure_capabilities",
+                data_schema=self._base_schema(include_device=False),
+                errors={CONF_NATURAL_LEVELS: error},
+            )
         # The same form carries the count on both paths, and only the creation path
         # used to read it: reconfiguring asked for no new code and stored nothing,
         # so the count silently returned to what it had been (#18, on 1.8.1b1).

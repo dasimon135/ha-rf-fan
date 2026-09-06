@@ -38,7 +38,8 @@ Cecotec fan is used as the reference example, but any RF fan works.
   - **Color temperature**: none / one cycling button / *two buttons* (warmer and
     cooler).
   - **Light brightness**: none / *two buttons* (brighter and dimmer).
-  - Optional **natural-airflow preset** and **sound** toggle.
+  - Optional **natural-airflow preset**, in one level or several, and **sound**
+    toggle.
   - **Sleep timers**: tick only the durations your remote actually has, out of
     1/2/4/8 h — they are independent, so a remote with off/2/4/8 declares three and
     nothing is missing. A separate **timer-cancel key** can be declared alongside
@@ -60,7 +61,7 @@ Depending on the declared capabilities, a device exposes:
 
 | Entity | When | Notes |
 | --- | --- | --- |
-| `fan` | always | discrete speeds; gains `direction` and a `natural` preset when enabled |
+| `fan` | always | discrete speeds; gains `direction` and one or more `natural` presets when enabled |
 | `light` | light ≠ none | on/off; gains a dead-reckoned `brightness` when the remote has ± keys |
 | `select` "color temperature" | color ≠ none | Warm → Neutral → Cold |
 | `button` calibrate | color ≠ none | resyncs the assumed color position — **emits nothing** |
@@ -153,6 +154,31 @@ One consequence worth knowing: a `dedicated` breeze key is **deaf while the fan 
 off** — the mode only exists while it is running. Asking for the preset with the fan
 stopped therefore transmits nothing; it is remembered, and pressed for you on the
 next start, right after the speed code that gets the fan going.
+
+### Breeze in several levels
+
+Some remotes give the breeze its own scale: *Breeze 1*, *Breeze 2*, *Breeze 3*, each
+a key of its own. Set **natural airflow levels** to how many there are and each
+becomes a preset mode on the fan entity — `natural 1` … `natural N` beside `normal`
+— so the level is something `fan.set_preset_mode` can set, the recorder can graph,
+and the card can show as one chip per level.
+
+| | Levels | Codes learned |
+| --- | --- | --- |
+| One breeze key | `0` | `fan_natural` (+ `fan_natural_reverse`) |
+| Breeze 1/2/3 | `3` | `fan_natural_1`…`_3` (+ `fan_natural_1_reverse`…) |
+
+Zero is the default and means the single-key shape, so an existing fan changes
+nothing and relearns nothing. Levels need `natural_control: dedicated`: a level is a
+value to set, and a key that only flips carries none — the form refuses the pairing
+rather than guessing which half you meant.
+
+A speed key still leaves the preset, exactly as it does with one level. On the
+remote that prompted this ([#61]) the frames say so on their own: the breeze level
+and the speed number are values of the *same* field in the code, so a speed press
+overwrites the level rather than sitting beside it.
+
+[#61]: https://github.com/dasimon135/ha-rf-fan/issues/61
 
 ### Keys this integration has no concept of
 

@@ -16,7 +16,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .actions import caps_from_data
+from .actions import caps_from_data, natural_level_count
 from .const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_NATURAL_REVERSE,
@@ -32,6 +32,8 @@ from .const import (
     NATURAL_CONTROL_NONE,
     PRESET_NATURAL,
     PRESET_NORMAL,
+    natural_action,
+    preset_natural,
     speed_action,
 )
 from .entity import RfFanBaseEntity
@@ -73,6 +75,12 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         self._dedicated_preset: bool = (
             self._natural_control == NATURAL_CONTROL_DEDICATED
         )
+        # How many airflow LEVELS this remote has keys for, 0 for the single-level
+        # shape. Only a `dedicated` remote can declare levels -- a key that merely
+        # flips carries no value to set -- and the config flow refuses the other
+        # pairing, so a non-zero count already implies `_dedicated_preset`.
+        self._natural_levels: int = natural_level_count(dict(config_entry.data))
+        self._levelled_preset: bool = bool(self._natural_levels)
 
         # Supported features computed per instance based on the capabilities
         features = (
@@ -86,8 +94,19 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             features |= FanEntityFeature.PRESET_MODE
         self._attr_supported_features = features
 
+        # One preset per declared level, plus `normal`. The single-level shape
+        # keeps the exact spelling it has always had: a preset name IS the entity's
+        # state, so renaming it would break every automation that compares against
+        # it and every line of recorder history already written.
+        self._preset_levels: dict[str, int] = {
+            preset_natural(level): level
+            for level in range(1, self._natural_levels + 1)
+        }
         if self._has_preset:
-            self._attr_preset_modes = [PRESET_NORMAL, PRESET_NATURAL]
+            self._attr_preset_modes = [
+                PRESET_NORMAL,
+                *(self._preset_levels or (PRESET_NATURAL,)),
+            ]
 
         # Assumed state of the optional capabilities
         self._direction: str | None = None
@@ -135,7 +154,10 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                     self._direction = direction
             if self._has_preset:
                 preset = last_state.attributes.get("preset_mode")
-                if preset in (PRESET_NORMAL, PRESET_NATURAL):
+                # Membership rather than a fixed pair: the declared level count can
+                # change on a reconfigure, and a preset the remote no longer has is
+                # not a state this entity may claim to be in.
+                if preset in (self._attr_preset_modes or ()):
                     self._preset = preset
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
 
@@ -220,8 +242,8 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         reverse = self._per_speed_direction and self._direction == DIRECTION_REVERSE
         return speed_action(index, reverse=reverse)
 
-    def _natural_action_for(self) -> str:
-        """Natural-airflow action key, in the current direction.
+    def _natural_action_for(self, level: int | None = None) -> str:
+        """Natural-airflow action key for a level, in the current direction.
 
         The mirror of `_speed_action_for`, one level down: a `per_speed` remote
         gives this key a code per direction as well, so sending the summer code
@@ -236,6 +258,13 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         until it is reconfigured.
         """
         reverse = self._per_speed_direction and self._direction == DIRECTION_REVERSE
+        if level is not None:
+            # A levelled remote learns its winter keys in the same pass as its
+            # summer ones, so no entry can be missing one -- but the fallback costs
+            # nothing and keeps a single rule for both shapes.
+            if reverse and self._codes.get(natural_action(level, reverse=True)):
+                return natural_action(level, reverse=True)
+            return natural_action(level)
         if reverse and self._codes.get(ACTION_FAN_NATURAL_REVERSE):
             return ACTION_FAN_NATURAL_REVERSE
         return ACTION_FAN_NATURAL
@@ -303,7 +332,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         A `toggle` remote has never been measured doing that, and inventing it
         would desynchronise the one shape that works today.
         """
-        if self._dedicated_preset and self._preset == PRESET_NATURAL:
+        if self._dedicated_preset and self._preset not in (None, PRESET_NORMAL):
             self._preset = PRESET_NORMAL
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
@@ -334,7 +363,10 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                 self.async_write_ha_state()
             return
 
-        if preset_mode == PRESET_NATURAL:
+        if preset_mode != PRESET_NORMAL:
+            # `None` on the single-level shape, which is what `_natural_action_for`
+            # reads as "the one airflow key".
+            level = self._preset_levels.get(preset_mode)
             if not (self._is_on and self._percentage):
                 # Deferred, and shown: the fan is stopped, so the next start is what
                 # carries it. Mirrors how `per_speed` records a direction with the
@@ -343,7 +375,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                 self._pending_preset = preset_mode
                 self.async_write_ha_state()
                 return
-            if await self._async_transmit_action(self._natural_action_for()):
+            if await self._async_transmit_action(self._natural_action_for(level)):
                 self._preset = preset_mode
                 self._pending_preset = None
                 self.async_write_ha_state()
@@ -406,6 +438,25 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             )
             self.async_write_ha_state()
             return
+
+        if self._levelled_preset:
+            for level in range(1, self._natural_levels + 1):
+                for reverse in (False, True):
+                    if action != natural_action(level, reverse=reverse):
+                        continue
+                    # A levelled key SETS its level and never flips it, so it reads
+                    # exactly like a speed code. It does NOT start the fan: on this
+                    # shape of remote the airflow key is deaf while the fan is
+                    # stopped (#34), so recording an "on" here would invent a fact
+                    # the frame does not carry.
+                    self._preset = preset_natural(level)
+                    self._pending_preset = None
+                    if self._per_speed_direction:
+                        self._direction = (
+                            DIRECTION_REVERSE if reverse else DIRECTION_FORWARD
+                        )
+                    self.async_write_ha_state()
+                    return
 
         if action in (ACTION_FAN_NATURAL, ACTION_FAN_NATURAL_REVERSE):
             # A `dedicated` key SETS the preset: following it as a flip drifts by

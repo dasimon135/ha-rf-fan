@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.9.1";
+const VERSION = "1.10.0";
 
 // Everything interpolated into innerHTML goes through this: entity names are
 // user-editable, so an unescaped `<` in a friendly name would break the markup.
@@ -366,9 +366,21 @@ class RfFanCard extends HTMLElement {
     }
     if (feat & FEATURE_PRESET_MODE) {
       const preset = fan.attributes.preset_mode;
+      // One chip per preset the entity declares, rather than the historical pair: a
+      // remote whose airflow key comes in levels offers `natural 1 … natural N`
+      // (#61). The level number is the only part of a label that is not translated.
+      const modes = fan.attributes.preset_modes || ["normal", "natural"];
       modeChips.push(
-        `<button class="chip ${preset !== "natural" ? "active" : ""}" data-preset="normal"><ha-icon icon="mdi:fan"></ha-icon><span>${L.normal}</span></button>`,
-        `<button class="chip ${preset === "natural" ? "active" : ""}" data-preset="natural"><ha-icon icon="mdi:weather-windy"></ha-icon><span>${L.natural}</span></button>`
+        ...modes.map((mode) => {
+          const level = /^natural (\d+)$/.exec(mode);
+          const label =
+            mode === "normal" ? L.normal : level ? `${L.natural} ${level[1]}` : L.natural;
+          const icon = mode === "normal" ? "mdi:fan" : "mdi:weather-windy";
+          // An unknown preset reads as `normal`, which is what the pair of chips
+          // did before there was a menu to read.
+          const active = preset === mode || (mode === "normal" && !preset);
+          return `<button class="chip ${active ? "active" : ""}" data-preset="${mode}"><ha-icon icon="${icon}"></ha-icon><span>${label}</span></button>`;
+        })
       );
     }
 
