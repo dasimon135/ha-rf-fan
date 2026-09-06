@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The tile layout is one Home Assistant grid row tall (56 px) instead of 62 px, so
   it lines up with the native tile card and with Mushroom cards in the same column.
-  The icon dot goes from 42 px to 36 px and the fan glyph from 26 px to 24 px,
-  keeping the icon-in-shape ratio the other cards use. Card 1.9.1.
+  The icon dot goes from 42 px to 36 px, the fan glyph from 26 px to 24 px, and the
+  name/state pair gets Home Assistant's text metrics (14 px on a 20 px line, 12 px on
+  a 16 px line) instead of an unset line-height that made it the tallest child at 38 px.
+  The name is a hair smaller, matching the native tile card. Card 1.9.1.
 
 ## [1.9.0] - 2026-09-05
 
