@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.9.0";
+const VERSION = "1.9.1";
 
 // Everything interpolated into innerHTML goes through this: entity names are
 // user-editable, so an unescaped `<` in a friendly name would break the markup.
@@ -591,12 +591,12 @@ class RfFanCard extends HTMLElement {
       /* Tile (ultra-compact) layout — config: layout: tile */
       ha-card.tilecard { padding: 10px 12px; }
       .tile { display:flex; align-items:center; gap:12px; }
-      .tdot { flex:0 0 auto; width:42px; height:42px; border-radius:50%; border:none; cursor:pointer;
+      .tdot { flex:0 0 auto; width:36px; height:36px; border-radius:50%; border:none; cursor:pointer;
               display:grid; place-items:center; padding:0; background: var(--divider-color); }
       .tile:not(.off) .tdot { background: color-mix(in srgb, var(--rf-fan-accent, var(--primary-color)) 22%, var(--card-background-color));
               box-shadow: 0 0 0 2px color-mix(in srgb, var(--rf-fan-accent, var(--primary-color)) 55%, transparent),
                           0 0 14px 1px color-mix(in srgb, var(--rf-fan-accent, var(--primary-color)) 45%, transparent); }
-      .tfan { width:26px; height:26px; }
+      .tfan { width:24px; height:24px; }
       .tfan .blades { transform-origin:50px 50px; animation: rf-spin var(--spin-dur,0s) linear infinite; }
       .tfan.off .blades { animation-play-state: paused; }
       .tfan .blades ellipse { fill: var(--rf-fan-accent, var(--primary-color)); }

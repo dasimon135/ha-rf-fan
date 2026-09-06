@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-09-06
+
+### Fixed
+
+- The tile layout is one Home Assistant grid row tall (56 px) instead of 62 px, so
+  it lines up with the native tile card and with Mushroom cards in the same column.
+  The icon dot goes from 42 px to 36 px and the fan glyph from 26 px to 24 px,
+  keeping the icon-in-shape ratio the other cards use. Card 1.9.1.
+
 ## [1.9.0] - 2026-09-05
 
 ### Added
