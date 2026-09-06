@@ -29,6 +29,7 @@ from .const import (
     CONF_HAS_TIMERS,
     CONF_LIGHT_LEVEL,
     CONF_NATURAL_CONTROL,
+    CONF_NATURAL_LEVELS,
     CONF_TIMER_HOURS,
     DIRECTION_CONTROL_NONE,
     DIRECTION_CONTROL_TOGGLE,
@@ -257,8 +258,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     four — that is exactly what the boolean meant — so NO CODE CHANGES NAME and
     nothing is relearned. The new `has_timer_off` is a claim about the hardware
     nobody has been asked yet, so it starts False.
+
+    v5 -> v6: the natural-airflow preset gains a LEVEL count
+    (const.CONF_NATURAL_LEVELS), because a remote whose airflow key comes in three
+    levels had no home at all (#61, @Ltek). Every existing entry declares zero,
+    which IS the single-level shape it was set up as, so NO CODE CHANGES NAME and
+    nothing is relearned.
     """
-    if entry.version > 5:
+    if entry.version > 6:
         # Entry created by a newer version of the integration: cannot downgrade.
         return False
     if entry.version < 2:
@@ -323,6 +330,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data.pop(CONF_HAS_TIMERS, None)
         hass.config_entries.async_update_entry(entry, data=data, version=5)
         _LOGGER.debug("Migrated config entry %s to version 5", entry.entry_id)
+    if entry.version < 6:
+        data = dict(entry.data)
+        # Zero is not "unset": it is the shape every existing entry was configured
+        # as, one airflow key answering to `fan_natural`. Levels are a claim about
+        # the hardware that only its owner can make, so nobody is migrated into one.
+        data.setdefault(CONF_NATURAL_LEVELS, 0)
+        hass.config_entries.async_update_entry(entry, data=data, version=6)
+        _LOGGER.debug("Migrated config entry %s to version 6", entry.entry_id)
     return True
 
 

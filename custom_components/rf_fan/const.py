@@ -98,6 +98,29 @@ NATURAL_CONTROL_OPTIONS: Final = [
     NATURAL_CONTROL_DEDICATED,
 ]
 
+# How many natural-airflow LEVELS the remote has a key for.
+#
+# Zero is the shape this integration started with: one airflow key, one
+# `PRESET_NATURAL`, and it stays the default so no existing entry changes meaning.
+# Two or more is a remote like @Ltek's, whose Breeze key comes in three levels
+# (#61): one key per level, each of which SETS that level.
+#
+# One is deliberately not offered. A single level IS zero, under a different action
+# name, so offering both would be two ways to declare the same remote -- differing
+# only in which code has to be learned.
+#
+# Only meaningful alongside `natural_control: dedicated`. A level is a value, and a
+# key that merely FLIPS carries no value, so `toggle` cannot express levels at all;
+# the config flow rejects that pairing rather than guess which half was meant.
+CONF_NATURAL_LEVELS: Final = "natural_levels"
+# Capped for the same reason as the free-form keys: every reachable action must
+# carry a label in all three translation files, which an unbounded count could not
+# satisfy. Six is well past the three levels any remote has been reported with.
+MAX_NATURAL_LEVELS: Final = 6
+# Two is the least that can be called a set of levels; one is the single-level shape
+# and is spelled zero. See `natural_action` for why the two cannot share keys.
+MIN_NATURAL_LEVELS: Final = 2
+
 # How the remote controls the rotation direction.
 #   none      - no direction control at all
 #   toggle    - one `fan_reverse` key that flips the direction (dead-reckoned)
@@ -335,3 +358,30 @@ def speed_action(index: int, *, reverse: bool = False) -> str:
 def timer_action(hours: int) -> str:
     """Action key for the N-hour timer."""
     return f"timer_{hours}h"
+
+
+def natural_action(index: int, *, reverse: bool = False) -> str:
+    """Action key for the nth natural-airflow level (1-based).
+
+    Mirrors `speed_action`, and for the same reason: on a remote that models levels,
+    an airflow key is a speed key in everything but which set it belongs to. The
+    index is what the learned code is stored against, so reducing the declared count
+    forgets the LAST level rather than renumbering -- reassigning a learned code to a
+    different level would emit the wrong one, silently.
+
+    `fan_natural` and `fan_natural_reverse` are NOT level one under another name.
+    They are the single-level shape, and they keep their historical names so that no
+    entry configured before levels existed has to relearn anything.
+    """
+    return f"fan_natural_{index}_reverse" if reverse else f"fan_natural_{index}"
+
+
+def preset_natural(index: int) -> str:
+    """Preset-mode name for the nth natural-airflow level (1-based).
+
+    A preset name IS the entity's state: it goes into recorder history and into
+    every automation that compares against it. `PRESET_NATURAL` therefore keeps its
+    exact spelling for the single-level shape, and only a remote that declares
+    levels ever shows a numbered one.
+    """
+    return f"{PRESET_NATURAL} {index}"

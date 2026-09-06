@@ -32,6 +32,7 @@ try:  # Home Assistant runtime: relative import within the package
         CONF_HAS_TIMER_OFF,
         CONF_HAS_TIMERS,
         CONF_LIGHT_LEVEL_STEPS,
+        CONF_NATURAL_LEVELS,
         CONF_TIMER_HOURS,
         DEFAULT_COLOR_TEMP_STEPS,
         DEFAULT_LIGHT_LEVEL_STEPS,
@@ -43,7 +44,9 @@ try:  # Home Assistant runtime: relative import within the package
         LIGHT_LEVEL_NONE,
         LIGHT_LEVEL_RELATIVE,
         MAX_EXTRA_COUNT,
+        MAX_NATURAL_LEVELS,
         MAX_STEP_COUNT,
+        MIN_NATURAL_LEVELS,
         MIN_STEP_COUNT,
         NATURAL_CONTROL_NONE,
         NATURAL_CONTROL_TOGGLE,
@@ -52,6 +55,7 @@ try:  # Home Assistant runtime: relative import within the package
         TIMER_HOURS,
         TOGGLE_ACTIONS,
         extra_action,
+        natural_action,
         speed_action,
         timer_action,
     )
@@ -83,6 +87,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         CONF_HAS_TIMER_OFF,
         CONF_HAS_TIMERS,
         CONF_LIGHT_LEVEL_STEPS,
+        CONF_NATURAL_LEVELS,
         CONF_TIMER_HOURS,
         DEFAULT_COLOR_TEMP_STEPS,
         DEFAULT_LIGHT_LEVEL_STEPS,
@@ -94,7 +99,9 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         LIGHT_LEVEL_NONE,
         LIGHT_LEVEL_RELATIVE,
         MAX_EXTRA_COUNT,
+        MAX_NATURAL_LEVELS,
         MAX_STEP_COUNT,
+        MIN_NATURAL_LEVELS,
         MIN_STEP_COUNT,
         NATURAL_CONTROL_NONE,
         NATURAL_CONTROL_TOGGLE,
@@ -103,6 +110,7 @@ except ImportError:  # pragma: no cover - tests: top-level import via conftest
         TIMER_HOURS,
         TOGGLE_ACTIONS,
         extra_action,
+        natural_action,
         speed_action,
         timer_action,
     )
@@ -115,6 +123,7 @@ def split_actions(
     has_fan_on: bool = False,
     direction_control: str = DIRECTION_CONTROL_NONE,
     natural_control: str = NATURAL_CONTROL_NONE,
+    natural_levels: int = 0,
     color_control: str = COLOR_CONTROL_NONE,
     light_level: str = LIGHT_LEVEL_NONE,
     timer_hours: Iterable[int] = (),
@@ -169,12 +178,29 @@ def split_actions(
     if direction_control == DIRECTION_CONTROL_TOGGLE:
         required.append(ACTION_FAN_REVERSE)
     if natural_control != NATURAL_CONTROL_NONE:
-        required.append(ACTION_FAN_NATURAL)
-        # Same reasoning as the reverse speeds, and the same combination: a remote
-        # that has no direction key gives its natural-airflow key a code per
-        # direction too, so one more key has to be learned — and only here.
-        if direction_control == DIRECTION_CONTROL_PER_SPEED:
-            required.append(ACTION_FAN_NATURAL_REVERSE)
+        levels = natural_levels if natural_levels >= MIN_NATURAL_LEVELS else 0
+        if levels:
+            # One key per level, each of which SETS that level (#61, @Ltek's Breeze
+            # 1/2/3). The single-level keys are NOT reused as level one: they name a
+            # different button on a different remote, and an entry that declares
+            # levels has never been asked to learn them.
+            required.extend(natural_action(index) for index in range(1, levels + 1))
+            # Same reasoning as the reverse speeds, and the same combination: a
+            # remote with no direction key gives every airflow level a code per
+            # direction too. Kept adjacent to the forward levels, which is the order
+            # they are learned in.
+            if direction_control == DIRECTION_CONTROL_PER_SPEED:
+                required.extend(
+                    natural_action(index, reverse=True)
+                    for index in range(1, levels + 1)
+                )
+        else:
+            required.append(ACTION_FAN_NATURAL)
+            # Same reasoning as the reverse speeds, and the same combination: a remote
+            # that has no direction key gives its natural-airflow key a code per
+            # direction too, so one more key has to be learned — and only here.
+            if direction_control == DIRECTION_CONTROL_PER_SPEED:
+                required.append(ACTION_FAN_NATURAL_REVERSE)
     if color_control == COLOR_CONTROL_CYCLE:
         required.append(ACTION_LIGHT_KELVIN)
     elif color_control == COLOR_CONTROL_RELATIVE:
@@ -361,6 +387,24 @@ def caps_from_data(data: dict[str, object]) -> dict[str, object]:
         else:
             caps[name] = default
     return caps
+
+
+def natural_level_count(data: dict[str, object]) -> int:
+    """Number of natural-airflow levels declared for this fan, clamped on read.
+
+    Clamped like the free-form key count, and for the same reason: the value reaches
+    here from stored entry data, which outlives the dropdown that validated it.
+    Anything unreadable, and anything below the minimum, means the single-level
+    shape — which is exactly what an entry created before levels existed says by
+    saying nothing.
+    """
+    try:
+        count = int(data.get(CONF_NATURAL_LEVELS, 0))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+    if count < MIN_NATURAL_LEVELS:
+        return 0
+    return min(MAX_NATURAL_LEVELS, count)
 
 
 def extra_button_count(data: dict[str, object]) -> int:

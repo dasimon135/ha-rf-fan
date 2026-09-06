@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from custom_components.rf_fan.actions import split_actions
-from custom_components.rf_fan.const import TIMER_HOURS
+from custom_components.rf_fan.const import MAX_NATURAL_LEVELS, TIMER_HOURS
 
 COMPONENT = Path(__file__).resolve().parent.parent / "custom_components" / "rf_fan"
 FILES = {
@@ -37,6 +37,9 @@ FILES = {
 LIGHT_CONTROL = ("none", "toggle", "on_off")
 DIRECTION_CONTROL = ("none", "toggle", "per_speed")
 NATURAL_CONTROL = ("none", "toggle", "dedicated")
+# 0 and the cap, for the same reason as the extra keys: a remote models airflow
+# levels or it does not, and the cap is what makes the label guarantee keepable.
+NATURAL_LEVELS = (0, MAX_NATURAL_LEVELS)
 COLOR_CONTROL = ("none", "cycle", "relative")
 LIGHT_LEVEL = ("none", "relative")
 # 2 and 12 are the bounds; 6 was the old cap, and the range either side of it is
@@ -65,6 +68,7 @@ def _every_reachable_action() -> set[str]:
             sound,
             fan_on,
             extras,
+            levels,
         ) in itertools.product(
             LIGHT_CONTROL,
             DIRECTION_CONTROL,
@@ -75,6 +79,7 @@ def _every_reachable_action() -> set[str]:
             (False, True),
             (False, True),
             EXTRA_COUNTS,
+            NATURAL_LEVELS,
         ):
             required, optional = split_actions(
                 speed_count,
@@ -82,6 +87,7 @@ def _every_reachable_action() -> set[str]:
                 has_fan_on=fan_on,
                 direction_control=direction,
                 natural_control=natural,
+                natural_levels=levels,
                 color_control=color,
                 light_level=level,
                 # All four durations plus the cancel key, or none of them: this axis

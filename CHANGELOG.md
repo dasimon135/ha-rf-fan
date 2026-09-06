@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-06
+
+### Added
+
+- **Natural airflow can come in levels.** A remote whose airflow key offers
+  *Breeze 1 / 2 / 3* now declares how many levels it has, and each becomes a preset
+  mode on the fan entity: `natural 1` … `natural N` beside `normal`. That gives the
+  level a home it never had — `fan.set_preset_mode` for automations, `preset_mode`
+  in the recorder, and one chip per level on the bundled card — without a single
+  new entity. Reported by @Ltek on [#59], designed on [#61].
+- One learned code per level, and per direction on a remote that has no direction
+  key: `fan_natural_1` … `fan_natural_N`, plus `fan_natural_1_reverse` … . Same
+  rule the speeds already follow.
+
+### Changed
+
+- The capability form asks for the number of airflow levels beside the airflow
+  selector. **Zero is the default and means the shape that shipped**: one airflow
+  key, one `natural` preset, nothing renamed and nothing relearned.
+- Levels are refused on an airflow key that only *flips*. A level is a value and a
+  toggle carries none, so the form says so instead of silently dropping half the
+  answer.
+
+### Why the model is what it is
+
+The behaviour that decides it — does a speed press leave the airflow preset —
+was never measured on @Ltek's fan. His own capture document answered it instead.
+Splitting his 26-bit codes into a 16-bit prefix, a 4-bit value and a 6-bit key
+field shows Breeze carrying **the same key field as a forward speed**, with the
+level in the same four bits that hold the speed number: speeds 0-9, Breeze 1/2/3
+as 11/12/13. One field holds one value, so from Breeze 2 the Speed 5 key emits the
+code already stored as Speed 5, byte for byte, and the fan cannot still be in
+Breeze afterwards. That is exactly what `natural_control: dedicated` has meant
+since [#34].
+
+### Migration
+
+Config entries move to version 6 on the first restart. Every existing entry
+declares zero levels, which *is* the single-level shape it was set up as, so no
+action key changes name and nothing is relearned.
+
+[#34]: https://github.com/dasimon135/ha-rf-fan/issues/34
+[#59]: https://github.com/dasimon135/ha-rf-fan/issues/59
+[#61]: https://github.com/dasimon135/ha-rf-fan/issues/61
+
 ## [1.9.1] - 2026-09-06
 
 ### Fixed
