@@ -637,6 +637,35 @@ A drifted colour position is resynced with the **calibrate** button (it emits no
 just resets the assumption to Warm). A button that was mis-captured is fixed with
 **⋮ → Reconfigure → Relearn RF codes**.
 
+## Support
+
+Open an issue here for anything about this integration — a bug, a question, or a
+feature request. Forum threads are for general discussion and user-to-user help;
+nothing raised there is tracked, and it can be lost. An issue cannot.
+
+Before you open one, read [Known limitations](#known-limitations) and
+[Troubleshooting](#troubleshooting). This integration replays codes it cannot
+verify, so a good share of reported problems are documented behaviour rather
+than defects.
+
+To get a useful answer on the first exchange, include:
+
+- your Home Assistant version and the version of this integration;
+- the gateway — board and CC1101 module, ESPHome version — and the fan or remote
+  model with its frequency;
+- the diagnostics download (Settings → Devices & services → RF Fan → **⋮** →
+  *Download diagnostics*), which dumps what the integration currently believes;
+- a debug log, plus what you did, what you expected, and what happened instead.
+
+### Staying informed
+
+New versions are announced here and nowhere else. To hear about one:
+
+- **HACS already offers you the update**, release notes included — nothing to do;
+- subscribe to `https://github.com/dasimon135/ha-rf-fan/releases.atom` in any RSS
+  reader, or inside Home Assistant through the `feedreader` integration;
+- or use **Watch → Custom → Releases** on this repository.
+
 ## Development
 
 The pure logic tests (`tests/test_actions.py`) run anywhere:

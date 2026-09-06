@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a capability this integration does not have yet
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before you write: Decoding or interpreting an RF protocol is deliberately out of scope: this integration learns and replays opaque codes. A request to add protocol decoding will be closed with that explanation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the goal, not only the feature. The best solution is often not the one first imagined.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would it look like?
+      description: Entity, service, option, ESPHome configuration - whatever form you have in mind.
+    validations:
+      required: false
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Can you test it?
+      description: |
+        Only hardware someone actually owns can be verified. Say which fan, remote and gateway you can test a change on.
+    validations:
+      required: false

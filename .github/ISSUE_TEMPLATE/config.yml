@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Known limitations - read this first
+    url: https://github.com/dasimon135/ha-rf-fan#known-limitations
+    about: This integration replays codes it cannot verify, so several reported problems are documented behaviour rather than defects.
+  - name: General discussion (English)
+    url: https://community.home-assistant.io/t/1017083
+    about: User-to-user help. Not tracked - open an issue for anything that needs a fix.
+  - name: Discussion generale (francais)
+    url: https://forum.hacf.fr/t/81887
+    about: Entraide entre utilisateurs. Non suivi - ouvrez une issue pour tout correctif attendu.
