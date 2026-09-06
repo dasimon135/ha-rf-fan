@@ -6,23 +6,41 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License](https://img.shields.io/github/license/dasimon135/ha-rf-fan)](LICENSE)
 
-A **generic** Home Assistant integration for RF (typically 433 MHz) ceiling and wall
-fans that have no manufacturer-specific integration. You pair it with an ESPHome
-gateway that can transmit — and ideally receive — the raw RF frames, then teach Home
-Assistant your remote button by button.
-
-It is deliberately protocol-agnostic: the integration stores your codes as **opaque
-strings** and replays them through the ESPHome gateway. It does not care whether the
-frames are `rc_switch`, raw timings, or anything else the gateway understands. A
-Cecotec fan is used as the reference example, but any RF fan works.
+Put your **RF ceiling or wall fan** into Home Assistant — speed, light,
+direction, timers — even though its manufacturer never made an integration for
+it. You teach Home Assistant your own remote, one button at a time, and it
+replays those buttons for you.
 
 <p align="center">
-  <img src="assets/rf-fan-card.gif" width="200" alt="RF Fan animated card">
+  <img src="assets/rf-fan-card.gif" width="200" alt="The bundled RF Fan card, cycling through fan speeds">
   &nbsp;&nbsp;
   <img src="custom_components/rf_fan/brand/icon@2x.png" width="120" alt="RF Fan icon">
 </p>
 
-## Features
+## Will this work for me?
+
+**Your fan.** Almost certainly, if it is driven by a 433 MHz remote. This
+integration never tries to *understand* your fan's radio protocol — it records
+what your remote sends and plays it back unchanged. That is why it is not a
+list of supported brands: a Cecotec is the worked example, but Ltek and others
+are in use. If your gateway can capture the code, the integration can send it.
+
+**You will have to build a transmitter.** There is no dongle to plug in. You
+need an ESP32 board with a CC1101 radio module, flashed with ESPHome — a
+handful of parts and an evening. The reference build, wiring included, is in
+[Hardware](#hardware-reference-gateway).
+
+**Your fan never answers back.** A remote talks, the fan listens, and nothing
+comes back. So Home Assistant shows what it last *told* the fan, not what the
+fan is doing. Press the physical remote and the two drift apart until you use
+Home Assistant again — unless your gateway can also receive, in which case the
+integration follows the physical remote too.
+
+**Teaching it takes about ten minutes** per fan: the setup wizard asks you to
+press each button in turn and records what it hears. You only get asked about
+the buttons your remote actually has.
+
+## What you get
 
 - **Config flow** — no YAML to write.
 - **Two setup methods**: paste already-sniffed codes manually, or **guided learning**
