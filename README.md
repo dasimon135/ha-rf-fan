@@ -231,6 +231,17 @@ follows: after a recall, either drive the fan once from Home Assistant, or use t
 declaration controls ("Assumed light state", "Assumed brightness position", the
 colour select) to say where things actually are.
 
+**One thing, or several: that is what decides where a key belongs.** A key that
+does exactly one thing — a memory *store*, an ioniser, a beep — changes nothing
+this integration tracks, and can be exposed to voice assistants and used in scenes
+like any other button. A key that walks the fan through states it never reports
+back, a memory *recall* being the clearest case, should stay off both: everything
+downstream will act on an assumed state that no longer holds, with nothing in the
+press to say so. Leave it unexposed and out of your scenes, and it stays exactly
+where it is useful — one button, pressed by a person who can see the fan. The line
+is not "extra keys are risky", it is "a key that changes what the integration
+tracks leaves it wrong".
+
 Anything Home Assistant *does* have a concept of stays typed — speed, direction,
 colour, brightness, the airflow preset. A typed entity works in scenes, in voice
 assistants and in every native card; a labelled button works only for a human
