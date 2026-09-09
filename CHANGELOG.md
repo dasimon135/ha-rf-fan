@@ -61,6 +61,16 @@ since [#34].
 
 [#18]: https://github.com/dasimon135/ha-rf-fan/issues/18
 
+### Validated
+
+This build has run on the maintainer's own instance since 6 September: config entry
+`loaded`, migrated to version 6, `natural_levels` at zero, all sixteen learned codes
+intact, nothing from `rf_fan` in the error log.
+
+**The levelled path itself has been actuated on no hardware.** Nobody here owns a
+remote with airflow levels; the model comes from reading @Ltek's capture document,
+not from a measurement on a fan. [#61] is where to say what a real one does.
+
 ### Migration
 
 Config entries move to version 6 on the first restart. Every existing entry
