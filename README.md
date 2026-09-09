@@ -644,6 +644,52 @@ protocol:
 Confirmed on the reporter's hardware.
 </details>
 
+### The light key changes the fan speed
+
+Pressing the light from Home Assistant also moves the blades — or stops them — while
+the same key on the physical remote leaves the fan alone.
+
+On some remotes the light and dim keys are not frames of their own. The frame carries
+the **current speed** in a field of its own, and the remote fills that field with
+whatever is running, so its light command never disturbs the fan. What you captured is
+therefore *light plus the speed that happened to be running at capture time*, and this
+integration replays a code exactly as it was learned — that speed included. Capture the
+light key with the fan off and it carries speed 0: every light toggle from Home
+Assistant now stops the fan.
+
+**The fix is a code you write yourself.** Put a value in the speed field that the fan
+has no speed for. A receiver that reads the light bit and ignores an unknown speed then
+toggles the light without touching the blades. Nothing else is relearned: the manual
+form checks only that a code is present and that no two actions share one
+(`actions.py:247-282`), so a hand-built string is as valid as a captured one.
+
+Worked example — the Hampton Bay 9-speed of
+[#59](https://github.com/dasimon135/ha-rf-fan/issues/59), 26 bits:
+
+| | prefix (16) | speed (4) | key (6) |
+| --- | --- | --- | --- |
+| Speed 0, forward | `0101111000000010` | `0000` | `010000` |
+| Speed 5, forward | `0101111000000010` | `0101` | `010000` |
+| Light, captured with the fan off | `0101111000000010` | `0000` | `100100` |
+| **Light, rebuilt** | `0101111000000010` | **`1111`** | `100100` |
+
+The last row is what goes in the light key: `01011110000000101111100100`. Speeds use
+0–9 (`0000`–`1001`) and the breeze levels 11–13, so `1111` is a value that remote never
+sends. Dim up and dim down are the same edit, each keeping its own key field.
+
+To find the fields on your own remote, line up the codes you captured: the bits that
+change from one speed to the next are the speed field, the ones that change between a
+speed and the light key are the key field, and what never changes at all is the prefix.
+
+**It is a bet on the firmware, so bench it.** A receiver may equally ignore the frame
+outright, or act on the unknown value. Test it against a running fan before keeping it —
+and note that a *real* speed 0 in that field is not the neutral choice it looks like, it
+is the stop command.
+
+Found and solved on his own hardware by @Ltek, who went on to build
+[a card](https://github.com/Ltek/rf-fan-card) that rebuilds those frames as it sends
+them.
+
 ### The fan obeys Developer Tools but ignores the dashboard
 
 **Raise the repeat count** under **⋮ → Reconfigure**. This is the same code, correctly
