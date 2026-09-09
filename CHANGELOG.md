@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0] - 2026-09-09
 
 ### Added
 
@@ -39,6 +39,27 @@ as 11/12/13. One field holds one value, so from Breeze 2 the Speed 5 key emits t
 code already stored as Speed 5, byte for byte, and the fan cannot still be in
 Breeze afterwards. That is exactly what `natural_control: dedicated` has meant
 since [#34].
+
+### Documentation
+
+- **Troubleshooting → "The light key changes the fan speed".** On some remotes the
+  light and dim keys have no frames of their own: each frame carries the *current
+  speed* in a field of its own, and the physical remote fills that field with
+  whatever is running so its light command never disturbs the fan. This integration
+  replays a code exactly as it was learned, that speed included — capture the light
+  key with the fan off and every light toggle from Home Assistant sends the stop
+  command. The fix needs nothing from the code: a light code written by hand,
+  carrying a value the fan has no speed for, toggles the light and leaves the blades
+  alone. Found on his own hardware by @Ltek ([#59]), with his frames as the worked
+  example and how to locate the fields on an undecoded remote.
+- **Which extra keys may be exposed to voice assistants and scenes.** A key that does
+  one thing — a store, an ioniser, a beep — changes nothing this integration tracks
+  and is safe there. A key that walks the fan through states it never reports back
+  leaves every assumption wrong at once, with nothing in the press to say so. The
+  section documented the drift; it now states the rule that follows from it.
+  Promised to @elmr91 on [#18].
+
+[#18]: https://github.com/dasimon135/ha-rf-fan/issues/18
 
 ### Migration
 
