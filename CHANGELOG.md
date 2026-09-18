@@ -5,6 +5,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Documentation
+
+- **The replay troubleshooting section gives every rc_switch protocol's inline
+  block, and the gateway YAMLs show protocol 1's**
+  ([#78](https://github.com/dasimon135/ha-rf-fan/issues/78)). The comment at the
+  `protocol:` line used to show the Hampton Bay block from #59 as its example, which
+  is protocol 6: `sync: [31, 1]`, `inverted: true`. In a file whose `rc_protocol`
+  defaults to `"1"`, it read as a template to fill in, and a protocol 1 remote given
+  that block with its own unit sends a frame the fan does not recognise. The README
+  now tabulates all eight protocols from ESPHome's own table, says to change only
+  `pulse_length`, and warns that an inline block's omitted keys fall back to
+  protocol 1's values.
+
 ## [1.10.0] - 2026-09-09
 
 ### Added
