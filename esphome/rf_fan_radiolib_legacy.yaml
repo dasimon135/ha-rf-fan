@@ -62,18 +62,20 @@ api:
             # which are often not your remote's. That the receiver above
             # decodes protocol N proves nothing here — it runs at
             # `tolerance: 50%` and your fan does not. If replays are ignored,
-            # replace this line with an inline block carrying your measured
-            # unit AND the protocol's own `inverted:` flag:
+            # replace this line with an inline block: YOUR measured unit, and
+            # everything else copied from protocol N's row. For protocol 1:
             #
             #   protocol:
-            #     pulse_length: 335
-            #     sync: [31, 1]
-            #     zero: [1, 2]
-            #     one: [2, 1]
-            #     inverted: true    # omitting this defaults to false
+            #     pulse_length: 350   # your remote's short pulse, in µs
+            #     sync: [1, 31]
+            #     zero: [1, 3]
+            #     one: [3, 1]
+            #     inverted: false
             #
-            # See "The fan ignores a code that was learned correctly" in the
-            # README for how to read the flag off ESPHome's protocol table.
+            # Any other protocol has other ratios, and protocol 6 is
+            # `inverted: true`: take N's row from the table under "The fan
+            # ignores a code that was learned correctly" in the README. A row
+            # copied from another protocol sends a frame your fan ignores.
             protocol: ${rc_protocol}
             repeat:
               times: !lambda "return repeat_count;"

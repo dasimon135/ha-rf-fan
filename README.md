@@ -596,28 +596,56 @@ which may be nothing like what your remote actually emits. Measure, then replace
 protocol number with an inline block.
 
 Capture the original with `rtl_433 -A`, which prints the pulse/gap breakdown, or read the
-durations out of a `remote_receiver` raw dump. Then:
+durations out of a `remote_receiver` raw dump. Then take **the row of the protocol your
+log names** — the number after `protocol=` in `Received RCSwitch Raw:` — and change only
+`pulse_length`:
+
+| `protocol=` | `sync` | `zero` | `one` | `inverted` | stock `pulse_length` |
+|---|---|---|---|---|---|
+| 1 | `[1, 31]` | `[1, 3]` | `[3, 1]` | `false` | 350 |
+| 2 | `[1, 10]` | `[1, 2]` | `[2, 1]` | `false` | 650 |
+| 3 | `[30, 71]` | `[4, 11]` | `[9, 6]` | `false` | 100 |
+| 4 | `[1, 6]` | `[1, 3]` | `[3, 1]` | `false` | 380 |
+| 5 | `[6, 14]` | `[1, 2]` | `[2, 1]` | `false` | 500 |
+| 6 | `[23, 1]` | `[1, 2]` | `[2, 1]` | **`true`** | 450 |
+| 7 | `[2, 62]` | `[1, 6]` | `[6, 1]` | `false` | 150 |
+| 8 | `[1, 10]` | `[1, 5]` | `[1, 1]` | `false` | 250 |
+
+`sync`, `zero` and `one` are multiples of `pulse_length`. Set `pulse_length` to the short
+pulse you measured (rtl_433's `short_width`); protocol 3 is the one exception, where the
+short pulse is four units, so divide your measurement by 4. If you measured the sync gap
+as well, use your own `sync`; otherwise keep the row's.
+
+For protocol 1, a remote measured at 396 µs gives:
 
 ```yaml
 protocol:
-  pulse_length: 400   # the short pulse, in µs (rtl_433's short_width)
-  sync: [1, 18]
+  pulse_length: 396
+  sync: [1, 31]
   zero: [1, 3]
   one: [3, 1]
-  inverted: true      # SEE BELOW - omitting this defaults to false
+  inverted: false
 ```
+
+These happen to be ESPHome's defaults for an inline block, so for protocol 1 alone
+`pulse_length:` is enough. **For every other protocol, write all five lines**: an omitted
+key silently falls back to protocol 1's value.
+
+**Never copy another protocol's row** — not the one in the example YAML's comment, not the
+worked example below. Different ratios, or a different `inverted:`, and the frame goes
+out in a shape your fan does not know.
 
 **`inverted:` is the half everybody forgets.** It selects whether a bit is
 *pulse-then-gap* (`false`) or *gap-then-pulse* (`true`). Get it wrong and every frame goes
 out inside out: bit-perfect, correctly timed, and ignored by the fan. Nothing in the
-receive log warns you, because receiving never exercises it.
+receive log warns you, because receiving never exercises it. Only protocol 6 is inverted.
 
-The flag is **a property of the protocol you are replacing, not a free choice.** When you
-swap `rc_protocol: "N"` for an inline block you must carry over protocol N's own value.
-Read it off the last argument of the matching row in ESPHome's protocol table
-([`remote_base/rc_switch_protocol.h`](https://github.com/esphome/esphome/blob/dev/esphome/components/remote_base/rc_switch_protocol.h)) —
-for example protocol 6 is declared `RCSwitchBase(10350, 450, 450, 900, 900, 450, true)`,
-so an inline replacement for it needs `inverted: true`.
+The table is ESPHome's own
+([`remote_base/rc_switch_protocol.h`](https://github.com/esphome/esphome/blob/dev/esphome/components/remote_base/rc_switch_protocol.h)),
+divided by each protocol's unit: protocol 6 is declared
+`{10350, 450, 450, 900, 900, 450, true}`, which is `[23, 1]`, `[1, 2]`, `[2, 1]` at 450 µs
+with `inverted: true`. Checked against ESPHome 2026.6.2 and the `dev` branch on
+2026-09-18.
 
 <details>
 <summary>Worked example: a 9-speed Hampton Bay remote (issue #59)</summary>
@@ -630,7 +658,9 @@ once, and each alone was enough to break it:
   receiver made it decode at all;
 - the transmit block said `inverted: false`, while protocol 6 is `inverted: true`.
 
-The fix keeps protocol 6's ratios and flag and changes only the unit:
+The fix keeps protocol 6's bit ratios and flag with the measured unit. The sync became
+`[31, 1]` instead of the row's `[23, 1]` because it was measured too: 31 × 335 µs is the
+same ~10.4 ms gap as protocol 6's stock 10 350 µs.
 
 ```yaml
 protocol:
