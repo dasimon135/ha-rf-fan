@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.1] - 2026-09-20
 
 ### Fixed
 
@@ -63,6 +63,24 @@ was seen failing first.
   now tabulates all eight protocols from ESPHome's own table, says to change only
   `pulse_length`, and warns that an inline block's omitted keys fall back to
   protocol 1's values.
+
+### Validated
+
+This build has run on the maintainer's own instance since 20 September, through two
+restarts: config entry loaded, states restored, nothing from `rf_fan` in the log.
+`fan.set_percentage`, `fan.turn_on` on the running fan and `fan.turn_off` were
+called against the real gateway, on a remote with no `fan_on` key, so `turn_on`
+went through the new fallback; the bundled card was rendered in its tile layout and
+follows the fan and the lamp.
+
+**What was not observed on hardware:** which speed the fan physically held across
+that `turn_on` — nobody was watching it, and the test is what pins it — and
+anything about a `dedicated` airflow preset or a second gateway, neither of which
+exists here. Those three fixes rest on their tests, each of which was seen failing
+before its fix.
+
+Nothing to migrate: config entries stay at version 6, no action key changes name,
+and nothing is relearned.
 
 ## [1.10.0] - 2026-09-09
 
