@@ -811,3 +811,39 @@ async def test_relearn_one_code_without_redeclaring_anything(
     assert entry.data["light_control"] == "toggle"
     assert entry.data["has_light"] is True
     assert entry.title == "Recon"
+
+
+async def test_manual_relearn_rejects_a_code_a_kept_action_already_owns(
+    hass: HomeAssistant,
+) -> None:
+    """Pasting a code is held to the same rule as capturing one.
+
+    The manual form only validated the actions it was showing, so a code pasted
+    for the one being re-learned could duplicate a KEPT action's code unnoticed --
+    and the reverse lookup would then never reach one of the two from the remote.
+    The learning path has always refused this (`_store_learned_code`).
+    """
+    entry = _basic_entry(hass)
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
+        )
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_codes"}
+        )
+        result = await flow.async_configure(
+            result["flow_id"], {"relearn_light_toggle": True}
+        )
+        result = await flow.async_configure(result["flow_id"], {"method": "manual"})
+        assert result["step_id"] == "codes"
+
+        # "c1" is what `fan_speed_1` already answers to, and it is being kept.
+        result = await flow.async_configure(result["flow_id"], {"light_toggle": "c1"})
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "codes"
+    assert result["errors"] == {"light_toggle": "duplicate_code"}
+    assert entry.data["codes"]["light_toggle"] == "c_tog"
