@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+Found by a full read of the code rather than reported. Each of them left Home
+Assistant showing a state the hardware was not in, and each now has a test that
+was seen failing first.
+
+- **A second gateway in range could swallow a press of the physical remote.** Two
+  gateways running the same YAML report the same code string for the same press.
+  The receive de-bounce is keyed on that string and was consulted before the
+  frame's origin, so a neighbour's copy arriving first made ours look like a
+  repeat, and the press was dropped.
+- **`fan.turn_on` on a running fan dropped it to speed 1 while the state kept the
+  old percentage.** On a remote with no `fan_on` key the fallback is a speed key;
+  it is now the speed the fan is showing, and it goes through the same path as any
+  other speed, so it also ends a `dedicated` airflow preset and settles a
+  `per_speed` direction.
+- **An airflow preset asked for while the fan was stopped** is now pressed by
+  whichever service starts the fan. The bundled card's speed segments and the
+  more-info slider call `fan.set_percentage`, which ignored it. It then stayed
+  armed behind a state that read `normal` and went on the air at the next
+  `fan.turn_on`, unasked; it is dropped when a speed key leaves the preset.
+- **The brightness resynchronisation button** cancels a brightness move still in
+  flight, and is cancelled by the next one, like any other move on that control.
+  It used to press its way down beside a walk still climbing, then declare the
+  bottom reached.
+- **Relearning by pasting a code** now refuses one that a kept action already
+  owns, as capturing one always has.
+- **A refused rename** no longer resets the airflow levels and the extra-key count
+  on the form it sends back.
+- **Diagnostics** label the colour position the way the select does (1…N unless
+  the lamp has the three named positions), and carry the brightness position.
+- **Card:** a preset name is escaped before it goes into the markup. The card
+  accepts any `fan.*` entity, so that name is not always this integration's.
+
+### Changed
+
+- **The card walks the entity registry once per registry instead of once per
+  state change.** Home Assistant hands a card a new `hass` on every state change
+  anywhere in the house, and each one used to filter every entity of the install
+  to find the fan's siblings, twice when it led to a render.
+- Removed three constants nothing referenced (`LIGHT_LEVEL_STEPS`,
+  `COLOR_TEMP_OPTIONS`, `KELVIN_STEP_GAP_SEC`) and a transmit helper the
+  resynchronisation fix made unused.
+
 ### Documentation
 
 - **The replay troubleshooting section gives every rc_switch protocol's inline

@@ -339,22 +339,6 @@ class RfFanBaseEntity(Entity):
             if index < steps - 1:
                 await sleep(STEP_GAP_SEC)
 
-    async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
-        """Transmit an action's code `times` times (cycle).
-
-        `gap` seconds are awaited between successive presses so a debouncing receiver
-        registers each as a distinct press; without a gap a rapid burst merges into a
-        single step. Returns True if at least one transmission succeeded.
-        """
-        sent_any = False
-        count = max(0, times)
-        for index in range(count):
-            if await self._async_transmit_action(action):
-                sent_any = True
-            if gap and index < count - 1:
-                await sleep(gap)
-        return sent_any
-
     @property
     def _runtime(self) -> RfFanRuntimeData:
         """Typed runtime data for the entry (set in __init__.py async_setup_entry)."""
