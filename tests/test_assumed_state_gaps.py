@@ -16,8 +16,14 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.core import HomeAssistant
 
-from tests.ha_helpers import actions_sent, fire_rf, id_by_unique_suffix, one_id
-from tests.ha_helpers import setup_full, setup_relative
+from tests.ha_helpers import (
+    actions_sent,
+    fire_rf,
+    id_by_unique_suffix,
+    one_id,
+    setup_full,
+    setup_relative,
+)
 
 
 @pytest.fixture(autouse=True)

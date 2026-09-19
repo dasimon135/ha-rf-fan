@@ -410,6 +410,21 @@ class RfFanBaseEntity(Entity):
         # Normalize the ESPHome dash/underscore ambiguity on both sides.
         return device.replace("-", "_") == self._gateway_service
 
+    def _received_action(self, event: Any) -> str | None:
+        """The remote press a bus event stands for, or None when it is not one.
+
+        The order is the point. Origin first: a neighbouring gateway running the
+        same YAML reports the same code string for the same press, and letting its
+        copy into the de-bounce made ours arrive as a "repeat" and vanish. Then the
+        echo before the de-bounce: our own transmission coming back is not a press
+        at all, so it must never be recorded as the start of a burst.
+        """
+        if not self._is_own_event(event.data):
+            return None
+        if self._is_echo(event.data) or self._is_repeat(event):
+            return None
+        return self._event_action(event.data)
+
     def _event_action(self, event_data: dict[str, Any]) -> str | None:
         """Extract the received RF action from the ESPHome event."""
         if not self._is_own_event(event_data):

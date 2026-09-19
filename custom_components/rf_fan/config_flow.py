@@ -406,7 +406,16 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     if str(user_input.get(action, "")).strip()
                 }
             )
-            errors = validate_codes(codes, actions, optional=self._optional_actions())
+            optional_actions = self._optional_actions()
+            # Reconfiguring shows only the actions being (re)learned. The codes of
+            # the ones kept out of sight are still spoken for.
+            shown = {*actions, *optional_actions}
+            errors = validate_codes(
+                codes,
+                actions,
+                optional=optional_actions,
+                taken=[code for action, code in codes.items() if action not in shown],
+            )
             if not errors:
                 return self._finish(codes)
 

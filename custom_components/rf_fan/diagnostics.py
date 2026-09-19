@@ -7,7 +7,8 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import COLOR_TEMP_OPTIONS, CONF_CODES, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE
+from .actions import color_temp_options, color_temp_steps
+from .const import CONF_CODES, CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE
 from .data import RfFanConfigEntry
 
 TO_REDACT = {CONF_ESPHOME_DEVICE, CONF_GATEWAY_SERVICE}
@@ -32,6 +33,8 @@ async def async_get_config_entry_diagnostics(
     now = hass.loop.time()
 
     position = runtime.kelvin_position
+    # The select's own labels: three named positions, or 1..N for any other count.
+    colours = color_temp_options(color_temp_steps(data))
     return {
         "config": async_redact_data(data, TO_REDACT),
         "options": dict(entry.options),
@@ -41,9 +44,8 @@ async def async_get_config_entry_diagnostics(
         },
         "runtime": {
             "kelvin_position": position,
-            "colour": COLOR_TEMP_OPTIONS[position]
-            if 0 <= position < len(COLOR_TEMP_OPTIONS)
-            else None,
+            "colour": colours[position] if 0 <= position < len(colours) else None,
+            "level_position": runtime.level_position,
             "light_on": runtime.light_on,
             "timer_ends_at": runtime.timer_ends_at.isoformat()
             if runtime.timer_ends_at
