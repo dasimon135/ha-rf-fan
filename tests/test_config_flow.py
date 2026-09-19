@@ -847,3 +847,57 @@ async def test_manual_relearn_rejects_a_code_a_kept_action_already_owns(
     assert result["step_id"] == "codes"
     assert result["errors"] == {"light_toggle": "duplicate_code"}
     assert entry.data["codes"]["light_toggle"] == "c_tog"
+
+
+async def test_a_refused_rename_keeps_every_answer_on_the_form(
+    hass: HomeAssistant,
+) -> None:
+    """Being told the name is taken must not cost the rest of the form.
+
+    The refusal branch copied the answers by hand and forgot two of them, so the
+    form came back with the airflow levels and the extra-key count reset to what
+    the entry had before -- to be noticed, or not, under an error about the name.
+    """
+    taken = MockConfigEntry(
+        domain=DOMAIN,
+        title="Chambre",
+        unique_id="esp32_test_chambre",
+        data={**_basic_entry(hass).data, "fan_name": "Chambre"},
+    )
+    taken.add_to_hass(hass)
+
+    entry = _basic_entry(hass)
+    hass.config_entries.async_update_entry(entry, unique_id="esp32_test_recon")
+    flow = hass.config_entries.flow
+
+    result = await flow.async_init(
+        DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+    )
+    result = await flow.async_configure(
+        result["flow_id"], {"next_step_id": "reconfigure_capabilities"}
+    )
+    result = await flow.async_configure(
+        result["flow_id"],
+        {
+            "fan_name": "Chambre",
+            "speed_count": 3,
+            "light_control": "toggle",
+            "has_fan_on": False,
+            "direction_control": "none",
+            "natural_control": "dedicated",
+            "natural_levels": 3,
+            "color_control": "none",
+            "light_level": "none",
+            "timer_hours": [],
+            "has_timer_off": False,
+            "has_sound": False,
+            "extra_count": 2,
+        },
+    )
+    assert result["errors"] == {"fan_name": "name_already_used"}
+
+    defaults = {
+        str(key): key.default() for key in result["data_schema"].schema if hasattr(key, "default")
+    }
+    assert defaults["natural_levels"] == 3
+    assert defaults["extra_count"] == 2
