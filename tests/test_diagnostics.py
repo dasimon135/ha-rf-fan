@@ -64,3 +64,35 @@ async def test_diagnostics_still_redact_the_gateway(hass: HomeAssistant) -> None
 
     assert diag["config"]["esphome_device"] == "**REDACTED**"
     assert diag["summary"]["action_count"] == len(entry.data["codes"])
+
+
+async def test_diagnostics_label_the_colour_the_way_the_select_does(
+    hass: HomeAssistant,
+) -> None:
+    """A lamp with five positions has no "Chaud": its positions are numbered.
+
+    The label used to be looked up in the three historical names whatever the
+    declared count, so position 0 of 5 read "Chaud" and position 3 read nothing.
+    """
+    from tests.ha_helpers import setup_relative
+
+    entry, _calls = await setup_relative(hass, color_temp_steps=5)
+    entry.runtime_data.kelvin_position = 3
+
+    runtime = (await async_get_config_entry_diagnostics(hass, entry))["runtime"]
+
+    assert runtime["colour"] == "4"
+
+
+async def test_diagnostics_carry_the_assumed_brightness_position(
+    hass: HomeAssistant,
+) -> None:
+    """The other dead-reckoned position belongs beside the colour one."""
+    from tests.ha_helpers import setup_relative
+
+    entry, _calls = await setup_relative(hass)
+    entry.runtime_data.level_position = 6
+
+    runtime = (await async_get_config_entry_diagnostics(hass, entry))["runtime"]
+
+    assert runtime["level_position"] == 6

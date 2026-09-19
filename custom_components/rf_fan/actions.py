@@ -248,6 +248,8 @@ def validate_codes(
     codes: dict[str, str],
     required: list[str],
     optional: Iterable[str] = (),
+    *,
+    taken: Iterable[str] = (),
 ) -> dict[str, str]:
     """Return {field: error_key}; empty dict if everything is valid.
 
@@ -264,11 +266,15 @@ def validate_codes(
     `required` may already contain the optional actions (the config flow builds one
     combined list for the form); the scan is deduplicated so passing them twice does
     not make an action collide with itself.
+
+    `taken` is the codes owned by actions this call is NOT looking at. A
+    reconfiguration shows only the actions being (re)learned, and a code pasted
+    there must not duplicate one that is being kept out of sight.
     """
     optional_list = list(optional)
     optional_set = set(optional_list)
     errors: dict[str, str] = {}
-    seen: set[str] = set()
+    seen: set[str] = {code for code in taken if code}
     for action in dict.fromkeys([*required, *optional_list]):
         code = codes.get(action)
         if not code:

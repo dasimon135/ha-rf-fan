@@ -78,12 +78,7 @@ class RfFanSoundSwitch(RfFanBaseEntity, RestoreEntity, SwitchEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Toggle the sound state from the received RF action."""
-        # Short-circuit order matters: an echo of our own transmission is not a
-        # remote press at all, so it must never be recorded as the start of a burst.
-        if self._is_echo(event.data) or self._is_repeat(event):
-            return
-
-        action = self._event_action(event.data)
+        action = self._received_action(event)
         if action == ACTION_SOUND_TOGGLE and self._is_on is not None:
             self._is_on = not self._is_on
             self.async_write_ha_state()

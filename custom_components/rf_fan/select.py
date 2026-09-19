@@ -143,12 +143,7 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         delta, so the assumed position tracks the hardware in both directions
         instead of only forwards.
         """
-        # Short-circuit order matters: an echo of our own transmission is not a
-        # remote press at all, so it must never be recorded as the start of a burst.
-        if self._is_echo(event.data) or self._is_repeat(event):
-            return
-
-        action = self._event_action(event.data)
+        action = self._received_action(event)
         if action in (ACTION_LIGHT_KELVIN, ACTION_LIGHT_KELVIN_UP):
             self._advance_kelvin_position()
             self.async_write_ha_state()

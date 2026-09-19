@@ -20,11 +20,12 @@ from .actions import (
 )
 from .const import (
     ACTION_LIGHT_BRIGHT_DOWN,
+    ACTION_LIGHT_BRIGHT_UP,
     ACTION_TIMER_OFF,
+    AXIS_LEVEL,
     COLOR_CONTROL_NONE,
     CONF_HAS_TIMER_OFF,
     LIGHT_LEVEL_RELATIVE,
-    STEP_GAP_SEC,
     extra_action,
     extra_default_name,
     timer_action,
@@ -153,12 +154,34 @@ class RfFanBrightnessResyncButton(RfFanBaseEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Step down to the bottom of the range and record the position."""
-        if not await self._async_transmit_times(
-            ACTION_LIGHT_BRIGHT_DOWN, self._light_level_steps - 1, gap=STEP_GAP_SEC
-        ):
-            # Nothing went on the air (unmapped code): the lamp has not moved, so
-            # claiming it sits at the bottom would replace one wrong position with
-            # another.
+        # A walk like any other on this axis, so it cancels a brightness move still
+        # in flight and is cancelled by the next one -- it used to press its way
+        # down BESIDE a walk still climbing, then declare the bottom reached.
+        #
+        # What it counts is kept to itself rather than written to the shared
+        # position: it starts from "the top" only so that N-1 presses get planned,
+        # which is a way to reach the stop from anywhere and not a belief about
+        # where the lamp is.
+        presses_left = self._light_level_steps - 1
+
+        def _count(position: int) -> None:
+            nonlocal presses_left
+            presses_left = position
+
+        await self._async_walk(
+            AXIS_LEVEL,
+            up_action=ACTION_LIGHT_BRIGHT_UP,
+            down_action=ACTION_LIGHT_BRIGHT_DOWN,
+            target=0,
+            size=self._light_level_steps,
+            wrap=False,
+            get_position=lambda: presses_left,
+            set_position=_count,
+        )
+        if presses_left:
+            # Unmapped code, or superseded by a brightness move before the end: the
+            # stop was not reached, so claiming it would replace one wrong position
+            # with another.
             return
         self._runtime.level_position = 0
         async_dispatcher_send(self.hass, self._level_signal())
