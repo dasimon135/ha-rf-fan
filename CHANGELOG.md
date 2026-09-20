@@ -5,6 +5,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Documentation
+
+- **A raw-timings gateway wants a repeat count of 1, and the README only ever said
+  to raise it** ([#78](https://github.com/dasimon135/ha-rf-fan/issues/78)). `idle: 12ms`
+  captures a press whole, so a remote that repeats itself within one press puts every
+  one of those frames inside the learned code: on a Cecotec ceiling fan, one code is
+  241 timings, four frames 6 ms apart. The repeat count then multiplies presses rather
+  than frames, and at its default of 3 the fan beeps three times while a toggled light
+  blinks before it settles. Relearning does not help, because the code is right.
+- **The repeat count is on `Configure`, not `Reconfigure`.** It lives in the options
+  flow, titled *RF Transmission Options*; `Reconfigure` is the menu that relearns codes
+  and has never carried it. The troubleshooting section sent readers to the wrong screen.
+
 ## [1.10.1] - 2026-09-20
 
 ### Fixed
