@@ -93,10 +93,10 @@ what is actually relevant to the report:
 | Topic in the issue | Read these |
 | --- | --- |
 | Setup, capabilities, relearning, reconfigure | `custom_components/rf_fan/config_flow.py`, `const.py` |
-| Code learning, sniffed frames not matching, echo | `custom_components/rf_fan/data.py`, `actions.py`, `const.py` (`ECHO_SUPPRESS_SEC`), `tests/test_echo_suppression.py`, `tests/test_unmatched_code.py` |
-| Transmission, repeats, toggle actions | `custom_components/rf_fan/actions.py` (`transmit_repeat_count`), `const.py` (`TOGGLE_ACTIONS`, `KELVIN_STEP_GAP_SEC`) |
+| Code learning, sniffed frames not matching, echo, de-bounce, a second gateway | `custom_components/rf_fan/entity.py` (`_received_action`: origin, then echo, then de-bounce), `data.py`, `actions.py`, `const.py` (`ECHO_SUPPRESS_SEC`, `RECEIVE_DEBOUNCE_SEC`), `tests/test_echo_suppression.py`, `tests/test_receive_debounce.py`, `tests/test_unmatched_code.py`, `tests/test_assumed_state_gaps.py` |
+| Transmission, repeats, toggle actions | `custom_components/rf_fan/actions.py` (`transmit_repeat_count`), `const.py` (`TOGGLE_ACTIONS`, `STEP_GAP_SEC`) |
 | Fan / light / select / button / switch / sensor behaviour | the matching `custom_components/rf_fan/*.py`, plus `entity.py` |
-| ESPHome gateway, `transmit_rf_fan`, `rf_fan_received`, rc_switch code shape | `esphome/rf_fan_example.yaml`, `esphome/rf_fan_radiolib_legacy.yaml` |
+| ESPHome gateway, `transmit_rf_fan`, `rf_fan_received`, rc_switch code shape | `esphome/rf_fan_example.yaml`, `esphome/rf_fan_radiolib_legacy.yaml`, and `esphome/rf_fan_raw_gateway.yaml` for a remote rc_switch cannot decode |
 | Dashboard card, layouts, auto-discovery | `custom_components/rf_fan/frontend/rf-fan-card.js`, `tests/frontend/*.test.mjs` |
 | Diagnostics fields | `custom_components/rf_fan/diagnostics.py` |
 | Wording of a config-flow screen or an error message | `strings.json`, `translations/en.json`, `translations/fr.json` |
@@ -131,8 +131,9 @@ source that it is still accurate.
 
 You cannot tell what is happening without data the user has not supplied.
 
-Ask for exactly what you need, using this template verbatim. Drop the lines you
-genuinely do not need; add none.
+The list below is a menu, not a form. Ask for the fewest items that let you
+tell what is going on, usually two or three, and say what each will tell you.
+Drop every line you do not need; add none.
 
 > I need a few things before I can tell what is going on.
 >
@@ -174,7 +175,9 @@ Post, **as a comment only**:
 pull request, do not commit. The fix is text in a comment and nothing else.
 
 Label: `bug`. Use `enhancement` instead when the behaviour is correct as designed
-and the user is asking for something new.
+and the user is asking for something new. Add `upstream` when the root cause is
+in the ESPHome gateway YAML, ESPHome itself, or Home Assistant core rather than
+here — name which.
 
 ### (d) New or ambiguous
 
@@ -192,9 +195,13 @@ with a partial answer first.
 
 ## 4. Apply the label
 
-Exactly one of `bug`, `question`, `enhancement`, `needs-david`:
+Exactly one of `bug`, `question`, `enhancement`, `needs-david`, optionally plus
+`upstream`:
 
     gh issue edit $1 --add-label "<label>"
+
+Check `gh label list` before applying anything. If the label you chose is
+missing, apply nothing and report it in section 7 rather than failing the run.
 
 Do not remove a label a human already set. When triggered by a follow-up comment
 on an issue that already carries the right label, leave the label alone.
@@ -208,6 +215,14 @@ on an issue that already carries the right label, leave the label alone.
 - **No emoji.** None, anywhere.
 - No apologising for the integration, no promises about timelines, no speaking
   for the maintainer's plans.
+- **Shape, not vocabulary, is what gives a generated comment away.** So:
+  no em dash, use a comma or a full stop; no heading, no table, no bold in a
+  comment (bullets only for ordered steps or the list in case (b)); one
+  "not X, Y" at most; no "Two things worth knowing" opener; no adjective about
+  the reporter or the report, no staged self-blame, no "no rush", "no
+  obligation", "let me know" closer; 300 words at most, a diff or a YAML block
+  excluded. First sentence: the answer. Last sentence: what you need from them,
+  or nothing.
 - Say plainly when something is a known limitation (see the README's *Known
   limitations*) rather than implying it will be fixed.
 
