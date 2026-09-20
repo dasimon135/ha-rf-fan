@@ -722,9 +722,11 @@ them.
 
 ### The fan obeys Developer Tools but ignores the dashboard
 
-**Raise the repeat count** under **⋮ → Reconfigure**. This is the same code, correctly
-timed, simply not repeated enough — and it is invisible, because nothing here is ever
-confirmed by the fan, so a burst that falls on deaf ears produces no error anywhere.
+**Raise the repeat count** under **Configure** — the *RF Transmission Options* screen on
+the integration entry, which is not the **Reconfigure** menu that relearns codes. This is
+the same code, correctly timed, simply not repeated enough — and it is invisible, because
+nothing here is ever confirmed by the fan, so a burst that falls on deaf ears produces no
+error anywhere.
 
 Some receivers ignore a frame that is bit-perfect but sent fewer times than the original
 remote sends it, and the threshold differs **between keys on one remote**: on the first
@@ -737,6 +739,22 @@ rounded **down to the nearest odd number**, so that the fan ends up flipped exac
 whichever way its receiver counts a burst. A configured `4` therefore sends four frames
 for a speed and three for a toggle — and a configured `2` sends a single frame for every
 toggle, which is why the default is not 2.
+
+### Every command beeps twice, and the light blinks before it settles
+
+**Lower the repeat count to 1**, on the same *RF Transmission Options* screen. This is the
+mirror image of the section above, and it is what a **raw-timings gateway** does to a
+remote that repeats itself.
+
+An rc_switch code is one frame, so repeating it is how you match what the remote sends. A
+raw code is not: `idle: 12ms` is set long enough to capture a press *whole*, so whatever
+the remote repeats within that press is already inside the code. Measured on a Cecotec
+ceiling fan, one learned code is 241 timings — four frames, 6 ms apart, one press. Sent
+three times it is three presses, and the fan says so: it beeps for each, and a toggled
+light goes on, off, on before landing where you asked.
+
+Relearning does not help here, because the code is right. Reported by @sebcaps on
+[#78](https://github.com/dasimon135/ha-rf-fan/issues/78).
 
 A drifted colour position is resynced with the **calibrate** button (it emits nothing, it
 just resets the assumption to Warm). A button that was mis-captured is fixed with

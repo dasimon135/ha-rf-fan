@@ -24,6 +24,17 @@
 #   - "follow the physical remote" does NOT work, and never will. Pressing a
 #     button on the physical remote will not update the Home Assistant entities.
 #
+# WHAT YOU SHOULD SET AFTERWARDS
+#
+# `idle: 12ms` below captures a press WHOLE, so a remote that repeats itself
+# within one press puts all of those frames inside a single learned code. The
+# integration's repeat count then multiplies PRESSES, not frames: at its default
+# of 3 the fan beeps three times and a toggled light blinks before it settles.
+#
+# So set the repeat count to 1, on the integration's "RF Transmission Options"
+# screen. The default of 3 is sized for rf_fan_example.yaml, where a code is one
+# frame and repeating it is how you match the remote.
+#
 # That is a property of raw capture, not a bug to be fixed. If rc_switch decodes
 # your remote, prefer rf_fan_example.yaml.
 # ---------------------------------------------------------------------------
