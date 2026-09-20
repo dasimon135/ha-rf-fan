@@ -170,13 +170,13 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         fields: dict[Any, Any] = {}
         if include_device:
             available = self._available_esphome_devices()
-            default_device = available[0] if len(available) == 1 else ""
             if available:
-                fields[vol.Required(
-                    CONF_ESPHOME_DEVICE, default=default_device or available[0]
-                )] = SelectSelector(SelectSelectorConfig(options=available))
+                fields[vol.Required(CONF_ESPHOME_DEVICE, default=available[0])] = (
+                    SelectSelector(SelectSelectorConfig(options=available))
+                )
             else:
-                fields[vol.Optional(CONF_ESPHOME_DEVICE, default=default_device)] = str
+                # No gateway online: the name can still be typed by hand.
+                fields[vol.Optional(CONF_ESPHOME_DEVICE, default="")] = str
         fields[vol.Required(CONF_FAN_NAME, default=self._fan_name)] = str
         # A dropdown rather than a free number: the count decides how many codes have
         # to be learned, so an accidental 40 is an expensive typo. The old cap of 6
@@ -289,18 +289,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._unique_id_for(selected_device, self._fan_name)
                 )
                 self._abort_if_unique_id_configured()
-                self._speed_count = int(user_input[CONF_SPEED_COUNT])
-                self._light_control = user_input[CONF_LIGHT_CONTROL]
-                self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
-                self._has_light = self._light_control != LIGHT_CONTROL_NONE
-                self._caps = caps_from_data(user_input)
-                self._steps = {
-                    CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
-                    CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
-                }
-                error = self._read_natural_levels(user_input)
+                error = self._read_declaration(user_input)
                 if error is None:
-                    self._extra_count = extra_button_count(dict(user_input))
                     if self._extra_count:
                         return await self.async_step_extra_names()
                     self._extra_names = {}
@@ -406,7 +396,16 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     if str(user_input.get(action, "")).strip()
                 }
             )
-            errors = validate_codes(codes, actions, optional=self._optional_actions())
+            optional_actions = self._optional_actions()
+            # Reconfiguring shows only the actions being (re)learned. The codes of
+            # the ones kept out of sight are still spoken for.
+            shown = {*actions, *optional_actions}
+            errors = validate_codes(
+                codes,
+                actions,
+                optional=optional_actions,
+                taken=[code for action, code in codes.items() if action not in shown],
+            )
             if not errors:
                 return self._finish(codes)
 
@@ -423,6 +422,29 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(schema_fields),
             errors=errors,
         )
+
+    def _read_declaration(self, user_input: dict[str, Any]) -> str | None:
+        """Store every answer of the declaration form; return an error key or None.
+
+        One reader for the three places that show this form. Spelled out at each
+        of them, the branch that refuses a rename had forgotten the airflow levels
+        and the extra-key count, so the form came back with both reset under an
+        error about something else.
+
+        The name and the gateway are not read here: they decide the entry's
+        identity, and each caller validates them differently.
+        """
+        self._speed_count = int(user_input[CONF_SPEED_COUNT])
+        self._light_control = user_input[CONF_LIGHT_CONTROL]
+        self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
+        self._has_light = self._light_control != LIGHT_CONTROL_NONE
+        self._caps = caps_from_data(user_input)
+        self._steps = {
+            CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
+            CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
+        }
+        self._extra_count = extra_button_count(dict(user_input))
+        return self._read_natural_levels(user_input)
 
     def _read_natural_levels(self, user_input: dict[str, Any]) -> str | None:
         """Store the declared airflow-level count, or name why it cannot be stored.
@@ -734,15 +756,10 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             other.unique_id == new_unique_id and other.entry_id != entry.entry_id
             for other in self._async_current_entries()
         ):
+            # Read anyway, so the form comes back as it was filled in. Its own
+            # error, if any, waits for the resubmission: one complaint at a time.
             self._fan_name = fan_name
-            self._speed_count = int(user_input[CONF_SPEED_COUNT])
-            self._light_control = user_input[CONF_LIGHT_CONTROL]
-            self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
-            self._caps = caps_from_data(user_input)
-            self._steps = {
-                CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
-                CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
-            }
+            self._read_declaration(user_input)
             return self.async_show_form(
                 step_id="reconfigure_capabilities",
                 data_schema=self._base_schema(include_device=False),
@@ -750,26 +767,13 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
         self._fan_name = fan_name
-        self._speed_count = int(user_input[CONF_SPEED_COUNT])
-        self._light_control = user_input[CONF_LIGHT_CONTROL]
-        self._has_fan_on = bool(user_input[CONF_HAS_FAN_ON])
-        self._has_light = self._light_control != LIGHT_CONTROL_NONE
-        self._caps = caps_from_data(user_input)
-        self._steps = {
-            CONF_COLOR_TEMP_STEPS: color_temp_steps(dict(user_input)),
-            CONF_LIGHT_LEVEL_STEPS: light_level_steps(dict(user_input)),
-        }
-        error = self._read_natural_levels(user_input)
+        error = self._read_declaration(user_input)
         if error is not None:
             return self.async_show_form(
                 step_id="reconfigure_capabilities",
                 data_schema=self._base_schema(include_device=False),
                 errors={CONF_NATURAL_LEVELS: error},
             )
-        # The same form carries the count on both paths, and only the creation path
-        # used to read it: reconfiguring asked for no new code and stored nothing,
-        # so the count silently returned to what it had been (#18, on 1.8.1b1).
-        self._extra_count = extra_button_count(dict(user_input))
         if self._extra_count:
             return await self.async_step_extra_names()
         self._extra_names = {}

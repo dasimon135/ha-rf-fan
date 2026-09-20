@@ -14,10 +14,11 @@ from homeassistant.core import Event
 class RfFanRuntimeData:
     """Assumed state shared across the platforms of one config entry."""
 
-    # Dead-reckoned position in COLOR_TEMP_OPTIONS.
+    # Dead-reckoned colour position, 0-based, out of the declared step count.
     kelvin_position: int = 0
-    # Dead-reckoned brightness position in 0..LIGHT_LEVEL_STEPS-1, for a light whose
-    # remote has +/- keys instead of a level to set. None until it is established.
+    # Dead-reckoned brightness position, 0-based, out of the declared step count,
+    # for a light whose remote has +/- keys instead of a level to set. None until
+    # it is established.
     level_position: int | None = None
     # Walks in flight, keyed by axis ("color", "level"). A walk emits one key press
     # per step with a pause between them, so a nine-step move takes several seconds;

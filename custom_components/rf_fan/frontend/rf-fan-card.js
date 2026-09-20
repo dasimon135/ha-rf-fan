@@ -13,7 +13,7 @@
 // Keep in step with manifest.json: the integration cache-busts the card with the
 // manifest version, so a mismatch here makes the console banner lie about which
 // build the browser actually loaded — exactly when you are chasing a stale cache.
-const VERSION = "1.10.0";
+const VERSION = "1.10.1";
 
 // Everything interpolated into innerHTML goes through this: entity names are
 // user-editable, so an unescaped `<` in a friendly name would break the markup.
@@ -74,9 +74,20 @@ class RfFanCard extends HTMLElement {
 
     // Only look at entities on the SAME device. If the device can't be
     // resolved, do NOT guess across the whole system — just show the fan.
-    const siblings = deviceId
-      ? Object.keys(reg).filter((e) => reg[e] && reg[e].device_id === deviceId)
-      : [];
+    //
+    // Walked once per registry, not once per `hass`. Home Assistant hands over a
+    // new `hass` on every state change anywhere in the house, while the registry
+    // OBJECT is only replaced when the registry changes — so its identity is the
+    // cache key. Without it this filtered every entity of the install on each
+    // update, and a second time whenever that update led to a render.
+    const cache = this._siblings;
+    const siblings =
+      cache && cache.reg === reg && cache.fanId === fanId
+        ? cache.list
+        : deviceId
+          ? Object.keys(reg).filter((e) => reg[e] && reg[e].device_id === deviceId)
+          : [];
+    this._siblings = { reg, fanId, list: siblings };
 
     const firstOf = (domain, override) => {
       if (override) return override;
@@ -379,7 +390,7 @@ class RfFanCard extends HTMLElement {
           // An unknown preset reads as `normal`, which is what the pair of chips
           // did before there was a menu to read.
           const active = preset === mode || (mode === "normal" && !preset);
-          return `<button class="chip ${active ? "active" : ""}" data-preset="${mode}"><ha-icon icon="${icon}"></ha-icon><span>${label}</span></button>`;
+          return `<button class="chip ${active ? "active" : ""}" data-preset="${esc(mode)}"><ha-icon icon="${icon}"></ha-icon><span>${esc(label)}</span></button>`;
         })
       );
     }
@@ -684,10 +695,10 @@ class RfFanCard extends HTMLElement {
 }
 
 // Guarded: the module can legitimately be loaded twice under two different
-// URLs — the integration registers it via add_extra_js_url, and a user may
-// also register it as a Lovelace resource (the only mechanism the Android
-// companion app reliably loads). An unguarded define() throws on the second
-// pass and takes the card down everywhere.
+// URLs — the integration registers it as a Lovelace resource (and falls back to
+// add_extra_js_url where it cannot), and a user may have registered a resource
+// of their own at another path. An unguarded define() throws on the second pass
+// and takes the card down everywhere.
 //
 // But whichever copy runs FIRST wins, and a defined custom element cannot be
 // replaced. So when the two are different builds the browser silently keeps the

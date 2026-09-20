@@ -177,8 +177,6 @@ CONF_LIGHT_LEVEL_STEPS: Final = "light_level_steps"
 CONF_COLOR_TEMP_STEPS: Final = "color_temp_steps"
 DEFAULT_LIGHT_LEVEL_STEPS: Final = 10
 DEFAULT_COLOR_TEMP_STEPS: Final = 3
-# Historical name, kept so an external reference to it does not break.
-LIGHT_LEVEL_STEPS: Final = DEFAULT_LIGHT_LEVEL_STEPS
 
 # Bounds for both counts. Two is the least that can be called a range; twenty is far
 # past any remote reported so far, and the upper bound exists only to keep a typo
@@ -307,15 +305,11 @@ PRESET_NATURAL: Final = "natural"
 # already written. Any other count is labelled by position instead; see
 # `actions.color_temp_options`.
 COLOR_TEMP_NAMED: Final = ["Chaud", "Neutre", "Froid"]
-# Historical name, kept so an external reference to it does not break.
-COLOR_TEMP_OPTIONS: Final = COLOR_TEMP_NAMED
 
 # Pause (seconds) between successive steps of a walk (colour, brightness) so a
 # debouncing receiver registers each as a separate press. A rapid burst with no gap
 # merges into a single step.
 STEP_GAP_SEC: Final = 0.4
-# Historical name, kept so an external reference to it does not break.
-KELVIN_STEP_GAP_SEC: Final = STEP_GAP_SEC
 
 # Anti-echo window: the gateway sniffs its own transmissions, so every code we send
 # comes back as a reception a moment later. For this number of seconds after sending a

@@ -182,16 +182,21 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         """Turn on the fan, optionally at a given speed and/or preset."""
         if percentage is not None:
             await self.async_set_percentage(percentage)
+        elif await self._async_transmit_action(ACTION_FAN_ON):
+            self._is_on = True
+            if self._percentage is None or self._percentage <= 0:
+                self._percentage = round(100 / self._speed_count)
+            self.async_write_ha_state()
         else:
-            sent = await self._async_transmit_action(ACTION_FAN_ON)
-            if not sent:
-                sent = await self._async_transmit_action(self._speed_action_for(1))
-
-            if sent:
-                self._is_on = True
-                if self._percentage is None or self._percentage <= 0:
-                    self._percentage = round(100 / self._speed_count)
-                self.async_write_ha_state()
+            # No `fan_on` key: a speed key is what starts this fan. The one it is
+            # already showing when it runs -- speed 1 here used to drop a fan at
+            # full speed to its lowest while the state went on reading 100 % -- and
+            # through the same path as any other speed, because a speed key is a
+            # speed key: it ends a `dedicated` preset and settles the direction.
+            running = self._is_on and self._percentage
+            await self.async_set_percentage(
+                self._percentage if running else round(100 / self._speed_count)
+            )
 
         # Applied last: the airflow preset is a separate button on the remote, and
         # the fan has to be running for it to take effect.
@@ -280,6 +285,9 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if sent:
             self._is_on = True
             self._percentage = round(speed_index * (100 / self._speed_count))
+            # Read before the speed key clears it: a preset asked for while the fan
+            # was stopped has been waiting for exactly this frame.
+            deferred = self._pending_preset
             # A speed key is how a `dedicated` remote leaves the preset -- measured,
             # and the reason this shape exists (#34).
             self._leave_dedicated_preset()
@@ -288,6 +296,12 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                 # no longer a guess.
                 self._direction = DIRECTION_FORWARD
             self.async_write_ha_state()
+            if deferred is not None:
+                # The fan is running now, so this is the first moment the airflow
+                # key can be heard -- whichever service started it. The bundled
+                # card's speed segments and the more-info slider both come through
+                # here rather than through `turn_on`.
+                await self.async_set_preset_mode(deferred)
 
     async def async_set_direction(self, direction: str) -> None:
         """Set the rotation direction.
@@ -332,6 +346,9 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         A `toggle` remote has never been measured doing that, and inventing it
         would desynchronise the one shape that works today.
         """
+        # The deferred press goes with it. Left armed behind a state that reads
+        # `normal`, it went on the air at the next `turn_on`, unasked.
+        self._pending_preset = None
         if self._dedicated_preset and self._preset not in (None, PRESET_NORMAL):
             self._preset = PRESET_NORMAL
 
@@ -396,12 +413,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
     @callback
     def _handle_rf_event(self, event: Any) -> None:
         """Update the local state when the physical remote is used."""
-        # Short-circuit order matters: an echo of our own transmission is not a
-        # remote press at all, so it must never be recorded as the start of a burst.
-        if self._is_echo(event.data) or self._is_repeat(event):
-            return
-
-        action = self._event_action(event.data)
+        action = self._received_action(event)
         if action is None:
             return
 

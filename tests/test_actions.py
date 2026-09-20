@@ -753,3 +753,17 @@ def test_a_declared_count_is_read_back():
     data = {"color_temp_steps": 8, "light_level_steps": 8}
     assert color_temp_steps(data) == 8
     assert light_level_steps(data) == 8
+
+
+def test_validate_codes_rejects_a_code_taken_outside_the_form():
+    """A code owned by an action the form does not show still cannot be reused.
+
+    Reconfiguring shows only the actions being (re)learned; the kept ones are
+    passed as `taken`, or a pasted code could silently duplicate one of them.
+    """
+    errors = validate_codes({"light_toggle": "c1"}, ["light_toggle"], taken=["c1", "c2"])
+    assert errors == {"light_toggle": "duplicate_code"}
+
+
+def test_validate_codes_taken_does_not_flag_a_distinct_code():
+    assert validate_codes({"light_toggle": "c9"}, ["light_toggle"], taken=["c1"]) == {}

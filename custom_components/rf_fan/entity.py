@@ -339,22 +339,6 @@ class RfFanBaseEntity(Entity):
             if index < steps - 1:
                 await sleep(STEP_GAP_SEC)
 
-    async def _async_transmit_times(self, action: str, times: int, gap: float = 0.0) -> bool:
-        """Transmit an action's code `times` times (cycle).
-
-        `gap` seconds are awaited between successive presses so a debouncing receiver
-        registers each as a distinct press; without a gap a rapid burst merges into a
-        single step. Returns True if at least one transmission succeeded.
-        """
-        sent_any = False
-        count = max(0, times)
-        for index in range(count):
-            if await self._async_transmit_action(action):
-                sent_any = True
-            if gap and index < count - 1:
-                await sleep(gap)
-        return sent_any
-
     @property
     def _runtime(self) -> RfFanRuntimeData:
         """Typed runtime data for the entry (set in __init__.py async_setup_entry)."""
@@ -409,6 +393,21 @@ class RfFanBaseEntity(Entity):
             return True
         # Normalize the ESPHome dash/underscore ambiguity on both sides.
         return device.replace("-", "_") == self._gateway_service
+
+    def _received_action(self, event: Any) -> str | None:
+        """The remote press a bus event stands for, or None when it is not one.
+
+        The order is the point. Origin first: a neighbouring gateway running the
+        same YAML reports the same code string for the same press, and letting its
+        copy into the de-bounce made ours arrive as a "repeat" and vanish. Then the
+        echo before the de-bounce: our own transmission coming back is not a press
+        at all, so it must never be recorded as the start of a burst.
+        """
+        if not self._is_own_event(event.data):
+            return None
+        if self._is_echo(event.data) or self._is_repeat(event):
+            return None
+        return self._event_action(event.data)
 
     def _event_action(self, event_data: dict[str, Any]) -> str | None:
         """Extract the received RF action from the ESPHome event."""
