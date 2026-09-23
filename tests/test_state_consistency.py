@@ -173,6 +173,9 @@ async def test_a_deferred_preset_survives_a_restart(hass: HomeAssistant) -> None
     `natural` again does nothing, since that is already the state.
     """
     entry, calls, fan_id = await _dedicated(hass)
+    # A known "off" first: only an on/off state is restored, and a fan HA has never
+    # driven reads `unknown`.
+    await hass.services.async_call("fan", "turn_off", {"entity_id": fan_id}, blocking=True)
     await hass.services.async_call(
         "fan", "set_preset_mode", {"entity_id": fan_id, "preset_mode": "natural"}, blocking=True
     )
@@ -259,3 +262,43 @@ async def test_learning_shows_the_name_given_to_a_free_form_key(hass: HomeAssist
     assert result["step_id"] == "codes"
     placeholders = result.get("description_placeholders") or {}
     assert "Mémoire" in placeholders.get("extra_names", "")
+
+
+async def test_relearning_a_free_form_key_names_it(hass: HomeAssistant) -> None:
+    """The listening screen said `extra_1`; the owner called that key "Mémoire"."""
+    from unittest.mock import patch
+
+    from homeassistant.config_entries import SOURCE_RECONFIGURE
+    from homeassistant.data_entry_flow import FlowResultType
+
+    from custom_components.rf_fan.const import EVENT_RF_FAN_RECEIVED
+
+    entry = _legacy_entry(hass)
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            **entry.data,
+            "extra_count": 1,
+            "extra_names": {"extra_1": "Mémoire"},
+            "codes": {**entry.data["codes"], "extra_1": "c_x1"},
+        },
+    )
+    flow = hass.config_entries.flow
+
+    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+        result = await flow.async_init(
+            DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+        )
+        result = await flow.async_configure(
+            result["flow_id"], {"next_step_id": "reconfigure_codes"}
+        )
+        result = await flow.async_configure(result["flow_id"], {"relearn_extra_1": True})
+        result = await flow.async_configure(result["flow_id"], {"method": "learn"})
+
+        assert result["type"] == FlowResultType.SHOW_PROGRESS
+        assert "Mémoire" in result["description_placeholders"]["action"]
+
+        hass.bus.async_fire(EVENT_RF_FAN_RECEIVED, {"device": DEVICE, "code": "c_x1_v2"})
+        await hass.async_block_till_done()
+        await flow.async_configure(result["flow_id"])
+        await hass.async_block_till_done()
