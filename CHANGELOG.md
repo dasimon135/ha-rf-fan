@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`fan.increase_speed` and `fan.decrease_speed` never changed the speed.** Called
+  without a `percentage_step`, which is how scripts, automations and voice assistants
+  call them, Home Assistant plans the next speed from the entity's `speed_count`. The
+  fan never set it, so it read the default of 100 and every call re-sent the speed the
+  fan was already at. A wall switch wired to "one notch faster" did nothing. Both
+  services now move exactly one speed, and one below the lowest turns the fan off, as
+  they do for any fan. The stored percentages do not change, so an automation that
+  compares against one keeps working.
+
 ### Documentation
 
 - **A raw-timings gateway wants a repeat count of 1, and the README only ever said

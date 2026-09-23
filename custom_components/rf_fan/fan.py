@@ -59,6 +59,10 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         # name (avoids a redundant "…Fan" suffix).
         self._attr_name = None
         self._speed_count: int = int(config_entry.data[CONF_SPEED_COUNT])
+        # Home Assistant derives `percentage_step` from this, and plans
+        # `fan.increase_speed` / `fan.decrease_speed` with it. Left at its default
+        # of 100, both services re-sent the current speed and never moved it.
+        self._attr_speed_count = self._speed_count
         self._is_on: bool | None = None
         self._percentage: int | None = None
         self._event_unsub = None
@@ -135,10 +139,33 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         """Return the assumed preset."""
         return self._preset
 
-    @property
-    def percentage_step(self) -> float:
-        """Return the supported speed step."""
-        return 100 / self._speed_count
+    async def async_increase_speed(self, percentage_step: int | None = None) -> None:
+        """One speed up, or Home Assistant's arithmetic when a step is given."""
+        await self._async_step_speed(1, percentage_step)
+
+    async def async_decrease_speed(self, percentage_step: int | None = None) -> None:
+        """One speed down (off below the lowest), or Home Assistant's arithmetic."""
+        await self._async_step_speed(-1, percentage_step)
+
+    async def _async_step_speed(self, delta: int, percentage_step: int | None) -> None:
+        """Move one notch on the fan's own speed index.
+
+        Home Assistant plans a step-less call on a percentage grid of its own, and
+        this fan stores `round(index * 100 / n)`: 17 % for speed 1 of 6 reads as
+        just above speed 1 there, so its plan jumps a speed on the way up. Working
+        on the index keeps the stored percentages as they are, which automations
+        compare against.
+        """
+        if percentage_step is not None:
+            if delta > 0:
+                await super().async_increase_speed(percentage_step)
+            else:
+                await super().async_decrease_speed(percentage_step)
+            return
+        running = self._is_on and self._percentage
+        current = self._speed_index(self._percentage) if running else 0
+        target = max(0, min(self._speed_count, current + delta))
+        await self.async_set_percentage(round(target * 100 / self._speed_count))
 
     async def async_added_to_hass(self) -> None:
         """Restore the assumed state, then subscribe to RF events."""
