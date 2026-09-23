@@ -33,7 +33,9 @@ class RfFanCard extends HTMLElement {
       throw new Error("rf-fan-card: an `entity` pointing to a fan.* is required");
     }
     this._config = config;
-    this._root = null;
+    // The root is kept. Home Assistant hands a new config to the SAME element (the
+    // dashboard editor's preview does it on every edit), and a second attachShadow
+    // is refused by the browser: the card froze on its first config.
     this._sig = null;
   }
 
@@ -85,7 +87,15 @@ class RfFanCard extends HTMLElement {
       cache && cache.reg === reg && cache.fanId === fanId
         ? cache.list
         : deviceId
-          ? Object.keys(reg).filter((e) => reg[e] && reg[e].device_id === deviceId)
+          ? Object.keys(reg).filter(
+              (e) =>
+                reg[e] &&
+                reg[e].device_id === deviceId &&
+                // Only this integration's entities. On another integration's fan
+                // nothing carries our translation keys, and the roles below fall back
+                // to elimination: a device's restart button became "recalibrate".
+                (!reg[e].platform || reg[e].platform === "rf_fan")
+            )
           : [];
     this._siblings = { reg, fanId, list: siblings };
 
@@ -478,6 +488,10 @@ class RfFanCard extends HTMLElement {
   }
 
   _onPointerDown(e) {
+    // A new gesture. A long press that opened more-info ends on the dialog, so its
+    // click never reaches the card to clear the flag; without this the next tap on
+    // any control was swallowed.
+    this._held = false;
     if (!e.target.closest("[data-act='power']")) return;
     this._holdTimer = window.setTimeout(() => {
       this._held = true;

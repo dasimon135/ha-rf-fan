@@ -21,6 +21,7 @@ from .const import (
     CONF_DIRECTION_CONTROL,
     CONF_DISABLE_CARD,
     CONF_ESPHOME_DEVICE,
+    CONF_FAN_NAME,
     CONF_GATEWAY_SERVICE,
     CONF_HAS_COLOR_TEMP,
     CONF_HAS_DIRECTION,
@@ -338,7 +339,42 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data.setdefault(CONF_NATURAL_LEVELS, 0)
         hass.config_entries.async_update_entry(entry, data=data, version=6)
         _LOGGER.debug("Migrated config entry %s to version 6", entry.entry_id)
+    if entry.version == 6 and entry.minor_version < 2:
+        _async_give_unique_id(hass, entry)
+        hass.config_entries.async_update_entry(entry, minor_version=2)
+        _LOGGER.debug("Migrated config entry %s to version 6.2", entry.entry_id)
     return True
+
+
+@callback
+def _async_give_unique_id(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Give an entry created before 1.5.0 the unique id the flow now assigns.
+
+    Without one, `_abort_if_unique_id_configured` has nothing to compare against, and
+    the same fan on the same gateway could be added a second time: two entries, each
+    reacting to every frame. An id another entry already holds is left alone, since
+    that entry is the same fan and taking its id would only move the duplicate.
+    """
+    from .config_flow import RfFanConfigFlow
+
+    if entry.unique_id is not None:
+        return
+    wanted = RfFanConfigFlow.unique_id_for(
+        entry.data[CONF_ESPHOME_DEVICE], entry.data.get(CONF_FAN_NAME, entry.title)
+    )
+    if any(
+        other.unique_id == wanted
+        for other in hass.config_entries.async_entries(DOMAIN)
+        if other.entry_id != entry.entry_id
+    ):
+        _LOGGER.warning(
+            "RF Fan entry %s is the same fan as another entry (%s) and is left without "
+            "a unique id; remove one of the two",
+            entry.title,
+            wanted,
+        )
+        return
+    hass.config_entries.async_update_entry(entry, unique_id=wanted)
 
 
 @callback

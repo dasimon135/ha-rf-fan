@@ -87,6 +87,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow to add a generic RF fan."""
 
     VERSION = 6
+    # 6.2: entries created before 1.5.0 get the unique id every later one has.
+    MINOR_VERSION = 2
 
     @staticmethod
     @callback
@@ -131,7 +133,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     _SERVICE_SUFFIX = "_transmit_rf_fan"
 
     @staticmethod
-    def _unique_id_for(esphome_device: str, fan_name: str) -> str:
+    def unique_id_for(esphome_device: str, fan_name: str) -> str:
         """Stable id for a fan: gateway + name.
 
         slugify normalizes the dash/underscore ambiguity of ESPHome device names,
@@ -286,7 +288,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._gateway_service = self._resolve_gateway_service(selected_device)
                 self._fan_name = user_input[CONF_FAN_NAME].strip()
                 await self.async_set_unique_id(
-                    self._unique_id_for(selected_device, self._fan_name)
+                    self.unique_id_for(selected_device, self._fan_name)
                 )
                 self._abort_if_unique_id_configured()
                 error = self._read_declaration(user_input)
@@ -338,6 +340,11 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="extra_names", data_schema=vol.Schema(fields)
         )
+
+    def _action_label(self, action: str) -> str:
+        """An action key, with the name its owner gave it for a free-form key."""
+        name = self._extra_names.get(action)
+        return f"{action} ({name})" if name else action
 
     def _extra_names_summary(self) -> str:
         """"1 = Memory - 2 = Ionisation", for a step description.
@@ -421,6 +428,13 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="codes",
             data_schema=vol.Schema(schema_fields),
             errors=errors,
+            # The field labels come from translations and can only say "extra key
+            # 3"; the owner named it one screen earlier, so the mapping goes here.
+            description_placeholders={
+                "extra_names": "\n\n" + self._extra_names_summary()
+                if self._extra_count
+                else ""
+            },
         )
 
     def _read_declaration(self, user_input: dict[str, Any]) -> str | None:
@@ -536,7 +550,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             progress_action="listen_rf_signal",
             progress_task=self._learn_task,
             description_placeholders={
-                "action": actions[self._learn_action_index],
+                "action": self._action_label(actions[self._learn_action_index]),
                 "timeout": str(LEARN_TIMEOUT_SEC),
             },
         )
@@ -587,7 +601,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 description_placeholders={
-                    "action": actions[self._learn_action_index],
+                    "action": self._action_label(actions[self._learn_action_index]),
                     "timeout": str(LEARN_TIMEOUT_SEC),
                 },
                 errors={"base": self._learn_error},
@@ -681,7 +695,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 entry,
                 data=data,
                 title=self._fan_name,
-                unique_id=self._unique_id_for(self._esphome_device, self._fan_name),
+                unique_id=self.unique_id_for(self._esphome_device, self._fan_name),
             )
         return self.async_create_entry(title=self._fan_name, data=data)
 
@@ -751,7 +765,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         # A rename changes the entry identity: refuse one that another fan on the
         # same gateway already answers to, rather than ending up with two entries
         # HA cannot tell apart.
-        new_unique_id = self._unique_id_for(self._esphome_device, fan_name)
+        new_unique_id = self.unique_id_for(self._esphome_device, fan_name)
         if any(
             other.unique_id == new_unique_id and other.entry_id != entry.entry_id
             for other in self._async_current_entries()

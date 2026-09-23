@@ -306,6 +306,18 @@ class RfFanBaseEntity(Entity):
                 del self._runtime.walks[axis]
         return get_position()
 
+    def _cancel_walks(self) -> None:
+        """Stop every walk in flight, on both axes, without raising in their callers.
+
+        For a lamp that has just gone off: nothing reaches it any more, so a further
+        step would be pressed for nothing and counted as if it had landed. Each task is
+        taken out of the map BEFORE it is cancelled, which is what `_async_walk` reads
+        to tell "superseded" (swallowed) from its own cancellation (re-raised).
+        """
+        walks = self._runtime.walks
+        for axis in list(walks):
+            walks.pop(axis).cancel()
+
     async def _async_walk_body(
         self,
         *,

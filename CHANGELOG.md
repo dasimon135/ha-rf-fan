@@ -17,6 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   services now move exactly one speed, and one below the lowest turns the fan off, as
   they do for any fan. The stored percentages do not change, so an automation that
   compares against one keeps working.
+- **A `dedicated` airflow preset stayed shown after the fan had left it**, on three
+  paths. A direction change on a `per_speed` remote re-sends a speed code, which is
+  what leaves the preset. The remote's ON key starts a stopped fan in normal airflow,
+  and it also left a preset asked for meanwhile armed, to be pressed right after the
+  next speed key. And a restart kept the shown preset but lost the press it was
+  waiting for, after which choosing it again did nothing.
+- **Switching the light off stops a brightness or colour walk in flight.** It went on
+  pressing the +/- keys for a lamp that was off, and counting them.
+- **Entries created before 1.5.0 now get a unique id** (config entry 6.2), so the same
+  fan can no longer be added twice on the same gateway. If two entries already are the
+  same fan, the second is left alone and named in the log.
+- **Free-form keys are shown by the name you gave them** on the learning screen and on
+  the manual codes form, which only said `extra_1`.
+- **Card:** it no longer freezes in the dashboard editor after the first edit, a long
+  press no longer swallows the next tap, and on another integration's fan it no longer
+  guesses which of that device's buttons is its own (a restart button could become
+  "recalibrate").
 
 ### Documentation
 
