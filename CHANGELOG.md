@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.2] - 2026-09-24
 
 ### Fixed
 
@@ -47,6 +47,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The repeat count is on `Configure`, not `Reconfigure`.** It lives in the options
   flow, titled *RF Transmission Options*; `Reconfigure` is the menu that relearns codes
   and has never carried it. The troubleshooting section sent readers to the wrong screen.
+
+### Validated
+
+On the maintainer's own instance, on a Cecotec fan whose remote has no `fan_on` key,
+before this release: the wall-switch scripts that call `fan.increase_speed` and
+`fan.decrease_speed` with no step moved the fan from 33 % to 50 % and back, where
+they had always re-sent the current speed. The config entry, created before 1.5.0,
+migrated to 6.2 and received its unique id. The light was switched on and off, the
+card rendered, and nothing from `rf_fan` reached the log.
+
+**What was not exercised on hardware:** the `dedicated` airflow preset (this fan's
+airflow key toggles) and a brightness walk (this lamp has no +/- keys). Those fixes
+rest on their tests, each of which was seen failing before its fix.
+
+Nothing to do after updating: the entry moves to 6.2 on its own at the next restart,
+no action key changes name, and nothing is relearned.
 
 ## [1.10.1] - 2026-09-20
 
