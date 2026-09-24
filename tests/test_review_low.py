@@ -81,14 +81,12 @@ async def test_a_name_already_used_is_a_form_error_not_the_end_of_the_flow(
     assert _defaults(result)["speed_count"] == 4
 
 
-async def test_an_unknown_gateway_keeps_the_rest_of_the_form(hass: HomeAssistant) -> None:
-    register_stub(hass)
-    await hass.async_block_till_done()
+async def test_a_missing_gateway_keeps_the_rest_of_the_form(hass: HomeAssistant) -> None:
+    """With no gateway online the field is free text; left blank it is refused, and
+    the form used to come back with every other answer reset."""
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
-    result = await flow.async_configure(
-        result["flow_id"], _declaration(esphome_device="not-a-gateway")
-    )
+    result = await flow.async_configure(result["flow_id"], _declaration(esphome_device=""))
 
     assert result["errors"] == {"esphome_device": "unknown_esphome_device"}
     defaults = _defaults(result)
