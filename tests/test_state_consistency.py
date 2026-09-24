@@ -96,8 +96,9 @@ async def test_the_same_fan_cannot_then_be_added_again(hass: HomeAssistant) -> N
         },
     )
 
-    assert result["type"] == "abort"
-    assert result["reason"] == "already_configured"
+    # Refused on the name field rather than by aborting the form (second review).
+    assert result["type"] == "form"
+    assert result["errors"] == {"fan_name": "name_already_used"}
 
 
 async def test_a_unique_id_already_taken_is_left_alone(hass: HomeAssistant) -> None:
