@@ -7,7 +7,7 @@
         "data": {
           "esphome_device": "Nom du device ESPHome",
           "fan_name": "Nom d'affichage du ventilateur",
-          "extra_count": "Les touches dont l'intégration n'a aucun concept - un bouton mémoire, un ionisateur, tout ce que le ventilateur fait sans que Home Assistant sache le nommer. Chacune devient un bouton que vous nommez, et les noms sont demandés à l'étape suivante.",
+          "extra_count": "Boutons supplémentaires",
           "speed_count": "Nombre de vitesses distinctes",
           "light_control": "Commande de la lumière",
           "has_fan_on": "Le ventilateur a un bouton marche dédié",
@@ -18,10 +18,12 @@
           "color_temp_steps": "Nombre de positions de couleur",
           "light_level": "Luminosité de la lampe",
           "light_level_steps": "Nombre de niveaux de luminosité",
-          "extra_count": "Boutons supplémentaires",
           "timer_hours": "Durées de minuterie",
           "has_timer_off": "Touche dédiée d'annulation de minuterie",
           "has_sound": "Son (bip)"
+        },
+        "data_description": {
+          "extra_count": "Les touches dont l'intégration n'a aucun concept - un bouton mémoire, un ionisateur, tout ce que le ventilateur fait sans que Home Assistant sache le nommer. Chacune devient un bouton que vous nommez, et les noms sont demandés à l'étape suivante."
         }
       },
       "extra_names": {
@@ -58,7 +60,7 @@
       },
       "learn_resolve": {
         "title": "Ventilateur RF - Apprentissage guidé",
-        "description": "Aucun signal RF capté pour l'action {action}. Collez le code manuellement, cochez ignorer, ou validez pour réécouter ({timeout}s).",
+        "description": "La capture pour l'action {action} n'a pas abouti. Collez le code manuellement, cochez ignorer, ou validez pour réécouter ({timeout}s).",
         "data": {
           "code": "Code RF capturé",
           "skip": "Ignorer cette action"
@@ -228,7 +230,8 @@
           "light_level_steps": "Nombre de niveaux de luminosité",
           "timer_hours": "Durées de minuterie",
           "has_timer_off": "Touche dédiée d'annulation de minuterie",
-          "has_sound": "Son (bip)"
+          "has_sound": "Son (bip)",
+          "extra_count": "Boutons supplémentaires"
         }
       }
     },
@@ -246,7 +249,8 @@
     },
     "abort": {
       "already_configured": "Un ventilateur portant ce nom est déjà configuré sur cette passerelle.",
-      "reconfigure_successful": "Reconfiguration enregistrée et rechargée."
+      "reconfigure_successful": "Reconfiguration enregistrée et rechargée.",
+      "already_in_progress": "Une configuration de ce ventilateur est déjà en cours."
     }
   },
   "options": {

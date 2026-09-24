@@ -164,7 +164,9 @@ async def test_extra_keys_are_named_then_learned(hass: HomeAssistant) -> None:
     assert result["type"] == FlowResultType.CREATE_ENTRY
     data = result["data"]
     assert data["extra_count"] == 2
-    assert data["extra_names"] == {"extra_1": "Mémoire", "extra_2": "Extra key 2"}
+    # A blank name is stored blank, so the entity takes its translated name. An
+    # English literal stored here would read "Extra key 2" in every language.
+    assert data["extra_names"] == {"extra_1": "Mémoire", "extra_2": ""}
     assert data["codes"]["extra_1"] == "C_x1"
     assert data["codes"]["extra_2"] == "C_x2"
 

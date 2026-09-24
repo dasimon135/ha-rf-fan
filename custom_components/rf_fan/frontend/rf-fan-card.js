@@ -50,7 +50,8 @@ class RfFanCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config && this._config.layout === "tile" ? 1 : 5;
+    const layout = this._config && this._config.layout;
+    return layout === "tile" ? 1 : layout === "compact" ? 3 : 5;
   }
 
   static getStubConfig(hass) {
@@ -156,7 +157,8 @@ class RfFanCard extends HTMLElement {
     const timers = buttons
       .filter(isTimer)
       .map((e) => ({ id: e, h: hoursOf(e) }))
-      .sort((a, b) => Number(a.h) - Number(b.h));
+      // A timer whose hours cannot be read sorts last rather than anywhere.
+      .sort((a, b) => (Number(a.h) || Infinity) - (Number(b.h) || Infinity));
     const calibrate = cfg.calibrate_entity || buttons.find(isCalibrate);
 
     // Selects: the entry can own two of them (colour temperature, and the assumed
@@ -195,13 +197,15 @@ class RfFanCard extends HTMLElement {
     const ent = this._discover();
     const ids = [ent.fan, ent.light, ent.color, ent.sound, ent.calibrate, ent.timerSensor]
       .concat(ent.timers.map((t) => t.id))
+      .concat((ent.extras || []).map((x) => x.id))
       .filter(Boolean);
     return ids
       .map((id) => {
         const s = this._hass.states[id];
         if (!s) return id + ":none";
         const a = s.attributes;
-        return `${id}:${s.state}:${a.percentage}:${a.direction}:${a.preset_mode}:${a.brightness}`;
+        // The name is drawn too, so a rename alone has to redraw the card.
+        return `${id}:${s.state}:${a.percentage}:${a.direction}:${a.preset_mode}:${a.brightness}:${a.friendly_name}`;
       })
       .join("|");
   }
@@ -418,7 +422,7 @@ class RfFanCard extends HTMLElement {
     let timerRow = "";
     if (ent.timers.length) {
       timerRow = `<div class="timers">` + ent.timers
-        .map((t) => `<button class="chip" data-timer="${esc(t.id)}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${esc(t.h)}h</span></button>`)
+        .map((t) => `<button class="chip" data-timer="${esc(t.id)}"><ha-icon icon="mdi:timer-outline"></ha-icon><span>${t.h ? `${esc(t.h)}h` : esc(this._hass.states[t.id]?.attributes?.friendly_name || t.id)}</span></button>`)
         .join("") + `</div>`;
     }
 
@@ -475,9 +479,15 @@ class RfFanCard extends HTMLElement {
     this._root = card;
     this._body.addEventListener("click", (e) => this._onClick(e));
     this._body.addEventListener("keydown", (e) => {
-      if ((e.key === "Enter" || e.key === " ") && e.target.closest("[data-act='tileinfo']")) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (e.target.closest("[data-act='tileinfo']")) {
         e.preventDefault();
         this._onTileTap();
+      } else if (e.target.closest("[data-act='power']")) {
+        // The full and compact fan picture is a role="button" with a tabindex, so
+        // it takes focus; without this the power was out of reach of a keyboard.
+        e.preventDefault();
+        this._call("fan", "toggle", { entity_id: this._discover().fan });
       }
     });
     this._body.addEventListener("change", (e) => this._onChange(e));
@@ -769,6 +779,8 @@ class RfFanCardEditor extends HTMLElement {
           light_entity: "Light entity (override)",
           color_entity: "Colour select (override)",
           sound_entity: "Sound switch (override)",
+          calibrate_entity: "Colour calibrate button (override)",
+          tile_tap: "Tile tap opens",
         }[s.name] || s.name);
       this._form.addEventListener("value-changed", (e) => {
         this.dispatchEvent(
@@ -801,6 +813,19 @@ class RfFanCardEditor extends HTMLElement {
       { name: "light_entity", selector: { entity: { domain: "light" } } },
       { name: "color_entity", selector: { entity: { domain: "select" } } },
       { name: "sound_entity", selector: { entity: { domain: "switch" } } },
+      { name: "calibrate_entity", selector: { entity: { domain: "button" } } },
+      {
+        name: "tile_tap",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "card", label: "The full card" },
+              { value: "more-info", label: "The more-info dialog" },
+            ],
+          },
+        },
+      },
     ];
     this._form.data = this._config;
   }

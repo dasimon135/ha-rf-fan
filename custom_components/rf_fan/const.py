@@ -207,11 +207,6 @@ def extra_action(index: int) -> str:
     """
     return f"extra_{index}"
 
-
-def extra_default_name(index: int) -> str:
-    """Fallback label for a key whose name was left blank."""
-    return f"Extra key {index}"
-
 # New actions
 ACTION_FAN_REVERSE: Final = "fan_reverse"
 ACTION_FAN_NATURAL: Final = "fan_natural"

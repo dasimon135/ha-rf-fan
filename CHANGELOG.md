@@ -5,6 +5,31 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Adding a fan under a name already used on that gateway** is now an error on the
+  name field. It aborted the whole form, and every answer on it was lost. A missing
+  gateway no longer resets the other answers either, and the gateway already picked
+  stays picked when the form comes back with an error.
+- **A free-form key left unnamed takes its translated name** ("Touche supplémentaire
+  1" in French). It was stored as the English "Extra key 1", so the translation
+  shipped in `fr.json` was never used. Keys named before this keep their stored name.
+- **Walks on the light:** three moves in quick succession could leave two walks
+  pressing keys at once, and reloading the entry (a reconfigure does) left a walk in
+  flight pressing keys against runtime data nothing read any more.
+- **Translations:** the explanation of the extra-key count was defined twice and
+  never shown, it is now the field's help text; the reconfigure form labels that
+  field; a second setup of the same fan has a message; and the recovery screen no
+  longer says "no RF signal" under a duplicate-code error.
+- **Blueprint:** the temperature thresholds accept Fahrenheit (they were capped at
+  40 and labelled °C, which made the blueprint unusable on a °F sensor).
+- **Card:** Enter or Space on the focused fan picture toggles the fan, a rename shows
+  without waiting for the next state change, a timer whose hours cannot be read is
+  labelled with its name instead of a bare "h", the visual editor offers `tile_tap`
+  and `calibrate_entity`, and the compact layout reports its smaller size.
+
 ## [1.10.2] - 2026-09-24
 
 ### Fixed

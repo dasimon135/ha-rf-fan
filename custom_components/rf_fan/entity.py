@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from asyncio import CancelledError, sleep
 from collections.abc import Callable
-from contextlib import suppress
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -278,11 +278,16 @@ class RfFanBaseEntity(Entity):
         running = self._runtime.walks.pop(axis, None)
         if running is not None and not running.done():
             running.cancel()
-            with suppress(CancelledError):
-                await running
 
-        task = self.hass.async_create_task(
+        # Registered BEFORE the old walk has finished unwinding, and the old walk is
+        # awaited inside the new one. Awaiting it here, with the axis empty, let a
+        # third call in that gap start a walk beside this one. A background task of
+        # the entry, so an unload or a reload stops it instead of leaving it pressing
+        # keys against runtime data nothing reads any more.
+        task = self._config_entry.async_create_background_task(
+            self.hass,
             self._async_walk_body(
+                after=running,
                 up_action=up_action,
                 down_action=down_action,
                 target=target,
@@ -290,16 +295,18 @@ class RfFanBaseEntity(Entity):
                 wrap=wrap,
                 get_position=get_position,
                 set_position=set_position,
-            )
+            ),
+            f"rf_fan walk {axis}",
         )
         self._runtime.walks[axis] = task
         try:
             await task
         except CancelledError:
-            # Superseded by a newer walk on the same axis: expected, not an error.
-            # Our own cancellation still propagates — the entry it left in the map
-            # is the newer walk's, so `is not task` distinguishes the two cases.
-            if self._runtime.walks.get(axis) is task:
+            # The walk was cancelled from outside: superseded, the light switched
+            # off, or the entry unloaded. Expected, not an error. Only a cancellation
+            # of THIS call, the service call awaiting the walk, propagates.
+            current = asyncio.current_task()
+            if current is not None and current.cancelling():
                 raise
         finally:
             if self._runtime.walks.get(axis) is task:
@@ -310,9 +317,8 @@ class RfFanBaseEntity(Entity):
         """Stop every walk in flight, on both axes, without raising in their callers.
 
         For a lamp that has just gone off: nothing reaches it any more, so a further
-        step would be pressed for nothing and counted as if it had landed. Each task is
-        taken out of the map BEFORE it is cancelled, which is what `_async_walk` reads
-        to tell "superseded" (swallowed) from its own cancellation (re-raised).
+        step would be pressed for nothing and counted as if it had landed. The service
+        call awaiting each walk treats this as an outside cancellation and returns.
         """
         walks = self._runtime.walks
         for axis in list(walks):
@@ -321,6 +327,7 @@ class RfFanBaseEntity(Entity):
     async def _async_walk_body(
         self,
         *,
+        after: asyncio.Task[None] | None = None,
         up_action: str,
         down_action: str | None,
         target: int,
@@ -330,6 +337,10 @@ class RfFanBaseEntity(Entity):
         set_position: Callable[[int], None],
     ) -> None:
         """Emit the individual steps of a walk (see `_async_walk`)."""
+        if after is not None:
+            # Plan from where the superseded walk actually stopped. `wait` does not
+            # raise for a cancelled task, and it lets OUR cancellation through.
+            await asyncio.wait([after])
         position = get_position()
         if down_action is None:
             # Forward-only cycling key: the shortest path may point backwards, but

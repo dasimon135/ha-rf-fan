@@ -27,7 +27,6 @@ from .const import (
     CONF_HAS_TIMER_OFF,
     LIGHT_LEVEL_RELATIVE,
     extra_action,
-    extra_default_name,
     timer_action,
 )
 from .entity import RfFanBaseEntity
@@ -225,7 +224,9 @@ class RfFanExtraButton(RfFanBaseEntity, ButtonEntity):
         self._attr_translation_key = self._action
         # An explicit name outranks the translation key, which is what lets the
         # entity carry the user's label while staying identifiable by that key.
-        self._attr_name = label or extra_default_name(index)
+        # Without one, the translation names it, in the user's language.
+        if label:
+            self._attr_name = label
 
     async def async_press(self) -> None:
         """Transmit the learned code.
