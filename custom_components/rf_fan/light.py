@@ -164,6 +164,8 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
     def _publish_light_state(self) -> None:
         """Share the assumed on/off state (so the color select can gate on it) and refresh."""
         self._runtime.light_on = self._is_on
+        if self._is_on is False:
+            self._cancel_walks()
         async_dispatcher_send(self.hass, self._kelvin_signal())
         async_dispatcher_send(self.hass, self._light_state_signal())
         self.async_write_ha_state()
@@ -181,6 +183,8 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         if declared is self._is_on:
             return
         self._is_on = declared
+        if declared is False:
+            self._cancel_walks()
         async_dispatcher_send(self.hass, self._kelvin_signal())
         self.async_write_ha_state()
 

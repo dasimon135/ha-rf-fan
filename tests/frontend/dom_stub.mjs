@@ -41,6 +41,11 @@ class StubHTMLElement extends StubElement {
   }
 
   attachShadow() {
+    // A browser refuses a second shadow root on the same element. Accepting it here
+    // is what hid a card that broke on its second `setConfig`.
+    if (this.shadowRoot) {
+      throw new Error("NotSupportedError: shadow root already attached");
+    }
     this.shadowRoot = new StubElement("#shadow-root");
     return this.shadowRoot;
   }

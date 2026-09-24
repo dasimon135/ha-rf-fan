@@ -66,7 +66,7 @@
       },
       "codes": {
         "title": "Ventilateur RF - Codes d'action",
-        "description": "Collez le code RF pour chaque action. Les codes sont des chaînes opaques, exactement comme produites par votre pipeline de sniff.",
+        "description": "Collez le code RF pour chaque action. Les codes sont des chaînes opaques, exactement comme produites par votre pipeline de sniff.{extra_names}",
         "data": {
           "fan_on": "Code pour ventilateur ON",
           "fan_off": "Code pour ventilateur OFF",

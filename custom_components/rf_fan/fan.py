@@ -14,7 +14,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import (
+    ExtraStoredData,
+    RestoredExtraData,
+    RestoreEntity,
+)
 
 from .actions import caps_from_data, natural_level_count
 from .const import (
@@ -186,7 +190,25 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                 # not a state this entity may claim to be in.
                 if preset in (self._attr_preset_modes or ()):
                     self._preset = preset
+            # The shown preset comes back with the state; the press it may still be
+            # waiting for has to come back with it. Without it the fan starts in
+            # normal airflow under a `natural` label, and picking `natural` again
+            # does nothing, since that already is the state.
+            extra = await self.async_get_last_extra_data()
+            pending = extra.as_dict().get("pending_preset") if extra else None
+            if (
+                self._dedicated_preset
+                and not self._is_on
+                and pending is not None
+                and pending == self._preset
+            ):
+                self._pending_preset = pending
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData:
+        """Keep a deferred airflow press across a restart (see `async_added_to_hass`)."""
+        return RestoredExtraData({"pending_preset": self._pending_preset})
 
     async def async_will_remove_from_hass(self) -> None:
         """Unsubscribe the callbacks."""
@@ -356,6 +378,9 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
                     # so neither may the assumed state.
                     self._direction = previous
                     return
+                # That was a speed key, and on a `dedicated` remote a speed key is
+                # what leaves the airflow preset (#34).
+                self._leave_dedicated_preset()
             # Fan off: nothing to re-send, and the direction applies to the next
             # speed code sent. Recording it now is what makes that code the right one.
             self.async_write_ha_state()
@@ -463,6 +488,12 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             return
 
         if action == ACTION_FAN_ON:
+            if not self._is_on:
+                # The airflow key is deaf while the fan is stopped, so a fan started
+                # from the remote runs in normal airflow, and a preset asked for
+                # meanwhile never went on the air. Left armed, it was pressed after
+                # the next speed key: the one gesture that leaves it.
+                self._leave_dedicated_preset()
             self._is_on = True
             if self._percentage is None or self._percentage <= 0:
                 self._percentage = round(100 / self._speed_count)
