@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.3] - 2026-09-24
 
 ### Fixed
 
@@ -29,6 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without waiting for the next state change, a timer whose hours cannot be read is
   labelled with its name instead of a bare "h", the visual editor offers `tile_tap`
   and `calibrate_entity`, and the compact layout reports its smaller size.
+
+### Validated
+
+On the maintainer's own instance before this release: loaded without a line in the log,
+and on the real gateway the wall-switch script started the fan at its lowest speed,
+the light went on and off, and the card rendered.
+
+**What was not exercised on hardware:** the add-form and translation changes (no fan
+was added), the walk fixes (this lamp has no +/- keys), the blueprint, and the card's
+keyboard and editor changes. Those rest on their tests, each seen failing first.
+
+Nothing to do after updating. A free-form key named before this keeps the name that
+was stored for it.
 
 ## [1.10.2] - 2026-09-24
 
