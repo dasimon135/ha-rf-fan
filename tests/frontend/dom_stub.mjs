@@ -29,7 +29,16 @@ class StubElement {
     return child;
   }
 
-  addEventListener() {}
+  // Listeners are kept, so a test can deliver an event the way the browser would.
+  addEventListener(type, handler) {
+    (this._listeners ||= {})[type] ||= [];
+    this._listeners[type].push(handler);
+  }
+
+  fire(type, event) {
+    for (const handler of (this._listeners || {})[type] || []) handler(event);
+  }
+
   setAttribute() {}
   remove() {}
 }

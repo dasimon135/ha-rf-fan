@@ -183,3 +183,47 @@ def test_french_is_actually_translated() -> None:
     untranslated = sorted(key for key, value in french.items() if value == english.get(key))
 
     assert untranslated == []
+
+
+@pytest.mark.parametrize("name", list(FILES))
+def test_no_key_is_defined_twice(name: str) -> None:
+    """JSON keeps the last of two equal keys, silently.
+
+    `extra_count` was defined twice in the same `data` block: the long explanation
+    was thrown away and only "Extra buttons" ever reached the screen.
+    """
+    duplicates: list[str] = []
+
+    def _hook(pairs):
+        seen: set[str] = set()
+        for key, _value in pairs:
+            if key in seen:
+                duplicates.append(key)
+            seen.add(key)
+        return dict(pairs)
+
+    json.loads(FILES[name].read_text(encoding="utf-8"), object_pairs_hook=_hook)
+
+    assert duplicates == []
+
+
+def test_the_reconfigure_form_labels_every_field_it_shows() -> None:
+    """Reconfiguring shows the same declaration form, extra-key count included."""
+    steps = _loaded("strings.json")["config"]["step"]
+    created = set(steps["user"]["data"]) - {"esphome_device"}
+
+    assert sorted(created - set(steps["reconfigure_capabilities"]["data"])) == []
+
+
+def test_every_abort_the_flow_can_raise_is_worded() -> None:
+    """`async_set_unique_id` aborts with `already_in_progress` on a second flow."""
+    aborts = _loaded("strings.json")["config"]["abort"]
+
+    assert "already_in_progress" in aborts
+
+
+def test_the_recovery_screen_does_not_claim_there_was_no_signal() -> None:
+    """It is also shown for a duplicate code, captured or pasted, under that error."""
+    description = _loaded("strings.json")["config"]["step"]["learn_resolve"]["description"]
+
+    assert "No RF signal" not in description

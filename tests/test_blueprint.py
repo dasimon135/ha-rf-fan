@@ -98,3 +98,24 @@ def test_blueprint_uses_the_modern_trigger_and_action_keys() -> None:
     assert "\n    - service:" not in raw and "\n      - service:" not in raw, (
         "use `action:` instead of `service:`"
     )
+
+
+def test_the_thresholds_accept_fahrenheit() -> None:
+    """A US install reports its sensors in °F, and `numeric_state` compares raw values.
+
+    Capped at 40 and labelled "°C", the thresholds could not hold 80 °F, and "above
+    40" stayed true all summer.
+    """
+    import yaml
+
+    class _Loader(yaml.SafeLoader):
+        pass
+
+    _Loader.add_constructor("!input", lambda loader, node: loader.construct_scalar(node))
+    text = BLUEPRINT_PATH.read_text(encoding="utf-8")
+    inputs = yaml.load(text, Loader=_Loader)["blueprint"]["input"]
+
+    for name in ("temp_on", "temp_off"):
+        number = inputs[name]["selector"]["number"]
+        assert number["max"] >= 110, name
+        assert number.get("unit_of_measurement") in (None, ""), name
