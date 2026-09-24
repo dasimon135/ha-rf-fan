@@ -34,27 +34,28 @@ blueprint:
           domain: fan
     temp_on:
       name: Turn-on temperature
-      description: The fan turns on when the temperature rises above this value.
+      description: >
+        The fan turns on when the temperature rises above this value, in the
+        sensor's own unit: the default suits °C, a °F sensor needs about 79.
       default: 26
       selector:
         number:
-          min: 10
-          max: 40
+          min: -40
+          max: 140
           step: 0.5
-          unit_of_measurement: "°C"
           mode: box
     temp_off:
       name: Turn-off temperature
       description: >
-        The fan turns off when the temperature drops below this value.
-        Keep it lower than the turn-on temperature to create hysteresis.
+        The fan turns off when the temperature drops below this value, in the
+        sensor's own unit. Keep it lower than the turn-on temperature to create
+        hysteresis.
       default: 24
       selector:
         number:
-          min: 10
-          max: 40
+          min: -40
+          max: 140
           step: 0.5
-          unit_of_measurement: "°C"
           mode: box
     speed:
       name: Fan speed

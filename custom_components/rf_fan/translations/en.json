@@ -7,7 +7,7 @@
         "data": {
           "esphome_device": "ESPHome device name",
           "fan_name": "Fan display name",
-          "extra_count": "Keys this integration has no concept of - a memory button, an ioniser, anything the fan does that Home Assistant cannot name. Each becomes a button you name yourself, and the names are asked for next.",
+          "extra_count": "Extra buttons",
           "speed_count": "Number of discrete speeds",
           "light_control": "Light control",
           "has_fan_on": "Fan has a dedicated on button",
@@ -18,10 +18,12 @@
           "color_temp_steps": "Number of colour positions",
           "light_level": "Light brightness",
           "light_level_steps": "Number of brightness steps",
-          "extra_count": "Extra buttons",
           "timer_hours": "Sleep timer durations",
           "has_timer_off": "Dedicated timer-cancel key",
           "has_sound": "Sound (beep)"
+        },
+        "data_description": {
+          "extra_count": "Keys this integration has no concept of - a memory button, an ioniser, anything the fan does that Home Assistant cannot name. Each becomes a button you name yourself, and the names are asked for next."
         }
       },
       "extra_names": {
@@ -58,7 +60,7 @@
       },
       "learn_resolve": {
         "title": "RF Fan - Guided Learning",
-        "description": "No RF signal was captured for action {action}. Paste the code manually, tick skip, or submit to listen again ({timeout}s).",
+        "description": "The capture for action {action} did not complete. Paste the code manually, tick skip, or submit to listen again ({timeout}s).",
         "data": {
           "code": "Captured RF code",
           "skip": "Skip this action"
@@ -228,7 +230,8 @@
           "light_level_steps": "Number of brightness steps",
           "timer_hours": "Sleep timer durations",
           "has_timer_off": "Dedicated timer-cancel key",
-          "has_sound": "Sound (beep)"
+          "has_sound": "Sound (beep)",
+          "extra_count": "Extra buttons"
         }
       }
     },
@@ -246,7 +249,8 @@
     },
     "abort": {
       "already_configured": "A fan with this name is already configured on this gateway.",
-      "reconfigure_successful": "Reconfiguration saved and reloaded."
+      "reconfigure_successful": "Reconfiguration saved and reloaded.",
+      "already_in_progress": "A setup for this fan is already in progress."
     }
   },
   "options": {

@@ -74,7 +74,6 @@ from .const import (
     NATURAL_CONTROL_OPTIONS,
     TIMER_HOURS,
     extra_action,
-    extra_default_name,
 )
 
 LEARN_TIMEOUT_SEC = 30
@@ -173,12 +172,20 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         if include_device:
             available = self._available_esphome_devices()
             if available:
-                fields[vol.Required(CONF_ESPHOME_DEVICE, default=available[0])] = (
+                # The gateway already picked, when the form comes back with an error.
+                chosen = (
+                    self._esphome_device
+                    if self._esphome_device in available
+                    else available[0]
+                )
+                fields[vol.Required(CONF_ESPHOME_DEVICE, default=chosen)] = (
                     SelectSelector(SelectSelectorConfig(options=available))
                 )
             else:
                 # No gateway online: the name can still be typed by hand.
-                fields[vol.Optional(CONF_ESPHOME_DEVICE, default="")] = str
+                fields[vol.Optional(CONF_ESPHOME_DEVICE, default=self._esphome_device)] = (
+                    str
+                )
         fields[vol.Required(CONF_FAN_NAME, default=self._fan_name)] = str
         # A dropdown rather than a free number: the count decides how many codes have
         # to be learned, so an accidental 40 is an expensive typo. The old cap of 6
@@ -272,9 +279,15 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         available_devices = self._available_esphome_devices()
 
         if user_input is not None:
+            # Read first, whatever is wrong: the form comes back as it was filled in,
+            # and every refusal below is one complaint, not a reset.
             selected_device = user_input.get(CONF_ESPHOME_DEVICE, "").strip()
             if not selected_device and len(available_devices) == 1:
                 selected_device = available_devices[0]
+            self._esphome_device = selected_device
+            self._fan_name = user_input[CONF_FAN_NAME].strip()
+            error = self._read_declaration(user_input)
+            unique_id = self.unique_id_for(selected_device, self._fan_name)
 
             if not selected_device:
                 if len(available_devices) > 1:
@@ -283,21 +296,20 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
             elif available_devices and selected_device not in available_devices:
                 errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
-            else:
-                self._esphome_device = selected_device
-                self._gateway_service = self._resolve_gateway_service(selected_device)
-                self._fan_name = user_input[CONF_FAN_NAME].strip()
-                await self.async_set_unique_id(
-                    self.unique_id_for(selected_device, self._fan_name)
-                )
-                self._abort_if_unique_id_configured()
-                error = self._read_declaration(user_input)
-                if error is None:
-                    if self._extra_count:
-                        return await self.async_step_extra_names()
-                    self._extra_names = {}
-                    return await self.async_step_method()
+            elif unique_id in self._async_current_ids(include_ignore=False):
+                # The same answer reconfiguring gives: aborting threw the whole form
+                # away over one field.
+                errors[CONF_FAN_NAME] = "name_already_used"
+            elif error is not None:
                 errors[CONF_NATURAL_LEVELS] = error
+            else:
+                self._gateway_service = self._resolve_gateway_service(selected_device)
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
+                if self._extra_count:
+                    return await self.async_step_extra_names()
+                self._extra_names = {}
+                return await self.async_step_method()
 
         return self.async_show_form(
             step_id="user",
@@ -325,7 +337,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             for index in range(1, self._extra_count + 1):
                 action = extra_action(index)
                 label = str(user_input.get(action, "")).strip()
-                self._extra_names[action] = label or extra_default_name(index)
+                # Blank stays blank: the button then takes its translated name. A
+                # literal fallback stored here read "Extra key 2" in every language.
+                self._extra_names[action] = label
             # Reconfiguring rejoins its own recap, which is where a kept code is
             # offered for re-learning and a forgotten one is dropped.
             if self._reconfigure:
@@ -354,8 +368,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         user's label into. The mapping goes above the form instead.
         """
         return " - ".join(
-            f"{index} = {self._extra_names.get(extra_action(index)) or extra_default_name(index)}"
+            f"{index} = {self._extra_names[extra_action(index)]}"
             for index in range(1, self._extra_count + 1)
+            if self._extra_names.get(extra_action(index))
         )
 
     async def async_step_method(
@@ -431,8 +446,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             # The field labels come from translations and can only say "extra key
             # 3"; the owner named it one screen earlier, so the mapping goes here.
             description_placeholders={
-                "extra_names": "\n\n" + self._extra_names_summary()
-                if self._extra_count
+                "extra_names": f"\n\n{summary}"
+                if (summary := self._extra_names_summary())
                 else ""
             },
         )
@@ -728,10 +743,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         self._natural_levels = natural_level_count(dict(data))
         self._extra_count = extra_button_count(dict(data))
-        self._extra_names = {
-            action: label or extra_default_name(index)
-            for index, (action, label) in enumerate(extra_names(dict(data)).items(), start=1)
-        }
+        self._extra_names = extra_names(dict(data))
         self._existing_codes = dict(data.get(CONF_CODES, {}))
         self._repeat_count = int(
             entry.options.get(
