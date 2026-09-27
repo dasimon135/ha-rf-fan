@@ -289,6 +289,14 @@ the local 433 MHz environment; TX is reliable.
 
 ## Installation
 
+**From HACS (recommended).** This button opens the repository in your own Home
+Assistant. HACS asks whether to add it as a custom repository: accept, then
+download **RF Fan** and restart Home Assistant.
+
+[![Open the RF Fan repository inside your Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dasimon135&repository=ha-rf-fan&category=integration)
+
+If the button does not reach your instance, add the repository by hand:
+
 1. Add this repository as a **custom repository** of type `Integration`.
 2. Install **RF Fan**.
 3. Restart Home Assistant.
