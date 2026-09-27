@@ -375,6 +375,10 @@ class RfFanBaseEntity(Entity):
         """Dispatcher signal name for the sleep timer, specific to the entry."""
         return f"{DOMAIN}_{self._config_entry.entry_id}_timer"
 
+    def _timer_elapsed_signal(self) -> str:
+        """Dispatcher signal sent when the assumed sleep timer runs out."""
+        return f"{DOMAIN}_{self._config_entry.entry_id}_timer_elapsed"
+
     def _level_signal(self) -> str:
         """Dispatcher signal name for the brightness position, specific to the entry."""
         return f"{DOMAIN}_{self._config_entry.entry_id}_level"

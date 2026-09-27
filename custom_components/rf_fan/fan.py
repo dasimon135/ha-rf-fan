@@ -12,7 +12,7 @@ from homeassistant.components.fan import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import (
     ExtraStoredData,
@@ -70,6 +70,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         self._is_on: bool | None = None
         self._percentage: int | None = None
         self._event_unsub = None
+        self._timer_unsub = None
 
         # Optional capabilities (config flow)
         caps = caps_from_data(dict(config_entry.data))
@@ -204,6 +205,9 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             ):
                 self._pending_preset = pending
         self._event_unsub = self.hass.bus.async_listen(EVENT_RF_FAN_RECEIVED, self._handle_rf_event)
+        self._timer_unsub = async_dispatcher_connect(
+            self.hass, self._timer_elapsed_signal(), self._on_timer_elapsed
+        )
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData:
@@ -215,6 +219,23 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         if self._event_unsub is not None:
             self._event_unsub()
             self._event_unsub = None
+        if self._timer_unsub is not None:
+            self._timer_unsub()
+            self._timer_unsub = None
+
+    @callback
+    def _on_timer_elapsed(self) -> None:
+        """The sleep timer ran out, so the fan has switched itself off (#85).
+
+        Nothing is transmitted: the fan did it. The timer is a belief too -- one
+        cancelled from the physical remote is not heard (#86) -- but a timer that
+        elapsed is the common case, and the one a person set it for.
+        """
+        if not self._is_on:
+            return
+        self._is_on = False
+        self._percentage = 0
+        self.async_write_ha_state()
 
     def _clear_timer(self) -> None:
         """Clear the assumed sleep-timer when the fan is switched off."""
