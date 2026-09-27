@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
@@ -26,6 +27,8 @@ from .const import (
     LIGHT_LEVEL_RELATIVE,
 )
 from .entity import RfFanBaseEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def brightness_to_position(brightness: int, steps: int = DEFAULT_LIGHT_LEVEL_STEPS) -> int:
@@ -72,6 +75,8 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         self._attr_unique_id = f"{config_entry.entry_id}_light"
         self._attr_translation_key = "light"
         self._is_on: bool | None = None
+        # The last toggle press made for a power request: (context id, turn_on).
+        self._last_toggle_press: tuple[str, bool] | None = None
         self._event_unsub = None
         self._signal_unsub = None
         self._state_unsub = None
@@ -183,6 +188,8 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         if declared is self._is_on:
             return
         self._is_on = declared
+        # The belief moved without a press: the next request presses, whatever its context.
+        self._last_toggle_press = None
         if declared is False:
             self._cancel_walks()
         async_dispatcher_send(self.hass, self._kelvin_signal())
@@ -222,11 +229,36 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         requested state, which took that gesture away. The line is not there: it is
         between a power command that was requested and one that merely rides along
         with a brightness -- see `async_turn_on`.
+
+        One exception, and it is not about the state at all: ONE request reaching
+        the lamp twice. A `light.turn_on` aimed at an area reaches the lamp directly
+        and again through every light group of that area, which relays the call
+        under the caller's `Context` (Home Assistant's groups and Magic Areas' both
+        do). On the `light_toggle` fallback the second press flipped the lamp back
+        behind Home Assistant's back. So the fallback is not pressed again for the
+        same context and the same direction as the press just made; a separate
+        request carries a new context and still presses (#45), a script's on, off,
+        on alternates direction and presses three times, and an absolute
+        `light_on`/`light_off` is re-sent regardless, since repeating it is harmless.
+        The claim is taken before anything is awaited, so the two arrivals may come
+        in either order, or at once. Returns False for the dropped repeat, which
+        leaves the belief to the press that did go out.
         """
         absolute = ACTION_LIGHT_ON if turn_on else ACTION_LIGHT_OFF
-        if await self._async_transmit_action(absolute):
-            return True
-        return await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
+        if self._codes.get(absolute):
+            return await self._async_transmit_action(absolute)
+        press = None if self._context is None else (self._context.id, turn_on)
+        if press is not None and press == self._last_toggle_press:
+            _LOGGER.debug("Not pressing %s twice for one request", ACTION_LIGHT_TOGGLE)
+            return False
+        self._last_toggle_press = press
+        sent = False
+        try:
+            sent = await self._async_transmit_action(ACTION_LIGHT_TOGGLE)
+        finally:
+            if not sent:
+                self._last_toggle_press = None
+        return sent
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light, and step it to a requested brightness.
