@@ -5,6 +5,36 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.4] - 2026-09-27
+
+### Fixed
+
+- **One request reaching a toggle-only lamp twice pressed its key twice.** A
+  `light.turn_on` aimed at an area reaches the lamp directly, and again through every
+  light group of that area: Home Assistant's own groups and Magic Areas' relay the
+  call to their members. On a lamp whose only power key is `light_toggle`, the second
+  press flipped it back, and Home Assistant went on showing it lit. Nothing reached
+  the logbook, since the belief never changed.
+
+  A group relays the call under the caller's `Context`, so the lamp now presses its
+  toggle key once per context and direction, whichever of the two calls arrives
+  first, or both at once.
+
+  **What does not change:** a separate `light.turn_on` or `light.turn_off` still
+  presses the key whatever the assumed state. That press is how a lamp that drifted
+  is brought back in line ([#45](https://github.com/dasimon135/ha-rf-fan/issues/45)),
+  and this fix leaves it alone. `light.toggle` presses every time. A script that
+  turns the lamp on, off, and on again still presses three times. `light_on` and
+  `light_off` codes are re-sent as before, since repeating them is harmless. The
+  "Assumed light state" select still presses nothing.
+
+### Validated
+
+Deployed to the maintainer's own instance and loaded after a restart. **The double
+press itself was not reproduced there:** the area call through a Magic Areas group
+rests on reading that integration's source and on the tests, which reproduce it
+with a Home Assistant light group.
+
 ## [1.10.3] - 2026-09-24
 
 ### Fixed
