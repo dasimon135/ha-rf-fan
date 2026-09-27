@@ -5,6 +5,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.5] - 2026-09-27
+
+### Fixed
+
+- **The fan now reads off when its sleep timer runs out**
+  ([#85](https://github.com/dasimon135/ha-rf-fan/issues/85)). The timer sensor cleared
+  itself at that moment, but nothing told the fan entity, so Home Assistant went on
+  showing it running at its last speed. Nothing is transmitted: the fan switched
+  itself off.
+
+  The timer is a belief as well. One cancelled from the physical remote is not heard
+  ([#86](https://github.com/dasimon135/ha-rf-fan/issues/86)), and in that case the fan
+  now reads off while it still runs. A speed press, or the remote, puts that right. A
+  timer that elapsed is by far the common case, and it is the one a person sets a
+  timer for. If the timer sensor entity is disabled, nothing changes.
+- **Removing the last fan could leave the card's dashboard resource behind**
+  ([#88](https://github.com/dasimon135/ha-rf-fan/issues/88)). With automatic dashboard
+  card loading disabled and the card registered by hand, the removal could read
+  the resource list before Home Assistant had loaded it, see nothing, and keep the
+  entry. That entry pointed at a file that stops being served at the next restart.
+
 ## [1.10.4] - 2026-09-27
 
 ### Fixed
