@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the resource list before Home Assistant had loaded it, see nothing, and keep the
   entry. That entry pointed at a file that stops being served at the next restart.
 
+### Validated
+
+On the maintainer's own instance, loaded without a line in the log. The fan was
+started at speed 1 with a one-hour timer, and at the timer's end Home Assistant
+moved it to off in the same second the timer sensor cleared, with nothing
+transmitted. **Not observed:** whether the fan physically stopped at that moment
+(nobody was in the room). The #88 path (card loading disabled, resource
+registered by hand, last fan removed) was not exercised: it rests on the tests.
+
 ## [1.10.4] - 2026-09-27
 
 ### Fixed
