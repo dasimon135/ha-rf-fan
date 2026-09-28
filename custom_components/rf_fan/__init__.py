@@ -432,6 +432,10 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if data is None or data.resource_mode != MODE_STORAGE:
         return
 
+    # Nothing may have read the store yet: with automatic card loading disabled the
+    # registration returns before it does, and `async_items()` would answer "empty"
+    # (#88, the same trap `_async_register_resource` guards against).
+    await data.resources.async_get_info()
     for item in list(data.resources.async_items()):
         if str(item.get("url", "")).split("?")[0] == CARD_URL:
             await data.resources.async_delete_item(item["id"])

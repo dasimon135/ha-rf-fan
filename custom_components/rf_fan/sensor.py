@@ -6,7 +6,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -98,10 +98,11 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
 
     @callback
     def _on_expired(self, _now) -> None:
-        """The assumed switch-off time has been reached: clear it."""
+        """The assumed switch-off time has been reached: clear it, and tell the fan."""
         self._expiry_unsub = None
         self._runtime.timer_ends_at = None
         self.async_write_ha_state()
+        async_dispatcher_send(self.hass, self._timer_elapsed_signal())
 
     @callback
     def _on_timer_changed(self) -> None:

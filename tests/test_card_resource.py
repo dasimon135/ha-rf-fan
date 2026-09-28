@@ -24,7 +24,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from custom_components.rf_fan import CARD_URL
-from tests.ha_helpers import full_entry
+from custom_components.rf_fan.const import CONF_DISABLE_CARD
+from tests.ha_helpers import full_entry, register_stub
 from tests.ha_helpers import setup_full as _setup_full
 
 
@@ -177,6 +178,37 @@ async def test_a_store_not_yet_read_is_not_mistaken_for_an_empty_one(
 
     ours = [item for item in _resources(hass) if item["url"].startswith(CARD_URL)]
     assert len(ours) == 1, f"the store was read as empty and duplicated: {ours}"
+
+
+async def test_removing_the_last_fan_reads_the_store_before_looking(
+    hass: HomeAssistant, hass_storage
+) -> None:
+    """The same trap on the way out (#88).
+
+    With automatic card loading disabled, the registration returns before it reads
+    the resource store, so nothing may have loaded it by the time the last fan is
+    removed. Read as empty, the hand-registered resource stayed behind, pointing at
+    a file that stops being served at the next restart.
+    """
+    hass_storage["lovelace_resources"] = {
+        "version": 1,
+        "key": "lovelace_resources",
+        "data": {"items": [{"id": "by_hand", "type": "module", "url": CARD_URL}]},
+    }
+    assert await async_setup_component(hass, "lovelace", {})
+    register_stub(hass)
+    entry = full_entry(hass)
+    hass.config_entries.async_update_entry(entry, options={CONF_DISABLE_CARD: True})
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+
+    resources = hass.data[LOVELACE_DATA].resources
+    await resources.async_get_info()
+    ours = [item for item in resources.async_items() if item["url"].startswith(CARD_URL)]
+    assert ours == [], "the resource was read as absent and outlived the last fan"
 
 
 async def test_copies_that_already_exist_are_cleaned_up(hass: HomeAssistant) -> None:
