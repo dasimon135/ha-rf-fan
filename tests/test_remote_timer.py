@@ -125,17 +125,18 @@ async def test_a_repeated_frame_does_not_restart_the_countdown(
 ) -> None:
     """One press is several frames on the air; the deadline is set by the first.
 
-    The de-bounce runs on `hass.loop.time()`, which the frozen clock does not move,
-    so the second frame is a repeat; the wall clock moves, so a restart would show.
+    100 ms apart is inside the de-bounce window, so the second frame is a repeat.
+    The shared state is read rather than the sensor, whose state is written to the
+    second and would hide a countdown restarted 100 ms later.
     """
-    await setup_full(hass)
+    entry, _calls = await setup_full(hass)
     before = dt_util.utcnow()
     await fire_rf(hass, "c_t2")
 
-    await _move_on(hass, freezer, timedelta(seconds=5))
+    await _move_on(hass, freezer, timedelta(milliseconds=100))
     await fire_rf(hass, "c_t2")
 
-    assert _ends_at(hass) == _to_second(before + timedelta(hours=2))
+    assert entry.runtime_data.timer_ends_at == before + timedelta(hours=2)
 
 
 async def test_a_timer_key_heard_by_another_gateway_is_ignored(hass: HomeAssistant) -> None:
@@ -152,17 +153,17 @@ async def test_our_own_timer_frame_coming_back_is_not_a_second_press(
 ) -> None:
     """The echo of Home Assistant's own `2h` must not be read as a new press.
 
-    The echo window runs on `hass.loop.time()` and is still open; the wall clock
-    moves, so a restarted countdown would show.
+    One second on, the echo window is still open and the de-bounce window is not,
+    so only the echo filter stands between the frame and a restarted countdown.
     """
-    await setup_full(hass)
+    entry, _calls = await setup_full(hass)
     await hass.services.async_call(
         "button", "press", {"entity_id": button_id(hass, "2h")}, blocking=True
     )
     await hass.async_block_till_done()
-    first = _ends_at(hass)
+    first = entry.runtime_data.timer_ends_at
 
-    await _move_on(hass, freezer, timedelta(seconds=5))
+    await _move_on(hass, freezer, timedelta(seconds=1))
     await fire_rf(hass, "c_t2")
 
-    assert _ends_at(hass) == first
+    assert entry.runtime_data.timer_ends_at == first
