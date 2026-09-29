@@ -227,9 +227,10 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
     def _on_timer_elapsed(self) -> None:
         """The sleep timer ran out, so the fan has switched itself off (#85).
 
-        Nothing is transmitted: the fan did it. The timer is a belief too -- one
-        cancelled from the physical remote is not heard (#86) -- but a timer that
-        elapsed is the common case, and the one a person set it for.
+        Nothing is transmitted: the fan did it. The timer is a belief too: the
+        remote's timer keys are followed (#86), but only on a gateway that reports
+        codes, and a press the gateway missed is not heard. A timer that elapsed is
+        still the common case, and the one a person set it for.
         """
         if not self._is_on:
             return
