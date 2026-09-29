@@ -798,6 +798,27 @@ thread, but this page is the only complete record. To hear about one:
   reader, or inside Home Assistant through the `feedreader` integration;
 - or use **Watch → Custom → Releases** on this repository.
 
+### How replies are written
+
+Some triage replies here are drafted by an agent that reads this repository's
+README and source, then posts a single comment — an answer, a request for the
+missing information, or a diagnosis. Those comments say so on their last line.
+
+Three things that never happen:
+
+- **No reply is posted without me running it.** Nothing is triggered
+  automatically by opening an issue. I start each triage myself and read what
+  goes out.
+- **The agent never changes code.** No commits, no branches, no pull requests.
+  A proposed fix appears as a diff inside the comment and nothing more.
+- **Nothing is posted anywhere by a tool.** On
+  [community.home-assistant.io](https://community.home-assistant.io), on the
+  HACF forum and everywhere else, every reply is posted by me, in my own name,
+  after I have read it. The agent has no account there and never sends a word.
+
+If a triage reply is wrong or misses the point, say so in the thread. I read
+every issue myself and I would rather know.
+
 ## Development
 
 The pure logic tests (`tests/test_actions.py`) run anywhere:
