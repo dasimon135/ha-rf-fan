@@ -38,6 +38,11 @@ def _ends_at(hass: HomeAssistant):
     return dt_util.parse_datetime(state)
 
 
+def _to_second(moment):
+    """A timestamp sensor's state is written to the second."""
+    return moment.replace(microsecond=0)
+
+
 async def _run_at(hass: HomeAssistant, fan_id: str, percentage: int) -> None:
     await hass.services.async_call(
         "fan", "set_percentage", {"entity_id": fan_id, "percentage": percentage}, blocking=True
@@ -61,7 +66,7 @@ async def test_a_timer_key_on_the_remote_sets_the_switch_off_time(
 
     await fire_rf(hass, "c_t2")
 
-    assert _ends_at(hass) == before + timedelta(hours=2)
+    assert _ends_at(hass) == _to_second(before + timedelta(hours=2))
 
 
 async def test_the_cancel_key_on_the_remote_clears_the_switch_off_time(
@@ -127,10 +132,10 @@ async def test_a_repeated_frame_does_not_restart_the_countdown(
     before = dt_util.utcnow()
     await fire_rf(hass, "c_t2")
 
-    await _move_on(hass, freezer, timedelta(milliseconds=300))
+    await _move_on(hass, freezer, timedelta(seconds=5))
     await fire_rf(hass, "c_t2")
 
-    assert _ends_at(hass) == before + timedelta(hours=2)
+    assert _ends_at(hass) == _to_second(before + timedelta(hours=2))
 
 
 async def test_a_timer_key_heard_by_another_gateway_is_ignored(hass: HomeAssistant) -> None:
@@ -157,7 +162,7 @@ async def test_our_own_timer_frame_coming_back_is_not_a_second_press(
     await hass.async_block_till_done()
     first = _ends_at(hass)
 
-    await _move_on(hass, freezer, timedelta(milliseconds=500))
+    await _move_on(hass, freezer, timedelta(seconds=5))
     await fire_rf(hass, "c_t2")
 
     assert _ends_at(hass) == first
