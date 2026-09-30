@@ -5,6 +5,22 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Timer keys pressed on the physical remote are now followed**
+  ([#86](https://github.com/dasimon135/ha-rf-fan/issues/86)). The fan, the light, the
+  colour and the sound already followed the remote; the sleep timer did not. A timer
+  key pressed on the remote now sets the timer sensor's switch-off time, and the
+  cancel key clears it, through the same filters as every other key (the gateway it
+  came from, the echo of Home Assistant's own transmission, the repeats of one
+  press). This also closes the gap left by 1.10.5: a timer cancelled from the remote
+  no longer switches the fan to off in Home Assistant when its old deadline passes,
+  and a timer set from the remote now does. Like every other key, this needs a
+  gateway that reports codes; a raw-timings gateway reports nothing a learned code
+  can be matched to.
+
 ## [1.10.5] - 2026-09-27
 
 ### Fixed

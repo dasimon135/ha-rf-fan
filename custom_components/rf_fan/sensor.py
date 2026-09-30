@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+from typing import Any
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
@@ -13,6 +16,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from .actions import timer_hours_from_data
+from .const import ACTION_TIMER_OFF, EVENT_RF_FAN_RECEIVED, timer_action
 from .entity import RfFanBaseEntity
 
 
@@ -33,6 +37,10 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
 
     Purely a local estimate (the fan gives no feedback): pressing a timer button
     records now + N hours; turning the fan off clears it.
+
+    The same keys pressed on the physical remote do the same (#86), heard through
+    the filters every other platform uses. Only where the remote can be followed at
+    all: a raw-timings gateway reports nothing a learned code can be matched to.
     """
 
     _attr_device_class = SensorDeviceClass.TIMESTAMP
@@ -47,6 +55,11 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
         self._attr_translation_key = "sleep_timer"
         self._signal_unsub = None
         self._expiry_unsub = None
+        self._event_unsub = None
+        self._hours_by_action = {
+            timer_action(hours): hours
+            for hours in timer_hours_from_data(dict(config_entry.data))
+        }
 
     @property
     def native_value(self):
@@ -67,12 +80,18 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
             self.hass, self._timer_signal(), self._on_timer_changed
         )
         self._schedule_expiry()
+        self._event_unsub = self.hass.bus.async_listen(
+            EVENT_RF_FAN_RECEIVED, self._handle_rf_event
+        )
 
     async def async_will_remove_from_hass(self) -> None:
         """Unsubscribe the callbacks."""
         if self._signal_unsub is not None:
             self._signal_unsub()
             self._signal_unsub = None
+        if self._event_unsub is not None:
+            self._event_unsub()
+            self._event_unsub = None
         self._cancel_expiry()
 
     def _cancel_expiry(self) -> None:
@@ -109,3 +128,24 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
         """Refresh the state when a timer is (re)started or cleared."""
         self._schedule_expiry()
         self.async_write_ha_state()
+
+    @callback
+    def _handle_rf_event(self, event: Any) -> None:
+        """Follow a timer key pressed on the physical remote.
+
+        Announced on the timer signal like a button press, which reschedules the
+        expiry. That matters beyond the display: since #85 the expiry switches the
+        fan off, and a timer cancelled from the remote must not take it down.
+        """
+        action = self._received_action(event)
+        if action is None:
+            return
+        if action == ACTION_TIMER_OFF:
+            self._runtime.timer_ends_at = None
+        elif action in self._hours_by_action:
+            self._runtime.timer_ends_at = dt_util.utcnow() + timedelta(
+                hours=self._hours_by_action[action]
+            )
+        else:
+            return
+        async_dispatcher_send(self.hass, self._timer_signal())
