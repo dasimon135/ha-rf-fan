@@ -12,6 +12,7 @@ from homeassistant.components.fan import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import (
@@ -395,9 +396,16 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
             self._direction = direction
             if self._is_on and self._percentage:
                 index = self._speed_index(self._percentage)
-                if not await self._async_transmit_action(self._speed_action_for(index)):
-                    # Nothing went on the air: the fan has not changed direction,
-                    # so neither may the assumed state.
+                # The new direction is set first because it is what picks the code.
+                # Nothing went on the air if that raises (code never learned, #87,
+                # or the gateway refused it): the fan has not changed direction, so
+                # neither may the assumed state.
+                try:
+                    sent = await self._async_transmit_action(self._speed_action_for(index))
+                except HomeAssistantError:
+                    self._direction = previous
+                    raise
+                if not sent:
                     self._direction = previous
                     return
                 # That was a speed key, and on a `dedicated` remote a speed key is

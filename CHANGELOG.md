@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does their job: a skipped `fan_on` starts the fan with a speed key, and a skipped
   `fan_off_reverse` stops it with `fan_off`.
 
+  On a remote whose direction lives in the speed codes, a direction change that
+  could not be sent, for that reason or because the gateway refused it, no longer
+  leaves Home Assistant believing the fan turned round: the next speed went out
+  from the wrong code set.
+
 ## [1.10.5] - 2026-09-27
 
 ### Fixed
