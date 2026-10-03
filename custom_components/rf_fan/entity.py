@@ -89,19 +89,29 @@ class RfFanBaseEntity(Entity):
             )
         )
 
-    async def _async_transmit_action(self, action: str) -> bool:
-        """Transmit an RF action via ESPHome if it is mapped.
+    async def _async_transmit_action(self, action: str, *, optional: bool = False) -> bool:
+        """Transmit an RF action via ESPHome.
 
-        Returns False only when the action has no mapped code (callers rely on
-        this to fall back to an alternative action). Hard failures — the gateway
-        service is not registered, or the service call itself fails — raise
-        HomeAssistantError so the user gets feedback in the UI instead of a
-        silently ignored command.
+        An action with no learned code raises HomeAssistantError, so the press is
+        answered in the UI and names the way back (Reconfigure -> Relearn RF codes).
+        Learning lets a key be skipped and the entry keeps every declared control,
+        so this is reachable from any of them (#87).
+
+        `optional=True` is for the two keys a remote may lack because another key
+        does the same job (`fan_on`, `fan_off_reverse`): the call then returns False
+        and the caller falls back. Hard failures -- the gateway service is not
+        registered, or the service call itself fails -- always raise.
         """
         code = self._codes.get(action)
         if not code:
-            _LOGGER.debug("Ignoring unmapped action: %s", action)
-            return False
+            if optional:
+                _LOGGER.debug("No code for optional action %s; falling back", action)
+                return False
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="action_not_learned",
+                translation_placeholders={"action": action, "fan_name": self._fan_name},
+            )
 
         service_name = f"{self._gateway_service}_transmit_rf_fan"
         if not self.hass.services.has_service("esphome", service_name):
@@ -353,8 +363,9 @@ class RfFanBaseEntity(Entity):
         delta = 1 if direction == STEP_UP else -1
         for index in range(steps):
             if not await self._async_transmit_action(action):
-                # Nothing went on the air (unmapped code): the hardware has not
-                # moved, so the assumed position may not either.
+                # Nothing went on the air: the hardware has not moved, so the
+                # assumed position may not either. (An unlearned code raises
+                # instead, out of the walk and into the call awaiting it.)
                 return
             current = get_position()
             moved = (0 if current is None else current) + delta

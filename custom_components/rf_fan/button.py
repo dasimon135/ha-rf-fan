@@ -80,8 +80,9 @@ class RfFanTimerButton(RfFanBaseEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Emit the timer action and record the assumed switch-off time."""
         if not await self._async_transmit_action(timer_action(self._hours)):
-            # Nothing went on the air (unmapped code): claiming a switch-off time
-            # would make the sensor announce an extinction that will never happen.
+            # Nothing went on the air: claiming a switch-off time would make the
+            # sensor announce an extinction that will never happen. (An unlearned
+            # code raises before this point, so the same holds there.)
             return
         self._runtime.timer_ends_at = dt_util.utcnow() + timedelta(hours=self._hours)
         async_dispatcher_send(self.hass, self._timer_signal())
@@ -178,8 +179,8 @@ class RfFanBrightnessResyncButton(RfFanBaseEntity, ButtonEntity):
             set_position=_count,
         )
         if presses_left:
-            # Unmapped code, or superseded by a brightness move before the end: the
-            # stop was not reached, so claiming it would replace one wrong position
+            # Superseded by a brightness move before the end: the stop was not
+            # reached, so claiming it would replace one wrong position
             # with another.
             return
         self._runtime.level_position = 0

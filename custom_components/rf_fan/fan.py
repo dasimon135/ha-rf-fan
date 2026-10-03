@@ -253,7 +253,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         """Turn on the fan, optionally at a given speed and/or preset."""
         if percentage is not None:
             await self.async_set_percentage(percentage)
-        elif await self._async_transmit_action(ACTION_FAN_ON):
+        elif await self._async_transmit_action(ACTION_FAN_ON, optional=True):
             self._is_on = True
             if self._percentage is None or self._percentage <= 0:
                 self._percentage = round(100 / self._speed_count)
@@ -293,7 +293,7 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         """
         sent = False
         if self._per_speed_direction and self._direction == DIRECTION_REVERSE:
-            sent = await self._async_transmit_action(ACTION_FAN_OFF_REVERSE)
+            sent = await self._async_transmit_action(ACTION_FAN_OFF_REVERSE, optional=True)
         if not sent:
             sent = await self._async_transmit_action(ACTION_FAN_OFF)
         if sent:
