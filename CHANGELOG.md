@@ -161,6 +161,11 @@ Assistant as before.
   can be matched to. Not validated on hardware: the only fan available here sits
   behind a raw-timings gateway, so this rests on the test suite alone.
 
+  On a remote whose direction lives in the speed codes, a direction change that
+  could not be sent, for that reason or because the gateway refused it, no longer
+  leaves Home Assistant believing the fan turned round: the next speed went out
+  from the wrong code set.
+
 ## [1.10.5] - 2026-09-27
 
 ### Fixed
