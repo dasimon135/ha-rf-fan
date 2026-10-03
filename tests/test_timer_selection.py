@@ -13,6 +13,7 @@ import pytest
 pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.rf_fan.const import ACTION_TIMER_OFF
@@ -102,7 +103,7 @@ async def test_cancelling_without_a_code_keeps_the_countdown(
     The same rule the timer buttons follow in reverse: they only claim a
     switch-off time once their code is sent, and this only drops one once its own
     code is sent. Claiming otherwise would announce an extinction that never comes
-    — or hide one that does.
+    — or hide one that does. The press is answered with an error (#87).
     """
     entry, calls = await setup_full(hass, extra_data={"has_timer_off": True})
     two_hours = id_by_unique_suffix(hass, entry, "button", "timer_2h")
@@ -116,9 +117,10 @@ async def test_cancelling_without_a_code_keeps_the_countdown(
     running = hass.states.get(sensor).state
 
     calls.clear()
-    await hass.services.async_call(
-        "button", "press", {"entity_id": cancel}, blocking=True
-    )
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": cancel}, blocking=True
+        )
     await hass.async_block_till_done()
 
     assert actions_sent(calls) == []

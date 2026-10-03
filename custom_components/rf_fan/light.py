@@ -22,8 +22,11 @@ from .const import (
     AXIS_LEVEL,
     COLOR_CONTROL_CYCLE,
     CONF_HAS_LIGHT,
+    CONF_LIGHT_CONTROL,
     DEFAULT_LIGHT_LEVEL_STEPS,
     EVENT_RF_FAN_RECEIVED,
+    LIGHT_CONTROL_ON_OFF,
+    LIGHT_CONTROL_TOGGLE,
     LIGHT_LEVEL_RELATIVE,
 )
 from .entity import RfFanBaseEntity
@@ -83,6 +86,11 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
 
         caps = caps_from_data(dict(config_entry.data))
         self._has_level: bool = caps["light_level"] == LIGHT_LEVEL_RELATIVE
+        # Read as the config flow reads it: an entry without the key is a toggle.
+        self._two_key_power: bool = (
+            config_entry.data.get(CONF_LIGHT_CONTROL, LIGHT_CONTROL_TOGGLE)
+            == LIGHT_CONTROL_ON_OFF
+        )
 
         if self._has_level:
             self._attr_color_mode = ColorMode.BRIGHTNESS
@@ -245,7 +253,12 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         leaves the belief to the press that did go out.
         """
         absolute = ACTION_LIGHT_ON if turn_on else ACTION_LIGHT_OFF
-        if self._codes.get(absolute):
+        if self._codes.get(absolute) or (
+            self._two_key_power and not self._codes.get(ACTION_LIGHT_TOGGLE)
+        ):
+            # Also taken when a two-key remote has no code for this direction and no
+            # toggle to fall back on, so the error names the key the reconfigure
+            # recap lists as "to learn", not a toggle this remote never had (#87).
             return await self._async_transmit_action(absolute)
         press = None if self._context is None else (self._context.id, turn_on)
         if press is not None and press == self._last_toggle_press:

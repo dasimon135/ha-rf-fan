@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a timer set from the remote now does. Like every other key, this needs a
   gateway that reports codes; a raw-timings gateway reports nothing a learned code
   can be matched to.
+- **A control whose code was never learned now says so when it is used**
+  ([#87](https://github.com/dasimon135/ha-rf-fan/issues/87)). Learning lets a key be
+  skipped, which is how you get past a key your remote does not have, and the fan
+  keeps every control you declared. Pressing one of those sent nothing and showed
+  nothing. It now answers with an error naming the key and the fan, and pointing at
+  **Reconfigure → Relearn RF codes**, where the missing keys are already listed as
+  "to learn". Two keys stay optional and fall back silently, because another key
+  does their job: a skipped `fan_on` starts the fan with a speed key, and a skipped
+  `fan_off_reverse` stops it with `fan_off`.
+
+  On a remote whose direction lives in the speed codes, a direction change that
+  could not be sent, for that reason or because the gateway refused it, no longer
+  leaves Home Assistant believing the fan turned round: the next speed went out
+  from the wrong code set.
 
 ## [1.10.5] - 2026-09-27
 

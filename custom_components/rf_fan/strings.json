@@ -275,6 +275,9 @@
     }
   },
   "exceptions": {
+    "action_not_learned": {
+      "message": "No RF code was learned for \"{action}\" on \"{fan_name}\", so nothing was sent. Learn it with Reconfigure → Relearn RF codes on this fan's entry."
+    },
     "gateway_service_missing": {
       "message": "The ESPHome gateway \"{device}\" does not expose the RF transmit service ({service}). Check that the gateway is online and that its configuration still includes the transmit_rf_fan service."
     },

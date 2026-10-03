@@ -14,6 +14,7 @@ import pytest
 pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
@@ -86,7 +87,10 @@ async def test_turning_the_fan_off_clears_the_timer(hass: HomeAssistant) -> None
 async def test_timer_is_not_recorded_when_the_code_is_missing(
     hass: HomeAssistant,
 ) -> None:
-    """An unmapped timer code sends nothing, so no switch-off time may be claimed."""
+    """An unmapped timer code sends nothing, so no switch-off time may be claimed.
+
+    The press is answered with an error rather than ignored (#87).
+    """
     entry, _calls = await setup_full(hass)
     sensor_id = one_id(hass, "sensor")
 
@@ -98,9 +102,10 @@ async def test_timer_is_not_recorded_when_the_code_is_missing(
     await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
 
-    await hass.services.async_call(
-        "button", "press", {"entity_id": button_id(hass, "4h")}, blocking=True
-    )
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": button_id(hass, "4h")}, blocking=True
+        )
     await hass.async_block_till_done()
 
     assert hass.states.get(sensor_id).state == "unknown"
