@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A control whose code was never learned now says so when it is used**
+  ([#87](https://github.com/dasimon135/ha-rf-fan/issues/87)). Learning lets a key be
+  skipped, which is how you get past a key your remote does not have, and the fan
+  keeps every control you declared. Pressing one of those sent nothing and showed
+  nothing. It now answers with an error naming the key and the fan, and pointing at
+  **Reconfigure → Relearn RF codes**, where the missing keys are already listed as
+  "to learn". Two keys stay optional and fall back silently, because another key
+  does their job: a skipped `fan_on` starts the fan with a speed key, and a skipped
+  `fan_off_reverse` stops it with `fan_off`.
+
 ## [2.1.0] - 2026-11-14
 
 ### The card's tile says more, and corrects the lamp
