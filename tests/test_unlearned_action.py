@@ -17,11 +17,13 @@ import pytest
 
 pytest.importorskip("pytest_homeassistant_custom_component")
 
-from homeassistant.core import HomeAssistant
+from homeassistant.components.fan import ATTR_DIRECTION
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.rf_fan.const import DOMAIN
 from tests.ha_helpers import (
+    TRANSMIT_SERVICE,
     actions_sent,
     button_id,
     id_by_unique_suffix,
@@ -144,3 +146,78 @@ async def test_a_fan_on_key_that_was_skipped_still_falls_back(hass: HomeAssistan
 
     assert actions_sent(calls) == ["fan_speed_1"]
     assert hass.states.get(fan).state == "on"
+
+
+async def _running_forward(hass: HomeAssistant, codes_to_drop: tuple[str, ...] = ()):
+    """A `per_speed` fan running at speed 2, facing forward."""
+    calls = register_stub(hass)
+    entry = relative_entry(hass)
+    codes = {
+        key: value for key, value in entry.data["codes"].items() if key not in codes_to_drop
+    }
+    hass.config_entries.async_update_entry(entry, data={**entry.data, "codes": codes})
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    fan = one_id(hass, "fan")
+    await hass.services.async_call(
+        "fan", "set_percentage", {"entity_id": fan, "percentage": 66}, blocking=True
+    )
+    assert hass.states.get(fan).attributes[ATTR_DIRECTION] == "forward"
+    return fan, calls
+
+
+async def _set_reverse(hass: HomeAssistant, fan: str) -> None:
+    await hass.services.async_call(
+        "fan", "set_direction", {"entity_id": fan, ATTR_DIRECTION: "reverse"}, blocking=True
+    )
+
+
+async def test_a_direction_whose_speed_code_is_missing_does_not_flip(
+    hass: HomeAssistant,
+) -> None:
+    """`per_speed` sets the direction by re-sending the speed from the other code set.
+
+    With that code never learned nothing goes on the air, so the assumed direction
+    must stay where the fan actually is. It did when the call returned False; the
+    error must not skip the restore.
+    """
+    fan, calls = await _running_forward(hass, ("fan_speed_2_reverse",))
+    calls.clear()
+
+    with pytest.raises(HomeAssistantError) as err:
+        await _set_reverse(hass, fan)
+
+    _assert_not_learned(err, "fan_speed_2_reverse", "Relative")
+    assert actions_sent(calls) == []
+    await hass.async_block_till_done()
+    assert hass.states.get(fan).attributes[ATTR_DIRECTION] == "forward"
+    # The next speed press must go out in the direction the fan is facing: the
+    # published state above is not rewritten on a raise, so it alone proves nothing.
+    await hass.services.async_call(
+        "fan", "set_percentage", {"entity_id": fan, "percentage": 100}, blocking=True
+    )
+    assert actions_sent(calls) == ["fan_speed_3"]
+
+
+async def test_a_direction_whose_send_fails_does_not_flip(hass: HomeAssistant) -> None:
+    """Same rule when the gateway rejects the call: nothing reached the fan."""
+    fan, _calls = await _running_forward(hass)
+
+    def _fail(call: ServiceCall) -> None:
+        raise RuntimeError("radio busy")
+
+    hass.services.async_register("esphome", TRANSMIT_SERVICE, _fail)
+
+    with pytest.raises(HomeAssistantError) as err:
+        await _set_reverse(hass, fan)
+
+    assert err.value.translation_key == "transmit_failed"
+    await hass.async_block_till_done()
+    assert hass.states.get(fan).attributes[ATTR_DIRECTION] == "forward"
+    # The published state alone does not show it: the raise skips the write, while
+    # the belief the next code is chosen from had already flipped.
+    calls = register_stub(hass)
+    await hass.services.async_call(
+        "fan", "set_percentage", {"entity_id": fan, "percentage": 100}, blocking=True
+    )
+    assert actions_sent(calls) == ["fan_speed_3"]
