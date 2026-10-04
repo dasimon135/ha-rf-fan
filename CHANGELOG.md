@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-04
+
 ### Changed
 
 - **A toggle-only lamp is no longer flipped towards the state it is believed to be
@@ -18,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [#45](https://github.com/dasimon135/ha-rf-fan/issues/45): pressing OFF on a lamp
   believed off no longer resynchronises it. Use the **Assumed light state** select
   instead, which corrects the belief without transmitting, or press the gateway's
-  own light button, which the integration does not hear. Remotes with absolute `light_on` /
-  `light_off` codes are unchanged: those are still re-sent every time.
+  own light button, which the integration does not hear. Remotes with absolute
+  `light_on` / `light_off` codes are unchanged: those are still re-sent every time.
+  Checked on a toggle-only Cecotec fan on 2026-10-04, including the area card's light
+  button.
 
 ### Fixed
 
@@ -30,7 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   example now runs on ESPHome's built-in `cc1101` component, with the same wiring (one
   shared GDO0 pin) and the same radio settings. The file keeps its name so existing
   links still work. CI now compiles this example instead of only validating it, since
-  validation passed throughout.
+  validation passed throughout. The same migration was flashed on a single-pin Cecotec
+  gateway on 2026-10-04: it transmits, and it still receives the physical remote. With
+  `dump: raw` left on, ambient 433 MHz noise fills the log with short bursts, so set
+  `dump` back to `[]` once learning works, as the example says.
 
 - **Timer keys pressed on the physical remote are now followed**
   ([#86](https://github.com/dasimon135/ha-rf-fan/issues/86)). The fan, the light, the
@@ -42,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer switches the fan to off in Home Assistant when its old deadline passes,
   and a timer set from the remote now does. Like every other key, this needs a
   gateway that reports codes; a raw-timings gateway reports nothing a learned code
-  can be matched to.
+  can be matched to. Not validated on hardware: the only fan available here sits
+  behind a raw-timings gateway, so this rests on the test suite alone.
 
 ## [1.10.5] - 2026-09-27
 
