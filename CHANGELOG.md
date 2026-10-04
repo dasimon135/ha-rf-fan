@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A toggle-only lamp is no longer flipped towards the state it is believed to be
+  in.** "Hey Google, turn off the lights" calls `light.turn_off` on every exposed
+  light; on a lamp whose only light key is `light_toggle` and that Home Assistant
+  already believed off, that pressed the toggle and lit the lamp, while the state
+  stayed off. `light.turn_off` on a lamp believed off, and `light.turn_on` on a lamp
+  believed on, now send nothing. This reverses what 1.8.0 settled in
+  [#45](https://github.com/dasimon135/ha-rf-fan/issues/45): pressing OFF on a lamp
+  believed off no longer resynchronises it. Use the **Assumed light state** select
+  instead, which corrects the belief without transmitting, or press the gateway's
+  own light button, which the integration does not hear. Remotes with absolute `light_on` /
+  `light_off` codes are unchanged: those are still re-sent every time.
+
 ### Fixed
 
 - **Timer keys pressed on the physical remote are now followed**

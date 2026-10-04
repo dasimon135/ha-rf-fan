@@ -6,9 +6,10 @@ own group, and Magic Areas' groups, both forward it under the caller's context).
 On a lamp whose only power key is `light_toggle`, the second arrival flipped the
 lamp back: Home Assistant believed it on, the lamp was dark.
 
-The lamp still presses its key for every request it is given (#45: a press towards
-the state already believed is how a person resynchronises). What it no longer does
-is press twice for ONE request, and one request is one `Context`.
+A press towards the state already believed is withheld anyway, but both arrivals
+can read the belief before either press lands, so that alone does not cover it.
+What closes it is never pressing twice for ONE request, and one request is one
+`Context`.
 
 Every test asserts the complete list of frames.
 """
@@ -123,14 +124,17 @@ async def test_two_concurrent_calls_under_one_context_press_once(hass: HomeAssis
     assert hass.states.get(light_id).state == "on"
 
 
-async def test_separate_requests_still_press_every_time(hass: HomeAssistant) -> None:
-    """The #45 gesture: a second, separate `turn_on` is a request of its own."""
+async def test_separate_requests_each_press_when_they_change_the_state(
+    hass: HomeAssistant,
+) -> None:
+    """Separate requests are separate presses; one towards the believed state is not."""
     _entry, calls = await _setup_relative(hass)
     light_id = _one_id(hass, "light")
-    await _power(hass, light_id, "turn_on", Context())
-    await _power(hass, light_id, "turn_on", Context())
+    for service in ("turn_on", "turn_on", "turn_off", "turn_on"):
+        await _power(hass, light_id, service, Context())
 
-    assert _actions_sent(calls) == ["light_toggle", "light_toggle"]
+    assert _actions_sent(calls) == ["light_toggle"] * 3
+    assert hass.states.get(light_id).state == "on"
 
 
 async def test_one_script_run_can_still_blink_the_lamp(hass: HomeAssistant) -> None:

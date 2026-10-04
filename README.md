@@ -127,11 +127,15 @@ they are deliberately different:
 | **"Assumed brightness position"** select | Declares where the lamp is. Emits nothing. | Silent and instant, but only as good as what you tell it. |
 | **"Resynchronise brightness"** button | Walks the lamp into its bottom stop (N−1 presses). | Physically true, but audible and slow — and on many remotes stepping below the lowest level switches the lamp off. |
 
-The lamp's own on/off state has the same pair, for the same reason: pressing **off**
-on a lamp Home Assistant already believes is off still sends the key, which puts a
-lit lamp out and realigns the two — while the **"Assumed light state"** select simply
-declares which state it is in, and sends nothing. Use the first when you are in
-front of the lamp, the second when you are not.
+The lamp's own on/off state has a declaration too: the **"Assumed light state"**
+select says which state the lamp is in, and sends nothing. On a lamp whose only
+light key is a toggle, Home Assistant never presses it towards the state it already
+believes: a voice assistant turning off "all the lights" would otherwise light a
+lamp that was dark. So when the belief is wrong, either declare the truth with the
+select, or press the gateway's own light button to move the lamp itself (the physical
+remote will not do: the gateway hears it, so the belief flips along with the lamp).
+Remotes with separate on and off keys still send them every time: repeating an
+absolute key is harmless and realigns the lamp.
 
 ### Direction without a reverse button
 
