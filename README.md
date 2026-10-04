@@ -280,7 +280,9 @@ to be re-moded on every RX/TX switch, and on ESP32 that can leave `remote_receiv
 permanently deaf — no decoded frames, not even background noise. If your gateway hears
 nothing at all, this is the first thing to rule out; a config for that older single-pin
 scheme is kept in
-[esphome/rf_fan_radiolib_legacy.yaml](esphome/rf_fan_radiolib_legacy.yaml).
+[esphome/rf_fan_radiolib_legacy.yaml](esphome/rf_fan_radiolib_legacy.yaml). Despite
+its name it no longer uses RadioLib, which stopped compiling with current ESPHome: it
+runs on the same built-in `cc1101` component, on one pin.
 A 433 MHz antenna is required — it connects to the **CC1101 module** (the ESP32 has no
 radio): solder a ~17.3 cm wire (quarter-wave for 433.92 MHz) to the **ANT** pad, unless
 your module already has a spring antenna or an SMA connector. A full working config is in
@@ -515,7 +517,7 @@ blueprints/automation/rf_fan/
   fan_temperature_control.yaml
 esphome/
   rf_fan_example.yaml          native cc1101:, separate RX/TX pins (recommended)
-  rf_fan_radiolib_legacy.yaml  RadioLib external component, single shared GDO0
+  rf_fan_radiolib_legacy.yaml  native cc1101:, single shared GDO0 (legacy wiring)
 scripts/
   Dockerfile.tests   run-tests.ps1    run-tests.sh
 tests/

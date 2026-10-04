@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The single-pin gateway example builds again.**
+  `esphome/rf_fan_radiolib_legacy.yaml` used the `juanboro/esphome-radiolib-cc1101`
+  component, which pulls RadioLib unpinned; RadioLib no longer compiles against the
+  ESP-IDF that current ESPHome ships (`driver/ledc.h: No such file or directory`). The
+  example now runs on ESPHome's built-in `cc1101` component, with the same wiring (one
+  shared GDO0 pin) and the same radio settings. The file keeps its name so existing
+  links still work. CI now compiles this example instead of only validating it, since
+  validation passed throughout.
+
 - **Timer keys pressed on the physical remote are now followed**
   ([#86](https://github.com/dasimon135/ha-rf-fan/issues/86)). The fan, the light, the
   colour and the sound already followed the remote; the sleep timer did not. A timer
