@@ -68,6 +68,31 @@ jobs:
           done
           exit $status
 
+  esphome-compile:
+    name: esphome (compile single-pin gateway)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Validating is not compiling. The single-pin example validated green for
+      # weeks while it could no longer be built: its RadioLib dependency, pulled
+      # unpinned, stopped compiling against the ESP-IDF that ESPHome ships
+      # (`driver/ledc.h`). A full build costs minutes, so only this example gets
+      # one: it is the config with the most of its own C++ around the radio.
+      - name: Compile the single-pin gateway
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp esphome/rf_fan_radiolib_legacy.yaml "$work/"
+          cat > "$work/secrets.yaml" <<'EOF'
+          wifi_ssid: "ci-stub"
+          wifi_password: "ci-stub-password"
+          rf_fan_api_key: "aHVudGVyMmh1bnRlcjJodW50ZXIyaHVudGVyMmh1bnQ="
+          ota_password: "ci-stub-password"
+          rf_fan_fallback_password: "ci-stub-password"
+          EOF
+          docker run --rm -v "$work:/config" -w /config \
+            ghcr.io/esphome/esphome:latest compile rf_fan_radiolib_legacy.yaml
+
   card:
     name: card (node)
     runs-on: ubuntu-latest
