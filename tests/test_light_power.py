@@ -13,17 +13,10 @@ slider flipped the lamp, and the walk that followed stepped a lamp that had just
 gone dark. The card is not involved: the native more-info slider does the same, and
 so does a scene.
 
-The distinction is not between the two shapes of power key, which is where the
-first attempt at this went wrong (#45). It is between a power command that was
-ASKED FOR and one that merely rides along:
-
-- `light.turn_on()` / `light.turn_off()` are the request. They always transmit,
-  even towards the state the lamp is already believed to be in, because on an
-  assumed-state device that is the only way a human can say "you are wrong about
-  my lamp" -- which is what Home Assistant's separate on/off buttons are for.
-- A brightness request carries a power key it never asked for. On a lamp already
-  believed lit there is nothing to power, and a flip there undoes the very state
-  being set.
+A brightness request carries a power key it never asked for. On a lamp already
+believed lit there is nothing to power, and a flip there undoes the very state being
+set. A bare `light.turn_on()` / `light.turn_off()` towards the state already
+believed is covered by `test_light_toggle_guard.py`.
 
 Every test asserts the COMPLETE list of frames: counting the stepping frames while
 ignoring everything around them is how the stray toggle shipped in the first place.
@@ -101,45 +94,6 @@ async def test_setting_the_brightness_still_powers_a_lamp_that_is_off(
     await hass.async_block_till_done()
 
     assert _actions_sent(calls) == ["light_toggle"] + ["light_bright_up"] * 9
-
-
-async def test_turning_off_a_lamp_believed_off_still_presses_the_key(
-    hass: HomeAssistant,
-) -> None:
-    """This is how a human resynchronises an assumed state, and it must keep working.
-
-    @elmr91 relies on it (#45): the lamp is lit, Home Assistant says off, and
-    pressing OFF sends the toggle -- the lamp goes dark and the two agree again.
-    Withholding the press because "it is already off" leaves no way back, and the
-    entity is `assumed_state` precisely because its belief can be wrong.
-
-    Home Assistant shows separate on/off buttons for exactly this reason, rather
-    than the single toggle a light with real feedback gets.
-    """
-    _entry, calls = await _setup_relative(hass)
-    light_id = _one_id(hass, "light")
-    await _power(hass, light_id, "turn_off")
-    calls.clear()
-
-    await _power(hass, light_id, "turn_off")
-
-    assert _actions_sent(calls) == ["light_toggle"]
-    assert hass.states.get(light_id).state == "off", "the belief is what was asserted"
-
-
-async def test_turning_on_a_lamp_believed_on_still_presses_the_key(
-    hass: HomeAssistant,
-) -> None:
-    """The mirror gesture, for a lamp that is really off while Home Assistant says on."""
-    _entry, calls = await _setup_relative(hass)
-    light_id = _one_id(hass, "light")
-    await _power(hass, light_id, "turn_on")
-    calls.clear()
-
-    await _power(hass, light_id, "turn_on")
-
-    assert _actions_sent(calls) == ["light_toggle"]
-    assert hass.states.get(light_id).state == "on"
 
 
 async def test_an_unknown_state_still_transmits(hass: HomeAssistant) -> None:

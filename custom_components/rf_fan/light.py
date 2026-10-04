@@ -218,27 +218,32 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
     async def _async_transmit_power(self, *, turn_on: bool) -> bool:
         """Put a power command on the air.
 
-        Always: a power command that was asked for is asked for, including towards
-        the state the lamp is already believed to be in. On a device that never
-        reports back, that press is the only way a person can say "you are wrong
-        about my lamp" -- @elmr91 uses exactly that to resynchronise (#45), and it
-        is why Home Assistant gives an `assumed_state` light two buttons instead of
-        one toggle.
+        An absolute `light_on`/`light_off` always goes out: it lands the lamp where
+        it was asked, whatever it was doing, so re-sending one is a free
+        re-assertion of a drifted state.
 
-        The first attempt at #41 withheld it whenever the lamp already read the
-        requested state, which took that gesture away. The line is not there: it is
-        between a power command that was requested and one that merely rides along
-        with a brightness -- see `async_turn_on`.
+        The `light_toggle` fallback does not go out towards the state the lamp is
+        already believed to be in. It is a flip, not a request: "Hey Google, turn
+        off the lights" calls `light.turn_off` on every exposed light, and on a lamp
+        believed off the flip lit it while Home Assistant kept saying off.
 
-        One exception, and it is not about the state at all: ONE request reaching
+        That used to be the resynchronisation gesture (#45): press OFF on a lamp
+        believed off to flip a lamp that was really lit. The "Assumed light state"
+        select replaced it -- it declares the truth without a press -- and the raw
+        flip stays one press away on the gateway's own button, which bypasses the
+        integration's belief entirely. An unknown state still transmits: nothing is
+        established until something goes out.
+
+        One more exception, and it is not about the state at all: ONE request reaching
         the lamp twice. A `light.turn_on` aimed at an area reaches the lamp directly
         and again through every light group of that area, which relays the call
         under the caller's `Context` (Home Assistant's groups and Magic Areas' both
         do). On the `light_toggle` fallback the second press flipped the lamp back
         behind Home Assistant's back. So the fallback is not pressed again for the
-        same context and the same direction as the press just made; a separate
-        request carries a new context and still presses (#45), a script's on, off,
-        on alternates direction and presses three times, and an absolute
+        same context and the same direction as the press just made -- the belief
+        alone cannot catch it, since both arrivals may read it before either press
+        lands. A script's on, off, on alternates direction and presses three
+        times, and an absolute
         `light_on`/`light_off` is re-sent regardless, since repeating it is harmless.
         The claim is taken before anything is awaited, so the two arrivals may come
         in either order, or at once. Returns False for the dropped repeat, which
@@ -247,6 +252,13 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         absolute = ACTION_LIGHT_ON if turn_on else ACTION_LIGHT_OFF
         if self._codes.get(absolute):
             return await self._async_transmit_action(absolute)
+        if self._is_on is turn_on:
+            _LOGGER.debug(
+                "Light already believed %s: not pressing %s",
+                "on" if turn_on else "off",
+                ACTION_LIGHT_TOGGLE,
+            )
+            return False
         press = None if self._context is None else (self._context.id, turn_on)
         if press is not None and press == self._last_toggle_press:
             _LOGGER.debug("Not pressing %s twice for one request", ACTION_LIGHT_TOGGLE)
@@ -268,8 +280,8 @@ class RfFanLightEntity(RfFanBaseEntity, RestoreEntity, LightEntity):
         of what a brightness request asked for, and on a toggle-only remote that
         stray press switched the lamp off at every move of the slider (#41).
 
-        Only that case is withheld. A bare `light.turn_on` still presses the key
-        whatever the assumed state, because there the press IS the request (#45).
+        A bare `light.turn_on` presses the key unless it is the `light_toggle`
+        fallback and the lamp is already believed on -- see `_async_transmit_power`.
         """
         was_on = self._is_on
         brightness = kwargs.get(ATTR_BRIGHTNESS)
