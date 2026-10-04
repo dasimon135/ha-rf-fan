@@ -1,9 +1,18 @@
-# RF Fan gateway — legacy single-pin configuration (RadioLib CC1101).
+# RF Fan gateway: legacy single-pin configuration.
 #
 # Kept for setups already wired with GDO0 shared between receive and transmit.
-# For a NEW build, use rf_fan_example.yaml instead: it uses ESPHome's built-in
-# cc1101: component with separate RX/TX pins, which avoids a pin-mode conflict
-# that can leave the receiver permanently deaf on ESP32.
+# For a NEW build, use rf_fan_example.yaml instead: it has separate RX/TX pins,
+# which avoids a pin-mode conflict that can leave the receiver permanently deaf
+# on ESP32.
+#
+# The file name is kept so existing links still work, but this config no longer
+# uses RadioLib. The juanboro/esphome-radiolib-cc1101 component pulls RadioLib
+# unpinned, and RadioLib stopped compiling against the ESP-IDF that ESPHome
+# ships (`driver/ledc.h: No such file or directory`). It now runs on ESPHome's
+# built-in cc1101: component. The wiring is unchanged: that component drives
+# GDO0 as serial data in both directions (IOCFG0 = 0x0D), so one pin still
+# carries both. Do NOT declare gdo0_pin: it is for packet mode only, and its
+# interrupt would fight remote_receiver over the same pin.
 
 substitutions:
   device_name: rf-fan-gateway
@@ -26,17 +35,14 @@ esphome:
   on_boot:
     priority: -100
     then:
-      - lambda: id(mycc1101).recv();
+      # The radio must be strobed into RX explicitly, otherwise nothing is
+      # received until the first transmission has happened.
+      - cc1101.begin_rx: mycc1101
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
-
-# RadioLib CC1101 component (required for 8-pin CC1101 modules)
-external_components:
-  - source: github://juanboro/esphome-radiolib-cc1101@main
-    components: [ radiolib_cc1101 ]
 
 logger:
 
@@ -110,15 +116,16 @@ spi:
 # CC1101 blue module wiring (standard 8-pin)
 # Pin 1 VCC→3V3 | Pin 2 GND→GND | Pin 3 MOSI→D23 | Pin 4 SCLK→D18
 # Pin 5 MISO→D19 | Pin 6 GDO2→(unused) | Pin 7 GDO0→D4 | Pin 8 CSN→D5
-radiolib_cc1101:
+#
+# Same radio settings as the RadioLib version: 464 kHz filter, 5 kBaud.
+cc1101:
   id: mycc1101
   cs_pin: 5
-  rx_pin:
-    number: 4
-    allow_other_uses: true
-  frequency: ${cc1101_frequency}
-  filter: 464kHz
-  bitrate: 5
+  frequency: ${cc1101_frequency}MHz
+  output_power: 10
+  modulation_type: ASK/OOK
+  symbol_rate: 5000
+  filter_bandwidth: 464kHz
 
 # RF transmitter on GDO0 (GPIO4) — switches the CC1101 to TX then back to RX
 remote_transmitter:
@@ -130,10 +137,10 @@ remote_transmitter:
     non_blocking: false
     on_transmit:
       then:
-        - lambda: id(mycc1101).xmit();
+        - cc1101.begin_tx: mycc1101
     on_complete:
       then:
-        - lambda: id(mycc1101).recv();
+        - cc1101.begin_rx: mycc1101
 
 # RF receiver on GDO0 (GPIO4) — sniffs and publishes to Home Assistant
 remote_receiver:
