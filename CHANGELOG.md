@@ -7,26 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+## [2.0.0] - 2026-10-20
 
-- **The domain is now `esphome_rf_fan` (was `rf_fan`).** `clevrdavid/rf_fan`, a
-  Broadlink fan integration in the default HACS store, already uses `rf_fan`:
-  both installed into `custom_components/rf_fan/`, so installing one silently
-  replaced the other ([hacs/default#10711](https://github.com/hacs/default/pull/10711)).
-  The card's URL moves to `/esphome_rf_fan_frontend/rf-fan-card.js` and the
-  release zip to `esphome_rf_fan.zip`. Unchanged on purpose: the card type
-  `custom:rf-fan-card`, the gateway's `esphome.rf_fan_received` event and
-  `transmit_rf_fan` service (no reflashing), and the blueprint's path.
+### The domain is now `esphome_rf_fan`, and your fans come over by themselves
 
-### Added
+`rf_fan` is also the domain of `clevrdavid/rf_fan`, a Broadlink fan integration
+in the default HACS store. Both installed into `custom_components/rf_fan/`, so
+installing one silently replaced the other, and this integration could not be
+listed in the default store under that name
+([hacs/default#10711](https://github.com/hacs/default/pull/10711)). A config
+entry cannot change domain, so 2.0.0 copies each fan into the new domain and
+hands it everything the old one owned.
 
-- **Existing fans come over by themselves.** Adding RF Fan once after the update
-  removes the old version (still installed beside the new one, since HACS
-  installs a renamed integration into a new folder), then, after a restart,
-  brings every fan over: learned codes, options, device and entity IDs are kept,
-  so nothing is relearned and automations keep working. See *Upgrading from 1.x*
-  in the README. An entry several schema versions behind is migrated on the way.
-  `clevrdavid/rf_fan`'s entries and folder are never touched.
+**What you keep:** every learned code, every option, the device with the name
+and area you gave it, and every entity ID. Nothing is relearned, and
+automations, scripts and dashboards that name `fan.…`, `light.…` or
+`custom:rf-fan-card` keep working.
+
+**Upgrading takes two restarts:**
+
+1. Update **RF Fan** in HACS and restart Home Assistant. Your fans keep running
+   on 1.11.0 for now: HACS installs 2.0.0 beside it, in
+   `custom_components/esphome_rf_fan/`, and leaves `custom_components/rf_fan/`
+   where it is.
+2. Go to **Settings → Devices & services → Add integration → RF Fan**. It offers
+   to remove the previous version: accept, then restart Home Assistant.
+3. Add **RF Fan** once more. It lists your fans and offers to bring them over:
+   accept.
+
+Between steps 2 and 3 your fans show as unavailable, and the log may report
+once that the integration `rf_fan` cannot be found or is not loaded (an
+`IntegrationNotLoaded` error when the old entry is removed). Both are expected
+and go away on their own; nothing needs doing.
+
+**What changes:** the card is served from
+`/esphome_rf_fan_frontend/rf-fan-card.js` (a dashboard resource left at the old
+path is moved there, not duplicated), the release zip is `esphome_rf_fan.zip`,
+and debug logging is now `custom_components.esphome_rf_fan`. A template that
+calls `integration_entities('rf_fan')` must say `esphome_rf_fan`.
+
+**What does not change:** the gateway's `esphome.rf_fan_received` event and its
+`transmit_rf_fan` service, so no gateway needs reflashing; the card type
+`custom:rf-fan-card`; the blueprint's path.
+
+`clevrdavid/rf_fan`'s entries and folder are never touched: the old folder is
+only removed when its manifest points at this repository.
+
+Validated on a real Home Assistant 2026.10.2 with a Cecotec fan on 2026-10-20,
+following the three steps above: all eleven entities kept their IDs, the device
+kept its area, and the card resource moved.
 
 ## [1.11.0] - 2026-10-04
 
