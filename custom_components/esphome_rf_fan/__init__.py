@@ -55,7 +55,7 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
 ]
 
-CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
+CARD_URL = "/esphome_rf_fan_frontend/rf-fan-card.js"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

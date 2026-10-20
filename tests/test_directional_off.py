@@ -19,7 +19,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.components.fan import ATTR_DIRECTION
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.const import ACTION_FAN_OFF, ACTION_FAN_OFF_REVERSE
+from custom_components.esphome_rf_fan.const import ACTION_FAN_OFF, ACTION_FAN_OFF_REVERSE
 from tests.ha_helpers import actions_sent, fire_rf, one_id, setup_relative
 
 REVERSE_OFF = {ACTION_FAN_OFF_REVERSE: "r_offr"}

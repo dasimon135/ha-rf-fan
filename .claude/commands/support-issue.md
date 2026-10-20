@@ -92,15 +92,15 @@ what is actually relevant to the report:
 
 | Topic in the issue | Read these |
 | --- | --- |
-| Setup, capabilities, relearning, reconfigure | `custom_components/rf_fan/config_flow.py`, `const.py` |
-| Code learning, sniffed frames not matching, echo, de-bounce, a second gateway | `custom_components/rf_fan/entity.py` (`_received_action`: origin, then echo, then de-bounce), `data.py`, `actions.py`, `const.py` (`ECHO_SUPPRESS_SEC`, `RECEIVE_DEBOUNCE_SEC`), `tests/test_echo_suppression.py`, `tests/test_receive_debounce.py`, `tests/test_unmatched_code.py`, `tests/test_assumed_state_gaps.py` |
-| Transmission, repeats, toggle actions | `custom_components/rf_fan/actions.py` (`transmit_repeat_count`), `const.py` (`TOGGLE_ACTIONS`, `STEP_GAP_SEC`) |
-| Fan / light / select / button / switch / sensor behaviour | the matching `custom_components/rf_fan/*.py`, plus `entity.py` |
+| Setup, capabilities, relearning, reconfigure | `custom_components/esphome_rf_fan/config_flow.py`, `const.py` |
+| Code learning, sniffed frames not matching, echo, de-bounce, a second gateway | `custom_components/esphome_rf_fan/entity.py` (`_received_action`: origin, then echo, then de-bounce), `data.py`, `actions.py`, `const.py` (`ECHO_SUPPRESS_SEC`, `RECEIVE_DEBOUNCE_SEC`), `tests/test_echo_suppression.py`, `tests/test_receive_debounce.py`, `tests/test_unmatched_code.py`, `tests/test_assumed_state_gaps.py` |
+| Transmission, repeats, toggle actions | `custom_components/esphome_rf_fan/actions.py` (`transmit_repeat_count`), `const.py` (`TOGGLE_ACTIONS`, `STEP_GAP_SEC`) |
+| Fan / light / select / button / switch / sensor behaviour | the matching `custom_components/esphome_rf_fan/*.py`, plus `entity.py` |
 | ESPHome gateway, `transmit_rf_fan`, `rf_fan_received`, rc_switch code shape | `esphome/rf_fan_example.yaml`, `esphome/rf_fan_radiolib_legacy.yaml`, and `esphome/rf_fan_raw_gateway.yaml` for a remote rc_switch cannot decode |
-| Dashboard card, layouts, auto-discovery | `custom_components/rf_fan/frontend/rf-fan-card.js`, `tests/frontend/*.test.mjs` |
-| Diagnostics fields | `custom_components/rf_fan/diagnostics.py` |
+| Dashboard card, layouts, auto-discovery | `custom_components/esphome_rf_fan/frontend/rf-fan-card.js`, `tests/frontend/*.test.mjs` |
+| Diagnostics fields | `custom_components/esphome_rf_fan/diagnostics.py` |
 | Wording of a config-flow screen or an error message | `strings.json`, `translations/en.json`, `translations/fr.json` |
-| Version, minimum Home Assistant | `custom_components/rf_fan/manifest.json`, `hacs.json`, `CHANGELOG.md` |
+| Version, minimum Home Assistant | `custom_components/esphome_rf_fan/manifest.json`, `hacs.json`, `CHANGELOG.md` |
 | Blueprint | `blueprints/automation/rf_fan/fan_temperature_control.yaml` |
 
 Two recurring sources of confusion. Confirm both in the source each time rather
@@ -139,7 +139,7 @@ Drop every line you do not need; add none.
 >
 > - **Home Assistant version** — Settings → About.
 > - **RF Fan version** — Settings → Devices & services → RF Fan, or the
->   `version` field in `custom_components/rf_fan/manifest.json` on your system.
+>   `version` field in `custom_components/esphome_rf_fan/manifest.json` on your system.
 > - **ESPHome version**, and the gateway YAML you flashed (redact nothing but
 >   Wi-Fi credentials and API keys).
 > - **Diagnostics** — Settings → Devices & services → RF Fan → ⋮ → Download
@@ -150,7 +150,7 @@ Drop every line you do not need; add none.
 >       logger:
 >         default: warning
 >         logs:
->           custom_components.rf_fan: debug
+>           custom_components.esphome_rf_fan: debug
 >
 > - **ESPHome device log** captured while you reproduce it (`esphome logs
 >   your-gateway.yaml`, or the Logs button in the ESPHome add-on).
@@ -166,7 +166,7 @@ You traced the failure to specific lines and you are confident about the cause.
 Post, **as a comment only**:
 
 1. What is wrong, in one or two sentences.
-2. The trace: file and line references (`custom_components/rf_fan/actions.py:42`)
+2. The trace: file and line references (`custom_components/esphome_rf_fan/actions.py:42`)
    and what the code does there versus what it should do.
 3. The proposed fix, as a diff or snippet **inside the comment**.
 4. A workaround, if one exists.

@@ -49,7 +49,7 @@ def no_gap(monkeypatch):
     async def _fake_sleep(delay: float) -> None:
         return None
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _fake_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _fake_sleep)
 
 
 async def _power(hass: HomeAssistant, light_id: str, service: str) -> None:

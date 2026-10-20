@@ -1,6 +1,6 @@
 name: Release
 
-# Attaches rf_fan.zip to every published release. hacs.json sets zip_release,
+# Attaches esphome_rf_fan.zip to every published release. hacs.json sets zip_release,
 # so this archive is what HACS downloads, and GitHub counts each download:
 # that count is the only install signal a custom integration gets.
 
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   zip:
-    name: Attach rf_fan.zip
+    name: Attach esphome_rf_fan.zip
     runs-on: ubuntu-latest
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -27,11 +27,11 @@ jobs:
         with:
           ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
       - name: Build the archive
-        # HACS extracts it straight into custom_components/rf_fan/, so the
+        # HACS extracts it straight into custom_components/esphome_rf_fan/, so the
         # files sit at the root of the zip, not under the folder.
-        working-directory: custom_components/rf_fan
-        run: zip -r -X "$GITHUB_WORKSPACE/rf_fan.zip" . -x '*__pycache__*' '*.pyc'
+        working-directory: custom_components/esphome_rf_fan
+        run: zip -r -X "$GITHUB_WORKSPACE/esphome_rf_fan.zip" . -x '*__pycache__*' '*.pyc'
       - name: Attach it to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" rf_fan.zip --clobber
+        run: gh release upload "$TAG" esphome_rf_fan.zip --clobber

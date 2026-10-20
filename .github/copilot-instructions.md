@@ -7,9 +7,9 @@ HACS integration for generic RF433 fans controlled by a remote.
 ## Stack
 
 - Python 3.14+ (Home Assistant 2026.5, the `hacs.json` target, requires it)
-- Home Assistant custom component (`custom_components/rf_fan/`)
+- Home Assistant custom component (`custom_components/esphome_rf_fan/`)
 - ESPHome for RF sniffing and transmission
-- A bundled Lovelace card in `custom_components/rf_fan/frontend/` (plain JS, no build)
+- A bundled Lovelace card in `custom_components/esphome_rf_fan/frontend/` (plain JS, no build)
 
 ## Conventions
 

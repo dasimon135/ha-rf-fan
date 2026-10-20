@@ -18,7 +18,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.diagnostics import async_get_config_entry_diagnostics
+from custom_components.esphome_rf_fan.diagnostics import async_get_config_entry_diagnostics
 from tests.ha_helpers import fire_rf, setup_full
 
 UNKNOWN = "1:001100110011001100110011"
@@ -67,7 +67,7 @@ async def test_the_unmatched_code_is_logged_once_not_once_per_platform(
     """Every platform of the entry sees the event; only one log line comes out."""
     await setup_full(hass)
 
-    with caplog.at_level(logging.DEBUG, logger="custom_components.rf_fan.entity"):
+    with caplog.at_level(logging.DEBUG, logger="custom_components.esphome_rf_fan.entity"):
         await fire_rf(hass, UNKNOWN)
 
     lines = [r for r in caplog.records if UNKNOWN in r.getMessage()]

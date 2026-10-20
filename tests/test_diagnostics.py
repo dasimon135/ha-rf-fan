@@ -14,7 +14,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.diagnostics import async_get_config_entry_diagnostics
+from custom_components.esphome_rf_fan.diagnostics import async_get_config_entry_diagnostics
 from tests.ha_helpers import one_id, setup_full
 
 

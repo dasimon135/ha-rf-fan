@@ -14,7 +14,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.const import DOMAIN
+from custom_components.esphome_rf_fan.const import DOMAIN
 from tests.ha_helpers import (
     DEVICE,
     actions_sent,
@@ -130,7 +130,7 @@ def _gate(monkeypatch):
             first_step_done.set()
             await release.wait()
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _gated_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _gated_sleep)
     return first_step_done, release
 
 

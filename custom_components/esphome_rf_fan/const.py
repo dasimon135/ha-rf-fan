@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-DOMAIN: Final = "rf_fan"
+DOMAIN: Final = "esphome_rf_fan"
 
 EVENT_RF_FAN_RECEIVED: Final = "esphome.rf_fan_received"
 

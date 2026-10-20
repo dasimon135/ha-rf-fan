@@ -180,7 +180,7 @@ async def test_resync_cancels_a_brightness_walk_in_flight(
             first_step_done.set()
             await release.wait()
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _gated_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _gated_sleep)
 
     climbing = asyncio.create_task(
         hass.services.async_call(

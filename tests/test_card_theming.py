@@ -14,7 +14,13 @@ Checked on the shipped file so it cannot regress silently:
 import re
 from pathlib import Path
 
-CARD = Path(__file__).parents[1] / "custom_components" / "rf_fan" / "frontend" / "rf-fan-card.js"
+CARD = (
+    Path(__file__).parents[1]
+    / "custom_components"
+    / "esphome_rf_fan"
+    / "frontend"
+    / "rf-fan-card.js"
+)
 
 HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 FALLBACK = re.compile(r"var\(\s*--[a-z0-9-]+\s*,\s*(?:var\([^)]*,\s*)?#[0-9a-fA-F]{3,8}\b")

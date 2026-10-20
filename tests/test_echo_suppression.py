@@ -96,7 +96,7 @@ async def test_repeated_echoes_of_one_transmission_are_all_suppressed(
 
 async def test_echo_window_expires(hass: HomeAssistant, monkeypatch) -> None:
     """Once the window has elapsed, the same code counts as a real remote press."""
-    monkeypatch.setattr("custom_components.rf_fan.entity.ECHO_SUPPRESS_SEC", 0.0)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.ECHO_SUPPRESS_SEC", 0.0)
 
     await setup_full(hass)
     light_id = one_id(hass, "light")

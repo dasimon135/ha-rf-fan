@@ -15,7 +15,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.rf_fan.const import ACTION_TIMER_OFF
+from custom_components.esphome_rf_fan.const import ACTION_TIMER_OFF
 from tests.ha_helpers import actions_sent, id_by_unique_suffix, setup_full
 
 CANCEL_CODE = {ACTION_TIMER_OFF: "c_toff"}

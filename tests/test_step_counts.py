@@ -16,7 +16,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.components.light import ATTR_BRIGHTNESS
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.const import COLOR_TEMP_NAMED
+from custom_components.esphome_rf_fan.const import COLOR_TEMP_NAMED
 from tests.ha_helpers import (
     actions_sent,
     button_id,

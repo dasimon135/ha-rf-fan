@@ -14,7 +14,7 @@ replays those buttons for you.
 <p align="center">
   <img src="assets/rf-fan-card.gif" width="200" alt="The bundled RF Fan card, cycling through fan speeds">
   &nbsp;&nbsp;
-  <img src="custom_components/rf_fan/brand/icon@2x.png" width="120" alt="RF Fan icon">
+  <img src="custom_components/esphome_rf_fan/brand/icon@2x.png" width="120" alt="RF Fan icon">
 </p>
 
 ## Will this work for me?
@@ -509,7 +509,7 @@ button is held, and one API call per repeat is enough to fill the ESPHome queue 
 ## Project structure
 
 ```text
-custom_components/rf_fan/
+custom_components/esphome_rf_fan/
   __init__.py        actions.py       config_flow.py   const.py
   data.py            diagnostics.py   entity.py        manifest.json
   fan.py             light.py         select.py        sensor.py
@@ -534,7 +534,7 @@ tests/
 ## Brand icon
 
 The integration ships its own icon/logo in
-[`custom_components/rf_fan/brand/`](custom_components/rf_fan/brand/). Since Home
+[`custom_components/esphome_rf_fan/brand/`](custom_components/esphome_rf_fan/brand/). Since Home
 Assistant 2026.3, custom integrations serve local brand images directly (they take
 priority over the brands CDN), so no submission to `home-assistant/brands` is needed.
 Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
@@ -591,7 +591,7 @@ ones, so it fails silently and completely when the two are shaped differently. C
 - **A code that differs from a learned one by one bit or a leading zero** — `rc_code_bits`
   is wrong. Read the true width off the `dump: rc_switch` log line and relearn.
 
-Enabling debug logging for `custom_components.rf_fan` prints the same comparison
+Enabling debug logging for `custom_components.esphome_rf_fan` prints the same comparison
 (unmatched code plus every learned code) on each newly unrecognised frame.
 
 ### The fan ignores a code that was learned correctly

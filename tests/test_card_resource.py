@@ -23,8 +23,8 @@ from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_YAML
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
-from custom_components.rf_fan import CARD_URL
-from custom_components.rf_fan.const import CONF_DISABLE_CARD
+from custom_components.esphome_rf_fan import CARD_URL
+from custom_components.esphome_rf_fan.const import CONF_DISABLE_CARD
 from tests.ha_helpers import full_entry, register_stub
 from tests.ha_helpers import setup_full as _setup_full
 

@@ -58,7 +58,7 @@ body:
     id: logs
     attributes:
       label: Relevant log output
-      description: Home Assistant logs related to the issue (Settings -> System -> Logs, filter on "rf_fan").
+      description: Home Assistant logs related to the issue (Settings -> System -> Logs, filter on "esphome_rf_fan").
       render: text
     validations:
       required: false

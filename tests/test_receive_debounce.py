@@ -14,7 +14,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.const import EVENT_RF_FAN_RECEIVED
+from custom_components.esphome_rf_fan.const import EVENT_RF_FAN_RECEIVED
 from tests.ha_helpers import (
     DEVICE,
     fire_rf,
