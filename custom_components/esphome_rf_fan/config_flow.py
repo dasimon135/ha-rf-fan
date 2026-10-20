@@ -290,17 +290,18 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         # created at the current version: nothing would ever migrate its data.
         if not await async_migrate_entry(self.hass, old):
             return self.async_abort(reason="legacy_too_new")
-        await self.async_set_unique_id(
-            old.unique_id
-            or self.unique_id_for(
-                old.data[CONF_ESPHOME_DEVICE], old.data.get(CONF_FAN_NAME, old.title)
-            )
-        )
+        await self.async_set_unique_id(self._legacy_unique_id(old))
         self._abort_if_unique_id_configured()
         return self.async_create_entry(
             title=old.title,
             data={**old.data, CONF_LEGACY_ENTRY_ID: old.entry_id},
             options=dict(old.options),
+        )
+
+    def _legacy_unique_id(self, old: ConfigEntry) -> str:
+        """The unique id an old entry keeps; computed for one that never got any."""
+        return old.unique_id or self.unique_id_for(
+            old.data[CONF_ESPHOME_DEVICE], old.data.get(CONF_FAN_NAME, old.title)
         )
 
     async def async_step_legacy_installed(
@@ -331,9 +332,13 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
             )
         if not pending:
             return self.async_abort(reason="legacy_gone")
-        # This flow carries the first; the rest get flows of their own. When the
-        # integration was not set up yet, async_setup starts the same flows and the
-        # unique ids make the second of each abort.
+        # This flow carries the first; the rest get flows of their own. The first one
+        # coming over sets the integration up, and async_setup then starts a flow for
+        # every fan not yet claimed -- this one included. Its unique id is taken
+        # BEFORE anything starts, so that duplicate is the flow that aborts, not this
+        # one (it did, as already_in_progress, while the id was taken last).
+        await self.async_set_unique_id(self._legacy_unique_id(pending[0]))
+        self._abort_if_unique_id_configured()
         for old in pending[1:]:
             self.hass.async_create_task(
                 self.hass.config_entries.flow.async_init(
