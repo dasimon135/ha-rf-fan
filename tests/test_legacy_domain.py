@@ -120,7 +120,7 @@ async def test_an_old_entry_comes_over_with_its_codes_and_entity_ids(
     hass: HomeAssistant,
 ) -> None:
     old = _legacy_entry(hass)
-    old_device = dr.async_get(hass).async_get_device({(LEGACY_DOMAIN, old.entry_id)})
+    [old_device] = dr.async_entries_for_config_entry(dr.async_get(hass), old.entry_id)
 
     await _start(hass)
 
@@ -143,8 +143,8 @@ async def test_an_old_entry_comes_over_with_its_codes_and_entity_ids(
     assert "fan.salon_2" not in hass.states.async_entity_ids("fan")
 
     # Same device, with the name and area the user gave it.
-    device = dr.async_get(hass).async_get_device({(DOMAIN, new.entry_id)})
-    assert device is not None
+    [device] = dr.async_entries_for_config_entry(dr.async_get(hass), new.entry_id)
+    assert (DOMAIN, new.entry_id) in device.identifiers
     assert device.id == old_device.id
     assert device.name_by_user == "My Salon"
     assert device.config_entries == {new.entry_id}
@@ -261,7 +261,7 @@ async def test_adding_the_integration_offers_to_bring_the_fans_over(
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
 
-    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result
     assert not hass.config_entries.async_entries(LEGACY_DOMAIN)
     assert len(hass.config_entries.async_entries(DOMAIN)) == 2
     assert hass.states.get("fan.salon") is not None
