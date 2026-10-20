@@ -14,7 +14,7 @@ replays those buttons for you.
 <p align="center">
   <img src="assets/rf-fan-card.gif" width="200" alt="The bundled RF Fan card, cycling through fan speeds">
   &nbsp;&nbsp;
-  <img src="custom_components/rf_fan/brand/icon@2x.png" width="120" alt="RF Fan icon">
+  <img src="custom_components/esphome_rf_fan/brand/icon@2x.png" width="120" alt="RF Fan icon">
 </p>
 
 ## Will this work for me?
@@ -308,6 +308,24 @@ If the button does not reach your instance, add the repository by hand:
 3. Restart Home Assistant.
 4. Add the **RF Fan** integration and follow the config flow.
 
+### Upgrading from 1.x
+
+In 2.0.0 the integration's domain changed from `rf_fan` to `esphome_rf_fan`:
+another integration in the default HACS store already uses `rf_fan`, and the two
+would install into the same folder. Your fans come over with their learned codes,
+options, devices and entity IDs, so nothing is relearned and automations keep
+working. It takes two restarts:
+
+1. Update **RF Fan** in HACS and restart Home Assistant. Your fans keep running
+   on the old version for now: HACS installs the new one beside it, in
+   `custom_components/esphome_rf_fan/`, and leaves `custom_components/rf_fan/`
+   in place.
+2. Go to **Settings → Devices & services → Add integration → RF Fan**. It offers
+   to remove the old version: accept, then restart Home Assistant.
+3. Add **RF Fan** again. It lists your fans and offers to bring them over: accept.
+
+If you enabled debug logging, the logger is now `custom_components.esphome_rf_fan`.
+
 ## Dashboard card (bundled)
 
 The integration ships an **animated Lovelace card** — no separate install or resource
@@ -509,7 +527,7 @@ button is held, and one API call per repeat is enough to fill the ESPHome queue 
 ## Project structure
 
 ```text
-custom_components/rf_fan/
+custom_components/esphome_rf_fan/
   __init__.py        actions.py       config_flow.py   const.py
   data.py            diagnostics.py   entity.py        manifest.json
   fan.py             light.py         select.py        sensor.py
@@ -534,7 +552,7 @@ tests/
 ## Brand icon
 
 The integration ships its own icon/logo in
-[`custom_components/rf_fan/brand/`](custom_components/rf_fan/brand/). Since Home
+[`custom_components/esphome_rf_fan/brand/`](custom_components/esphome_rf_fan/brand/). Since Home
 Assistant 2026.3, custom integrations serve local brand images directly (they take
 priority over the brands CDN), so no submission to `home-assistant/brands` is needed.
 Supported files: `icon.png` / `icon@2x.png` / `logo.png` (+ optional
@@ -591,7 +609,7 @@ ones, so it fails silently and completely when the two are shaped differently. C
 - **A code that differs from a learned one by one bit or a leading zero** — `rc_code_bits`
   is wrong. Read the true width off the `dump: rc_switch` log line and relearn.
 
-Enabling debug logging for `custom_components.rf_fan` prints the same comparison
+Enabling debug logging for `custom_components.esphome_rf_fan` prints the same comparison
 (unmatched code plus every learned code) on each newly unrecognised frame.
 
 ### The fan ignores a code that was learned correctly

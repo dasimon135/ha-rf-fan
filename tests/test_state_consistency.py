@@ -17,7 +17,7 @@ from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rf_fan.const import DOMAIN
+from custom_components.esphome_rf_fan.const import DOMAIN
 from tests.ha_helpers import (
     CODES,
     DEVICE,
@@ -211,7 +211,7 @@ async def test_switching_the_light_off_stops_a_brightness_walk(
             first_step_done.set()
             await release.wait()
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _gated_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _gated_sleep)
 
     climbing = asyncio.create_task(
         hass.services.async_call(
@@ -272,7 +272,7 @@ async def test_relearning_a_free_form_key_names_it(hass: HomeAssistant) -> None:
     from homeassistant.config_entries import SOURCE_RECONFIGURE
     from homeassistant.data_entry_flow import FlowResultType
 
-    from custom_components.rf_fan.const import EVENT_RF_FAN_RECEIVED
+    from custom_components.esphome_rf_fan.const import EVENT_RF_FAN_RECEIVED
 
     entry = _legacy_entry(hass)
     hass.config_entries.async_update_entry(
@@ -286,7 +286,7 @@ async def test_relearning_a_free_form_key_names_it(hass: HomeAssistant) -> None:
     )
     flow = hass.config_entries.flow
 
-    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+    with patch("custom_components.esphome_rf_fan.async_setup_entry", return_value=True):
         result = await flow.async_init(
             DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
         )

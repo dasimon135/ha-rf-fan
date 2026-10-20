@@ -233,6 +233,14 @@
           "has_sound": "Son (bip)",
           "extra_count": "Boutons supplémentaires"
         }
+      },
+      "legacy_installed": {
+        "title": "Supprimer d'abord l'ancienne version",
+        "description": "L'ancienne version de RF Fan est toujours installée, dans `{path}`, et c'est elle qui pilote vos {count} ventilateur(s) en ce moment. Les reprendre pendant qu'elle tourne donnerait deux maîtres à chaque ventilateur.\n\nValidez pour supprimer ce dossier. Redémarrez ensuite Home Assistant et ajoutez de nouveau RF Fan : vos ventilateurs sont repris avec leurs codes appris, leurs options et leurs identifiants d'entité, sans rien réapprendre."
+      },
+      "import_legacy": {
+        "title": "Reprendre vos ventilateurs",
+        "description": "Ces ventilateurs ont été configurés avec l'ancienne version de RF Fan : {fans}.\n\nValidez pour les reprendre. Les codes appris, les options, les appareils et les identifiants d'entité sont conservés : vos automatisations et tableaux de bord continuent de fonctionner, et rien n'est à réapprendre."
       }
     },
     "progress": {
@@ -250,7 +258,11 @@
     "abort": {
       "already_configured": "Un ventilateur portant ce nom est déjà configuré sur cette passerelle.",
       "reconfigure_successful": "Reconfiguration enregistrée et rechargée.",
-      "already_in_progress": "Une configuration de ce ventilateur est déjà en cours."
+      "already_in_progress": "Une configuration de ce ventilateur est déjà en cours.",
+      "restart_to_finish": "L'ancienne version est supprimée. Redémarrez Home Assistant, puis ajoutez de nouveau RF Fan pour reprendre vos ventilateurs.",
+      "legacy_not_removed": "Le dossier `custom_components/rf_fan` n'est pas l'ancienne version de cette intégration : il n'a pas été touché. Supprimez-le vous-même si c'est bien elle, puis redémarrez Home Assistant.",
+      "legacy_gone": "Ce ventilateur de l'ancienne version n'existe plus.",
+      "legacy_too_new": "Ce ventilateur a été configuré par une version plus récente que celle-ci et ne peut pas être repris."
     }
   },
   "options": {

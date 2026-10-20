@@ -14,7 +14,7 @@ import json
 import re
 from pathlib import Path
 
-_COMPONENT = Path(__file__).resolve().parent.parent / "custom_components" / "rf_fan"
+_COMPONENT = Path(__file__).resolve().parent.parent / "custom_components" / "esphome_rf_fan"
 
 
 def test_card_version_matches_the_manifest() -> None:

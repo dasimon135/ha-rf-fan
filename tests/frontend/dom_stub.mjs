@@ -80,12 +80,12 @@ export async function loadCard() {
   };
   globalThis.window = { customCards: [], setTimeout, clearTimeout };
 
-  await import("../../custom_components/rf_fan/frontend/rf-fan-card.js");
+  await import("../../custom_components/esphome_rf_fan/frontend/rf-fan-card.js");
   return defined;
 }
 
 /**
- * A hass double with one rf_fan device: a fan, plus whatever extras are asked for.
+ * A hass double with one esphome_rf_fan device: a fan, plus whatever extras are asked for.
  *
  * `buttons` and `selects` entries are `{id, translation_key, name}` — pass
  * `translation_key: null` to emulate a registry that does not expose it (older
@@ -113,19 +113,19 @@ export function makeHass({
       },
     },
   };
-  const entities = { "fan.x": { device_id: "d1", platform: "rf_fan" } };
+  const entities = { "fan.x": { device_id: "d1", platform: "esphome_rf_fan" } };
 
   // `lightAttrs` carries what the light entity declares about itself — notably
   // `supported_color_modes`, which is how the card tells a dimmable lamp from a
   // bare on/off one, and `brightness`.
   if (light !== null) {
     states["light.x"] = { state: light, attributes: { ...lightAttrs } };
-    entities["light.x"] = { device_id: "d1", platform: "rf_fan" };
+    entities["light.x"] = { device_id: "d1", platform: "esphome_rf_fan" };
   }
 
   for (const b of buttons) {
     states[b.id] = { state: "unknown", attributes: { friendly_name: b.name } };
-    entities[b.id] = { device_id: "d1", platform: "rf_fan" };
+    entities[b.id] = { device_id: "d1", platform: "esphome_rf_fan" };
     if (b.translation_key) entities[b.id].translation_key = b.translation_key;
   }
 
@@ -134,7 +134,7 @@ export function makeHass({
       state: sel.state || "unknown",
       attributes: { friendly_name: sel.name, options: sel.options || [] },
     };
-    entities[sel.id] = { device_id: "d1", platform: "rf_fan" };
+    entities[sel.id] = { device_id: "d1", platform: "esphome_rf_fan" };
     if (sel.translation_key) entities[sel.id].translation_key = sel.translation_key;
     // `entity_category` reaches the frontend independently of the translation key,
     // which is the whole reason the card leans on it. Pass "config" (or the raw

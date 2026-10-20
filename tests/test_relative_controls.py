@@ -26,7 +26,7 @@ from homeassistant.components.fan import DIRECTION_FORWARD, DIRECTION_REVERSE
 from homeassistant.components.light import ColorMode
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.const import EVENT_RF_FAN_RECEIVED
+from custom_components.esphome_rf_fan.const import EVENT_RF_FAN_RECEIVED
 from tests.ha_helpers import DEVICE
 from tests.ha_helpers import actions_sent as _actions_sent
 from tests.ha_helpers import id_by_unique_suffix as _id_by
@@ -49,7 +49,7 @@ def no_gap(monkeypatch):
     async def _fake_sleep(delay: float) -> None:
         sleeps.append(delay)
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _fake_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _fake_sleep)
     return sleeps
 
 
@@ -537,7 +537,7 @@ async def test_a_second_move_cancels_the_first_and_resumes_from_the_air(
         first_step_done.set()
         await release.wait()
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _gated_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _gated_sleep)
 
     # Walk towards full brightness: nine presses up, paused after the first.
     climbing = asyncio.create_task(

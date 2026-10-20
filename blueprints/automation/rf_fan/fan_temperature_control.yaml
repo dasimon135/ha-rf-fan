@@ -1,6 +1,6 @@
 # Blueprint: Control an RF fan by temperature
 #
-# For the RF Fan (rf_fan) custom integration.
+# For the RF Fan (esphome_rf_fan) custom integration.
 # This integration's fans are plain Home Assistant `fan.*` entities that are
 # driven over one-way RF, so there is NO state feedback from the device.
 # The fan's HA state is assumed to match the last command sent by this
@@ -14,7 +14,7 @@ blueprint:
   description: >
     Turn an RF fan on when a temperature sensor rises above an ON threshold,
     and off when it drops below an OFF threshold (hysteresis). Optionally sets
-    the fan speed percentage when turning on. Designed for the RF Fan (rf_fan)
+    the fan speed percentage when turning on. Designed for the RF Fan (esphome_rf_fan)
     integration, whose fans are one-way RF devices without state feedback, so
     the fan state is assumed from the last command sent.
   domain: automation

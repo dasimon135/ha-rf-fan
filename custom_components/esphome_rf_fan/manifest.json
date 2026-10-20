@@ -1,5 +1,5 @@
 {
-  "domain": "rf_fan",
+  "domain": "esphome_rf_fan",
   "name": "RF Fan",
   "after_dependencies": [
     "frontend",

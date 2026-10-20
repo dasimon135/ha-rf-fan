@@ -16,7 +16,7 @@ import { before, describe, it } from "node:test";
 
 import { loadCard } from "./dom_stub.mjs";
 
-const CARD = "../../custom_components/rf_fan/frontend/rf-fan-card.js";
+const CARD = "../../custom_components/esphome_rf_fan/frontend/rf-fan-card.js";
 const SOURCE = readFileSync(new URL(CARD, import.meta.url), "utf8");
 
 /** Run the card source again, which is what a second <script> tag does to a browser.

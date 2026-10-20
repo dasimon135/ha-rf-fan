@@ -12,7 +12,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED
+from custom_components.esphome_rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED
 
 DEVICE = "esp32-test"
 # The gateway service name mirrors config_flow: dashes become underscores.

@@ -146,7 +146,7 @@ async def test_color_cycle_repeats_per_step_and_gaps(hass: HomeAssistant, monkey
     async def _fake_sleep(delay: float) -> None:
         sleeps.append(delay)
 
-    monkeypatch.setattr("custom_components.rf_fan.entity.sleep", _fake_sleep)
+    monkeypatch.setattr("custom_components.esphome_rf_fan.entity.sleep", _fake_sleep)
 
     # Turn the light on (the colour cycle needs the lamp powered). The OFF->ON
     # transition bumps the assumed position 0->1 (Chaud -> Neutre).

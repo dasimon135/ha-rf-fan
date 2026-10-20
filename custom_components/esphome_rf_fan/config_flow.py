@@ -7,6 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
+    SOURCE_IMPORT,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -44,6 +45,7 @@ from .const import (
     CONF_HAS_LIGHT,
     CONF_HAS_SOUND,
     CONF_HAS_TIMER_OFF,
+    CONF_LEGACY_ENTRY_ID,
     CONF_LIGHT_CONTROL,
     CONF_LIGHT_LEVEL,
     CONF_LIGHT_LEVEL_STEPS,
@@ -59,6 +61,7 @@ from .const import (
     DIRECTION_CONTROL_OPTIONS,
     DOMAIN,
     EVENT_RF_FAN_RECEIVED,
+    LEGACY_DOMAIN,
     LIGHT_CONTROL_NONE,
     LIGHT_CONTROL_OPTIONS,
     LIGHT_CONTROL_TOGGLE,
@@ -75,6 +78,7 @@ from .const import (
     TIMER_HOURS,
     extra_action,
 )
+from .legacy import async_legacy_installed, async_remove_legacy_installed, legacy_entries
 
 LEARN_TIMEOUT_SEC = 30
 # After the first frame, keep listening briefly so a held button's repeats can be
@@ -271,10 +275,88 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         return vol.Schema(fields)
 
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+        """Bring one entry over from the old `rf_fan` domain (see legacy.py).
+
+        The new entry carries the old one's id; its setup adopts the registry rows
+        and then removes the old entry.
+        """
+        from . import async_migrate_entry
+
+        old = self.hass.config_entries.async_get_entry(import_data[CONF_LEGACY_ENTRY_ID])
+        if old is None or old.domain != LEGACY_DOMAIN:
+            return self.async_abort(reason="legacy_gone")
+        # The old entry may be several schema versions behind, and the new one is
+        # created at the current version: nothing would ever migrate its data.
+        if not await async_migrate_entry(self.hass, old):
+            return self.async_abort(reason="legacy_too_new")
+        await self.async_set_unique_id(self._legacy_unique_id(old))
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(
+            title=old.title,
+            data={**old.data, CONF_LEGACY_ENTRY_ID: old.entry_id},
+            options=dict(old.options),
+        )
+
+    def _legacy_unique_id(self, old: ConfigEntry) -> str:
+        """The unique id an old entry keeps; computed for one that never got any."""
+        return old.unique_id or self.unique_id_for(
+            old.data[CONF_ESPHOME_DEVICE], old.data.get(CONF_FAN_NAME, old.title)
+        )
+
+    async def async_step_legacy_installed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """The previous version is still installed and running: remove it first."""
+        if user_input is not None:
+            if not await async_remove_legacy_installed(self.hass):
+                return self.async_abort(reason="legacy_not_removed")
+            return self.async_abort(reason="restart_to_finish")
+        return self.async_show_form(
+            step_id="legacy_installed",
+            description_placeholders={
+                "count": str(len(legacy_entries(self.hass))),
+                "path": f"custom_components/{LEGACY_DOMAIN}",
+            },
+        )
+
+    async def async_step_import_legacy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Offer to bring the previous version's fans over."""
+        pending = legacy_entries(self.hass)
+        if user_input is None:
+            return self.async_show_form(
+                step_id="import_legacy",
+                description_placeholders={"fans": ", ".join(e.title for e in pending)},
+            )
+        if not pending:
+            return self.async_abort(reason="legacy_gone")
+        # This flow carries the first; the rest get flows of their own. The first one
+        # coming over sets the integration up, and async_setup then starts a flow for
+        # every fan not yet claimed -- this one included. Its unique id is taken
+        # BEFORE anything starts, so that duplicate is the flow that aborts, not this
+        # one (it did, as already_in_progress, while the id was taken last).
+        await self.async_set_unique_id(self._legacy_unique_id(pending[0]))
+        self._abort_if_unique_id_configured()
+        for old in pending[1:]:
+            self.hass.async_create_task(
+                self.hass.config_entries.flow.async_init(
+                    DOMAIN,
+                    context={"source": SOURCE_IMPORT},
+                    data={CONF_LEGACY_ENTRY_ID: old.entry_id},
+                )
+            )
+        return await self.async_step_import({CONF_LEGACY_ENTRY_ID: pending[0].entry_id})
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Step 1: general fan information."""
+        if user_input is None and legacy_entries(self.hass):
+            if await async_legacy_installed(self.hass):
+                return await self.async_step_legacy_installed()
+            return await self.async_step_import_legacy()
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
 

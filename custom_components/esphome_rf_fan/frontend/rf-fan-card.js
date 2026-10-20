@@ -1,5 +1,5 @@
 /**
- * RF Fan Card — a custom Lovelace card shipped with the `rf_fan` integration.
+ * RF Fan Card — a custom Lovelace card shipped with the `esphome_rf_fan` integration.
  *
  * Usage:
  *   type: custom:rf-fan-card
@@ -57,7 +57,7 @@ class RfFanCard extends HTMLElement {
   static getStubConfig(hass) {
     const reg = hass.entities || {};
     const fans = Object.keys(hass.states).filter((e) => e.startsWith("fan."));
-    const rf = fans.find((e) => reg[e] && reg[e].platform === "rf_fan");
+    const rf = fans.find((e) => reg[e] && reg[e].platform === "esphome_rf_fan");
     return { entity: rf || fans[0] || "fan.example" };
   }
 
@@ -95,7 +95,7 @@ class RfFanCard extends HTMLElement {
                 // Only this integration's entities. On another integration's fan
                 // nothing carries our translation keys, and the roles below fall back
                 // to elimination: a device's restart button became "recalibrate".
-                (!reg[e].platform || reg[e].platform === "rf_fan")
+                (!reg[e].platform || reg[e].platform === "esphome_rf_fan")
             )
           : [];
     this._siblings = { reg, fanId, list: siblings };

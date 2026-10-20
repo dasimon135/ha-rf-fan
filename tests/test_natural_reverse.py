@@ -16,8 +16,8 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.components.fan import ATTR_DIRECTION, ATTR_PRESET_MODE
 from homeassistant.core import HomeAssistant
 
-from custom_components.rf_fan.actions import split_actions, transmit_repeat_count
-from custom_components.rf_fan.const import (
+from custom_components.esphome_rf_fan.actions import split_actions, transmit_repeat_count
+from custom_components.esphome_rf_fan.const import (
     ACTION_FAN_NATURAL,
     ACTION_FAN_NATURAL_REVERSE,
 )

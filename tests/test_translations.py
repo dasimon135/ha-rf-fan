@@ -22,10 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.rf_fan.actions import split_actions
-from custom_components.rf_fan.const import MAX_NATURAL_LEVELS, TIMER_HOURS
+from custom_components.esphome_rf_fan.actions import split_actions
+from custom_components.esphome_rf_fan.const import MAX_NATURAL_LEVELS, TIMER_HOURS
 
-COMPONENT = Path(__file__).resolve().parent.parent / "custom_components" / "rf_fan"
+COMPONENT = Path(__file__).resolve().parent.parent / "custom_components" / "esphome_rf_fan"
 FILES = {
     "strings.json": COMPONENT / "strings.json",
     "en.json": COMPONENT / "translations" / "en.json",

@@ -33,7 +33,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED
+from custom_components.esphome_rf_fan.const import DOMAIN, EVENT_RF_FAN_RECEIVED
 
 DEVICE = "esp32-test"
 EVENT_PROGRESSED = "data_entry_flow_progressed"
@@ -299,7 +299,7 @@ async def test_reconfigure_can_add_an_extra_key(hass: HomeAssistant) -> None:
     entry = _basic_entry(hass)
     flow = hass.config_entries.flow
 
-    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+    with patch("custom_components.esphome_rf_fan.async_setup_entry", return_value=True):
         result = await flow.async_init(
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
@@ -359,7 +359,7 @@ async def test_reconfigure_can_take_an_extra_key_away(hass: HomeAssistant) -> No
     )
     flow = hass.config_entries.flow
 
-    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+    with patch("custom_components.esphome_rf_fan.async_setup_entry", return_value=True):
         result = await flow.async_init(
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
@@ -400,7 +400,7 @@ async def test_reconfigure_adds_capabilities(hass: HomeAssistant) -> None:
     # The reload triggered by async_update_reload_and_abort is neutralized: here we
     # only test the flow logic, not the (re)mounting of the platforms.
     with patch(
-        "custom_components.rf_fan.async_setup_entry", return_value=True
+        "custom_components.esphome_rf_fan.async_setup_entry", return_value=True
     ):
         result = await flow.async_init(
             DOMAIN,
@@ -473,7 +473,7 @@ async def test_reconfigure_relearn_and_light_control_change(hass: HomeAssistant)
     flow = hass.config_entries.flow
 
     with patch(
-        "custom_components.rf_fan.async_setup_entry", return_value=True
+        "custom_components.esphome_rf_fan.async_setup_entry", return_value=True
     ):
         result = await flow.async_init(
             DOMAIN,
@@ -549,7 +549,7 @@ async def test_reconfigure_learn_keeps_kept_codes(hass: HomeAssistant) -> None:
     learned = {"timer_1h": "t1", "timer_2h": "t2", "timer_4h": "t4", "timer_8h": "t8"}
 
     with patch(
-        "custom_components.rf_fan.async_setup_entry", return_value=True
+        "custom_components.esphome_rf_fan.async_setup_entry", return_value=True
     ):
         result = await flow.async_init(
             DOMAIN,
@@ -663,7 +663,7 @@ async def test_reconfigure_rename_updates_the_title_and_unique_id(
     hass.config_entries.async_update_entry(entry, unique_id="esp32_test_recon")
     flow = hass.config_entries.flow
 
-    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+    with patch("custom_components.esphome_rf_fan.async_setup_entry", return_value=True):
         result = await flow.async_init(
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
@@ -772,7 +772,7 @@ async def test_relearn_one_code_without_redeclaring_anything(
     entry = _basic_entry(hass)
     flow = hass.config_entries.flow
 
-    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+    with patch("custom_components.esphome_rf_fan.async_setup_entry", return_value=True):
         result = await flow.async_init(
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},
@@ -828,7 +828,7 @@ async def test_manual_relearn_rejects_a_code_a_kept_action_already_owns(
     entry = _basic_entry(hass)
     flow = hass.config_entries.flow
 
-    with patch("custom_components.rf_fan.async_setup_entry", return_value=True):
+    with patch("custom_components.esphome_rf_fan.async_setup_entry", return_value=True):
         result = await flow.async_init(
             DOMAIN,
             context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id},

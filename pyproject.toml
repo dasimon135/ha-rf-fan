@@ -23,4 +23,4 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["custom_components.rf_fan"]
+known-first-party = ["custom_components.esphome_rf_fan"]

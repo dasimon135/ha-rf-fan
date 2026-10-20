@@ -233,6 +233,14 @@
           "has_sound": "Sound (beep)",
           "extra_count": "Extra buttons"
         }
+      },
+      "legacy_installed": {
+        "title": "Remove the previous version first",
+        "description": "The previous version of RF Fan is still installed, in `{path}`, and it is the one driving your {count} fan(s) right now. Bringing them over while it runs would give every fan two masters.\n\nSubmit to delete that folder. Then restart Home Assistant and add RF Fan again: your fans come over with their learned codes, options and entity IDs, so nothing has to be relearned."
+      },
+      "import_legacy": {
+        "title": "Bring your fans over",
+        "description": "These fans were set up with the previous version of RF Fan: {fans}.\n\nSubmit to bring them over. Learned codes, options, devices and entity IDs are kept, so your automations and dashboards keep working and nothing has to be relearned."
       }
     },
     "progress": {
@@ -250,7 +258,11 @@
     "abort": {
       "already_configured": "A fan with this name is already configured on this gateway.",
       "reconfigure_successful": "Reconfiguration saved and reloaded.",
-      "already_in_progress": "A setup for this fan is already in progress."
+      "already_in_progress": "A setup for this fan is already in progress.",
+      "restart_to_finish": "The previous version is removed. Restart Home Assistant, then add RF Fan again to bring your fans over.",
+      "legacy_not_removed": "The folder `custom_components/rf_fan` is not the previous version of this integration, so it was left alone. Remove it yourself if it is, then restart Home Assistant.",
+      "legacy_gone": "That fan from the previous version no longer exists.",
+      "legacy_too_new": "That fan was set up by a newer version than this one and cannot be brought over."
     }
   },
   "options": {
