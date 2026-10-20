@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The domain is now `esphome_rf_fan` (was `rf_fan`).** `clevrdavid/rf_fan`, a
+  Broadlink fan integration in the default HACS store, already uses `rf_fan`:
+  both installed into `custom_components/rf_fan/`, so installing one silently
+  replaced the other ([hacs/default#10711](https://github.com/hacs/default/pull/10711)).
+  The card's URL moves to `/esphome_rf_fan_frontend/rf-fan-card.js` and the
+  release zip to `esphome_rf_fan.zip`. Unchanged on purpose: the card type
+  `custom:rf-fan-card`, the gateway's `esphome.rf_fan_received` event and
+  `transmit_rf_fan` service (no reflashing), and the blueprint's path.
+
+### Added
+
+- **Existing fans come over by themselves.** Adding RF Fan once after the update
+  removes the old version (still installed beside the new one, since HACS
+  installs a renamed integration into a new folder), then, after a restart,
+  brings every fan over: learned codes, options, device and entity IDs are kept,
+  so nothing is relearned and automations keep working. See *Upgrading from 1.x*
+  in the README. An entry several schema versions behind is migrated on the way.
+  `clevrdavid/rf_fan`'s entries and folder are never touched.
+
 ## [1.11.0] - 2026-10-04
 
 ### Changed

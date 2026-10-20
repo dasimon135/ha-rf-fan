@@ -41,6 +41,7 @@ from .const import (
     TIMER_HOURS,
 )
 from .data import RfFanConfigEntry, RfFanRuntimeData
+from .legacy import async_adopt_legacy_registry, async_import_legacy_entries
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +57,10 @@ PLATFORMS: list[Platform] = [
 ]
 
 CARD_URL = "/esphome_rf_fan_frontend/rf-fan-card.js"
+# Where the card was served before the domain rename. A resource registered
+# there points at a file nothing serves any more: adopted, not duplicated.
+LEGACY_CARD_URL = "/rf_fan_frontend/rf-fan-card.js"
+_CARD_PATHS = (CARD_URL, LEGACY_CARD_URL)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -72,6 +77,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             CARD_URL,
             exc_info=True,
         )
+    await async_import_legacy_entries(hass)
     return True
 
 
@@ -184,11 +190,13 @@ async def _async_register_resource(hass: HomeAssistant, url: str) -> bool:
     # Matched on the PATH, not the whole URL: the version query changes with every
     # release, and a copy the user registered by hand carries a different one (or
     # none). Adopting that copy is what keeps a hand-registered entry from becoming
-    # a second, stale card -- the exact failure of issue #29.
+    # a second, stale card -- the exact failure of issue #29. The path from before
+    # the domain rename counts as ours too: left alone, it is a dead resource that
+    # Home Assistant reports on every dashboard.
     ours = [
         item
         for item in resources.async_items()
-        if str(item.get("url", "")).split("?")[0] == CARD_URL
+        if str(item.get("url", "")).split("?")[0] in _CARD_PATHS
     ]
 
     if not ours:
@@ -398,8 +406,14 @@ def _async_remove_stale_entities(hass: HomeAssistant, entry: RfFanConfigEntry) -
 async def async_setup_entry(hass: HomeAssistant, entry: RfFanConfigEntry) -> bool:
     """Initialize an RF fan config entry."""
     entry.runtime_data = RfFanRuntimeData()
+    # Before anything creates an entity: see legacy.async_adopt_legacy_registry.
+    legacy_id = async_adopt_legacy_registry(hass, entry)
     _async_remove_stale_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if legacy_id is not None:
+        # Removed last, once nothing it held is still linked to it: removing a
+        # config entry deletes the entities and devices that only it owns.
+        hass.async_create_task(hass.config_entries.async_remove(legacy_id))
     return True
 
 
@@ -437,7 +451,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # (#88, the same trap `_async_register_resource` guards against).
     await data.resources.async_get_info()
     for item in list(data.resources.async_items()):
-        if str(item.get("url", "")).split("?")[0] == CARD_URL:
+        if str(item.get("url", "")).split("?")[0] in _CARD_PATHS:
             await data.resources.async_delete_item(item["id"])
             _LOGGER.debug("Removed the card resource with the last RF Fan entry")
 

@@ -308,6 +308,24 @@ If the button does not reach your instance, add the repository by hand:
 3. Restart Home Assistant.
 4. Add the **RF Fan** integration and follow the config flow.
 
+### Upgrading from 1.x
+
+In 2.0.0 the integration's domain changed from `rf_fan` to `esphome_rf_fan`:
+another integration in the default HACS store already uses `rf_fan`, and the two
+would install into the same folder. Your fans come over with their learned codes,
+options, devices and entity IDs, so nothing is relearned and automations keep
+working. It takes two restarts:
+
+1. Update **RF Fan** in HACS and restart Home Assistant. Your fans keep running
+   on the old version for now: HACS installs the new one beside it, in
+   `custom_components/esphome_rf_fan/`, and leaves `custom_components/rf_fan/`
+   in place.
+2. Go to **Settings → Devices & services → Add integration → RF Fan**. It offers
+   to remove the old version: accept, then restart Home Assistant.
+3. Add **RF Fan** again. It lists your fans and offers to bring them over: accept.
+
+If you enabled debug logging, the logger is now `custom_components.esphome_rf_fan`.
+
 ## Dashboard card (bundled)
 
 The integration ships an **animated Lovelace card** — no separate install or resource

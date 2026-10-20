@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import Final
 
 DOMAIN: Final = "esphome_rf_fan"
+# The domain before 2.0.0, shared with clevrdavid/rf_fan in the default HACS
+# store. Only legacy.py should need it: its entries are brought over from there.
+LEGACY_DOMAIN: Final = "rf_fan"
+# Carried in an imported entry's data until its registry rows have been adopted.
+CONF_LEGACY_ENTRY_ID: Final = "legacy_entry_id"
 
 EVENT_RF_FAN_RECEIVED: Final = "esphome.rf_fan_received"
 
