@@ -169,12 +169,19 @@ def async_adopt_legacy_registry(hass: HomeAssistant, entry: ConfigEntry) -> str 
             (DOMAIN, entry.entry_id) if identifier == (LEGACY_DOMAIN, old_id) else identifier
             for identifier in device.identifiers
         }
-        # Added before the old one is removed: a device left with no config entry
-        # is deleted, and with it the area and name the user gave it.
-        devices.async_update_device(
-            device.id, add_config_entry_id=entry.entry_id, new_identifiers=identifiers
-        )
-        devices.async_update_device(device.id, remove_config_entry_id=old_id)
+        try:
+            # Home Assistant 2026.9+: a device belongs to one config entry and is
+            # moved in one call; add/remove are deprecated (gone in 2027.8).
+            devices.async_update_device(
+                device.id, new_config_entry_id=entry.entry_id, new_identifiers=identifiers
+            )
+        except TypeError:
+            # Older: added before the old one is removed, since a device left with no
+            # config entry is deleted, and with it the area and name the user gave it.
+            devices.async_update_device(
+                device.id, add_config_entry_id=entry.entry_id, new_identifiers=identifiers
+            )
+            devices.async_update_device(device.id, remove_config_entry_id=old_id)
 
     # Repairs the old code raised can never be cleared by it again.
     issues = ir.async_get(hass)

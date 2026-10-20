@@ -117,7 +117,7 @@ async def _start(hass: HomeAssistant) -> None:
 
 
 async def test_an_old_entry_comes_over_with_its_codes_and_entity_ids(
-    hass: HomeAssistant,
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
     old = _legacy_entry(hass)
     [old_device] = dr.async_entries_for_config_entry(dr.async_get(hass), old.entry_id)
@@ -148,6 +148,9 @@ async def test_an_old_entry_comes_over_with_its_codes_and_entity_ids(
     assert device.id == old_device.id
     assert device.name_by_user == "My Salon"
     assert device.config_entries == {new.entry_id}
+    # Seen on a real 2026.10: moving a device with add/remove_config_entry_id is
+    # deprecated (a device has one config entry now) and stops working in 2027.8.
+    assert "async_update_device" not in caplog.text
 
 
 async def test_every_old_entry_comes_over(hass: HomeAssistant) -> None:
