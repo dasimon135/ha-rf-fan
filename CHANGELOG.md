@@ -55,7 +55,8 @@ only removed when its manifest points at this repository.
 
 Validated on a real Home Assistant 2026.10.2 with a Cecotec fan on 2026-10-20,
 following the three steps above: all eleven entities kept their IDs, the device
-kept its area, and the card resource moved.
+kept its area, the card resource moved, and the fan is driven from Home
+Assistant as before.
 
 ## [1.11.0] - 2026-10-04
 
