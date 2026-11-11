@@ -172,6 +172,11 @@ class RfFanEntity(RfFanBaseEntity, RestoreEntity, FanEntity):
         target = max(0, min(self._speed_count, current + delta))
         await self.async_set_percentage(round(target * 100 / self._speed_count))
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Declare an in-place rename safe (see `RfFanBaseEntity`)."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def async_added_to_hass(self) -> None:
         """Restore the assumed state, then subscribe to RF events."""
         last_state = await self.async_get_last_state()

@@ -5,6 +5,10 @@
     "frontend",
     "lovelace"
   ],
+  "categories": [
+    "climate.fans_ventilation",
+    "buttons_remotes"
+  ],
   "codeowners": [
     "@dasimon135"
   ],

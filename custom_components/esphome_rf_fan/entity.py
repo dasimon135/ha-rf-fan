@@ -8,9 +8,10 @@ from asyncio import CancelledError, sleep
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .actions import (
@@ -71,12 +72,27 @@ class RfFanBaseEntity(Entity):
             "color_control"
         ]
 
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": self._fan_name,
-            "manufacturer": "Generic RF",
-            "model": "RF Fan",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, config_entry.entry_id)},
+            name=self._fan_name,
+            manufacturer="Generic RF",
+            model="RF Fan",
+        )
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Let Home Assistant change the entity_id in place (2026.11+).
+
+        Nothing here is keyed on the entity_id: the dispatcher signals carry the
+        config entry id and the RF listener is on the bus, so there is nothing to
+        re-key. Home Assistant only treats a class as covered when that class
+        itself defines this method, so each one with its own `async_added_to_hass`
+        overrides it and lands here. Before 2026.11 the base class has no such
+        method and the call is never made.
+        """
+        parent = getattr(super(), "async_entity_id_changed", None)
+        if parent is not None:
+            parent(old_entity_id)
 
     def _repeat_count(self) -> int:
         """Return the RF repeat count."""

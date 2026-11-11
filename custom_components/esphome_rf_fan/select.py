@@ -109,6 +109,11 @@ class RfFanColorTempSelect(RfFanBaseEntity, RestoreEntity, SelectEntity):
         )
         self.async_write_ha_state()
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Declare an in-place rename safe (see `RfFanBaseEntity`)."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def async_added_to_hass(self) -> None:
         """Restore the color position, then subscribe to RF events and the kelvin signal."""
         last_state = await self.async_get_last_state()
@@ -188,6 +193,11 @@ class RfFanBrightnessPositionSelect(RfFanBaseEntity, RestoreEntity, SelectEntity
         async_dispatcher_send(self.hass, self._level_signal())
         self.async_write_ha_state()
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Declare an in-place rename safe (see `RfFanBaseEntity`)."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def async_added_to_hass(self) -> None:
         """Restore the declared position and follow the light's own updates."""
         last_state = await self.async_get_last_state()
@@ -254,6 +264,11 @@ class RfFanLightStateSelect(RfFanBaseEntity, SelectEntity):
         # The colour select gates on this belief, so it has to hear about it too.
         async_dispatcher_send(self.hass, self._kelvin_signal())
         self.async_write_ha_state()
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Declare an in-place rename safe (see `RfFanBaseEntity`)."""
+        super().async_entity_id_changed(old_entity_id)
 
     async def async_added_to_hass(self) -> None:
         """Follow the belief, whoever moved it."""

@@ -69,6 +69,11 @@ class RfFanTimerSensor(RfFanBaseEntity, RestoreEntity, SensorEntity):
             return None
         return ends
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Declare an in-place rename safe (see `RfFanBaseEntity`)."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def async_added_to_hass(self) -> None:
         """Restore the switch-off time, then subscribe to timer changes."""
         last_state = await self.async_get_last_state()
