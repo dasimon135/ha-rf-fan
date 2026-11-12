@@ -147,7 +147,7 @@ async def test_an_old_entry_comes_over_with_its_codes_and_entity_ids(
     assert (DOMAIN, new.entry_id) in device.identifiers
     assert device.id == old_device.id
     assert device.name_by_user == "My Salon"
-    assert device.config_entries == {new.entry_id}
+    assert device.config_entry_id == new.entry_id
     # Seen on a real 2026.10: moving a device with add/remove_config_entry_id is
     # deprecated (a device has one config entry now) and stops working in 2027.8.
     assert "async_update_device" not in caplog.text

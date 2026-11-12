@@ -5,6 +5,10 @@
     "frontend",
     "lovelace"
   ],
+  "categories": [
+    "climate.fans_ventilation",
+    "buttons_remotes"
+  ],
   "codeowners": [
     "@dasimon135"
   ],
@@ -16,5 +20,5 @@
   "integration_type": "device",
   "iot_class": "assumed_state",
   "issue_tracker": "https://github.com/dasimon135/ha-rf-fan/issues",
-  "version": "2.0.0"
+  "version": "2.0.1"
 }

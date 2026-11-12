@@ -46,6 +46,11 @@ class RfFanSoundSwitch(RfFanBaseEntity, RestoreEntity, SwitchEntity):
         """Return the assumed sound state."""
         return self._is_on
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Declare an in-place rename safe (see `RfFanBaseEntity`)."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def async_added_to_hass(self) -> None:
         """Restore the assumed sound state, then subscribe to RF events."""
         last_state = await self.async_get_last_state()

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-12
+
+### Ready for Home Assistant 2026.11
+
+Nothing to do when updating: no option, entity ID or learned code changes.
+
+### Changed
+
+- **Renaming an entity ID no longer removes and re-adds the entity** on Home
+  Assistant 2026.11 and later. Since 2026.11, Home Assistant changes an entity ID
+  in place, except for custom entities that set themselves up without saying they
+  can take it; those keep the old remove-and-re-add path until 2027.11. Nothing in
+  this integration depends on the entity ID, so every entity now says so. Before
+  2026.11 nothing changes.
+- **The device information is a `DeviceInfo`** rather than a plain dict, which
+  Home Assistant 2026.11 still accepts but marks as to be deprecated.
+- **The manifest declares its categories** (`climate.fans_ventilation`,
+  `buttons_remotes`), the ones Home Assistant's own Bond integration uses.
+
+Validated on a real Home Assistant 2026.11 with a Cecotec fan on 2026-11-11:
+the integration loads with an empty log, and an entity renamed and renamed back
+keeps its state. Home Assistant logs nothing either way, so which of
+the two rename paths it took is shown by the test suite, not on the instance.
+
 ## [2.0.0] - 2026-10-20
 
 ### The domain is now `esphome_rf_fan`, and your fans come over by themselves
