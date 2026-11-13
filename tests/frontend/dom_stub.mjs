@@ -100,6 +100,8 @@ export function makeHass({
   supportedFeatures = 61,
   buttons = [],
   selects = [],
+  presetMode = null,
+  timerEnd = null,
 } = {}) {
   const states = {
     "fan.x": {
@@ -110,10 +112,21 @@ export function makeHass({
         percentage_step: 100 / 3,
         supported_features: supportedFeatures,
         ...(direction === null ? {} : { direction }),
+        ...(presetMode === null ? {} : { preset_mode: presetMode }),
       },
     },
   };
   const entities = { "fan.x": { device_id: "d1", platform: "esphome_rf_fan" } };
+
+  // The sleep timer sensor: a timestamp holding when the fan switches off, or
+  // "unknown" when no timer runs. Pass the raw state string.
+  if (timerEnd !== null) {
+    states["sensor.x"] = {
+      state: timerEnd,
+      attributes: { device_class: "timestamp", friendly_name: "Timer" },
+    };
+    entities["sensor.x"] = { device_id: "d1", platform: "esphome_rf_fan" };
+  }
 
   // `lightAttrs` carries what the light entity declares about itself — notably
   // `supported_color_modes`, which is how the card tells a dimmable lamp from a
