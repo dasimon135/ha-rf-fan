@@ -5,7 +5,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-14
+
+### The card's tile says more, and corrects the lamp
+
+Nothing to do when updating beyond the usual browser refresh: no option, entity
+ID or learned code changes. Both gestures were checked by hand on the
+maintainer's own instance.
 
 ### Added
 
