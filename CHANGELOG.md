@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Correct the lamp from the card, without sending anything.** A long press on
+  the tile's light button tells Home Assistant the lamp is in the other state, for
+  a toggle-only lamp that drifted from what was believed: the remote was used out
+  of range of the gateway, or the lamp was already on. It sets the *Assumed light
+  state* select and puts nothing on the air; a short press still sends the code.
+  Home Assistant confirms it with a toast, and on a phone the press no longer opens
+  the browser's menu.
+- **The tile says more on its second line**: `Speed 3/6 · Natural · until 22:30`.
+  The airflow preset shows when it is not `normal`, and a running sleep timer shows
+  the time it switches the fan off, an end time rather than a countdown, so it is
+  never stale. A stopped fan still reads `Off`.
+
 ## [2.0.1] - 2026-11-12
 
 ### Ready for Home Assistant 2026.11

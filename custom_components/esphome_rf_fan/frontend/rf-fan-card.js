@@ -189,6 +189,10 @@ class RfFanCard extends HTMLElement {
       extras,
       calibrate,
       timerSensor: siblings.find((e) => e.startsWith("sensor.")),
+      // The assumed lamp state: a CONFIG select that emits nothing, which is why
+      // the colour row leaves it out. Only its translation key names it; without
+      // one there is no long press on the lamp button rather than a guess.
+      lightState: siblings.find((e) => e.startsWith("select.") && keyOf(e) === "light_state"),
     };
   }
 
@@ -229,6 +233,15 @@ class RfFanCard extends HTMLElement {
     const fr = String(lang).toLowerCase().startsWith("fr");
     const color = { Chaud: fr ? "Chaud" : "Warm", Neutre: fr ? "Neutre" : "Neutral", Froid: fr ? "Froid" : "Cold" };
     return {
+      lang: fr ? "fr" : String(lang),
+      until: fr ? "jusqu'à" : "until",
+      holdHint: fr
+        ? "Appui long : corriger l'état de la lampe sans rien envoyer"
+        : "Long press: correct the lamp's state without sending anything",
+      marked: (option) =>
+        fr
+          ? `Lampe notée ${option === "on" ? "allumée" : "éteinte"}, rien n'a été envoyé`
+          : `Lamp marked ${option === "on" ? "on" : "off"}, nothing was sent`,
       light: fr ? "Lampe" : "Light",
       brightness: fr ? "Luminosité" : "Brightness",
       sound: fr ? "Son" : "Sound",
@@ -285,14 +298,14 @@ class RfFanCard extends HTMLElement {
     // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
     // the name/state opens the full card in a popup (see _openCardDialog).
     if (tile) {
-      const sub = on ? (index > 0 ? `${L.speed} ${index}/${count}` : L.on) : L.off;
+      const sub = this._tileSub();
       // The light is the other thing you reach for on a ceiling fan, so it gets a
       // control of its own rather than only living in the popup. Omitted entirely
       // on a fan without a light so the row does not gain a dead button.
       const lightSt = ent.light && this._hass.states[ent.light];
       const lit = Boolean(lightSt && lightSt.state === "on");
       const lightBtn = ent.light
-        ? `<button class="tbtn tlight${lit ? " active" : ""}" data-act="light" aria-label="${esc(L.light)}"><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon></button>`
+        ? `<button class="tbtn tlight${lit ? " active" : ""}" data-act="light" aria-label="${esc(L.light)}"${ent.lightState ? ` title="${esc(L.holdHint)}"` : ""}><ha-icon icon="mdi:lightbulb${lit ? "" : "-outline"}"></ha-icon></button>`
         : "";
       this._body.innerHTML = `
         <div class="tile ${on ? "" : "off"}">
@@ -495,6 +508,11 @@ class RfFanCard extends HTMLElement {
     this._body.addEventListener("pointerup", () => this._clearHold());
     this._body.addEventListener("pointerleave", () => this._clearHold());
     this._body.addEventListener("pointercancel", () => this._clearHold());
+    // A long press on a phone also opens the browser's context menu; on the lamp
+    // button the long press is ours.
+    this._body.addEventListener("contextmenu", (e) => {
+      if (e.target.closest("[data-act='light']") && this._discover().lightState) e.preventDefault();
+    });
   }
 
   _onPointerDown(e) {
@@ -502,6 +520,10 @@ class RfFanCard extends HTMLElement {
     // click never reaches the card to clear the flag; without this the next tap on
     // any control was swallowed.
     this._held = false;
+    if (e.target.closest("[data-act='light']")) {
+      this._holdLight();
+      return;
+    }
     if (!e.target.closest("[data-act='power']")) return;
     this._holdTimer = window.setTimeout(() => {
       this._held = true;
@@ -514,6 +536,52 @@ class RfFanCard extends HTMLElement {
         })
       );
     }, 500);
+  }
+
+  // Long press on the lamp button: tell Home Assistant the lamp is in the other
+  // state, through the assumed-state select. Nothing goes on the air; that is the
+  // whole point, for a toggle-only lamp that drifted from what was believed.
+  _holdLight() {
+    const ent = this._discover();
+    if (!ent.lightState || !ent.light) return;
+    this._holdTimer = window.setTimeout(() => {
+      this._held = true;
+      this._clearHold();
+      const lit = this._hass.states[ent.light]?.state === "on";
+      const option = lit ? "off" : "on";
+      this._call("select", "select_option", { entity_id: ent.lightState, option });
+      const fire = (type, detail) =>
+        this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
+      fire("haptic", "success");
+      fire("hass-notification", { message: this._labels().marked(option) });
+    }, 500);
+  }
+
+  // The tile's secondary line: speed, then a preset other than normal, then the
+  // time a running timer ends. An end time rather than the time left, because the
+  // card only re-renders on a state change and an end time needs no clock.
+  _tileSub() {
+    const L = this._labels();
+    const ent = this._discover();
+    const fan = this._hass.states[ent.fan];
+    if (!fan || fan.state !== "on") return L.off;
+    const { count, index } = this._speedInfo(fan);
+    const parts = [index > 0 ? `${L.speed} ${index}/${count}` : L.on];
+    const preset = fan.attributes.preset_mode;
+    if (preset && preset !== "normal") {
+      const level = /^natural (\d+)$/.exec(preset);
+      parts.push(level ? `${L.natural} ${level[1]}` : preset === "natural" ? L.natural : preset);
+    }
+    const ts = ent.timerSensor && this._hass.states[ent.timerSensor];
+    const end = ts && new Date(ts.state);
+    if (end && !Number.isNaN(end.getTime())) {
+      const loc = this._hass.locale || {};
+      const opts = { hour: "2-digit", minute: "2-digit" };
+      // Home Assistant can be set to show times in the server's zone.
+      if (loc.time_zone === "server" && this._hass.config?.time_zone) opts.timeZone = this._hass.config.time_zone;
+      parts.push(`${L.until} ${end.toLocaleTimeString(L.lang, opts)}`);
+    }
+    return parts.join(" · ");
   }
 
   _clearHold() {
@@ -661,7 +729,8 @@ class RfFanCard extends HTMLElement {
               cursor:pointer; transition: transform .12s, border-color .2s; }
       .tbtn:hover { border-color: var(--rf-fan-accent, var(--primary-color)); }
       .tbtn:active { transform: scale(.9); }
-      .tlight { display:grid; place-items:center; color: var(--secondary-text-color); }
+      .tlight { display:grid; place-items:center; color: var(--secondary-text-color);
+        -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; }
       .tlight ha-icon { --mdc-icon-size:20px; }
       .tlight.active { background:var(--rf-fan-light, #f5a623); border-color:var(--rf-fan-light, #f5a623); color:var(--text-primary-color, #fff); }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }

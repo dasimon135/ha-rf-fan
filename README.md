@@ -359,6 +359,17 @@ On the `tile` layout the light toggle only appears when the fan actually has a l
 and tapping the name opens the full card in a popup — set `tile_tap: more-info` to get
 Home Assistant's native more-info dialog instead.
 
+The tile's second line reads like `Speed 3/6 · Natural · until 22:30`: the airflow
+preset appears when it is not `normal`, and the time a running sleep timer switches
+the fan off. A stopped fan just reads `Off`.
+
+**Long press the tile's light button** when the lamp is not in the state Home
+Assistant believes, which happens with a lamp that has only a toggle key: someone
+used the remote out of range of the gateway, or the lamp was on before Home
+Assistant ever saw it. The long press tells Home Assistant the lamp is in the other
+state and sends nothing; a short press still sends the code. It sets the *Assumed
+light state* select, which an automation can set too.
+
 **Theming.** The card is a real `ha-card` and follows your theme's card surface, text
 and accent. A theme can also set (without the leading dashes): `rf-fan-accent`
 (active controls and hover borders — falls back to `primary-color`), `rf-fan-light`
