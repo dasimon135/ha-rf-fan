@@ -306,6 +306,7 @@ async def test_without_old_fans_adding_the_integration_is_unchanged(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["step_id"] == "user"
+    assert result["menu_options"] == ["declare", "paste_declaration"]
 
 
 async def test_the_card_resource_left_at_the_old_path_is_adopted(

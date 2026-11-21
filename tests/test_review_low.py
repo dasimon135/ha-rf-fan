@@ -74,6 +74,7 @@ async def test_a_name_already_used_is_a_form_error_not_the_end_of_the_flow(
 
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(result["flow_id"], _declaration(fan_name="Full"))
 
     assert result["type"] == "form"
@@ -86,6 +87,7 @@ async def test_a_missing_gateway_keeps_the_rest_of_the_form(hass: HomeAssistant)
     the form used to come back with every other answer reset."""
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(result["flow_id"], _declaration(esphome_device=""))
 
     assert result["errors"] == {"esphome_device": "unknown_esphome_device"}

@@ -77,6 +77,7 @@ async def test_the_same_fan_cannot_then_be_added_again(hass: HomeAssistant) -> N
 
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {
@@ -239,6 +240,7 @@ async def test_learning_shows_the_name_given_to_a_free_form_key(hass: HomeAssist
     await hass.async_block_till_done()
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {

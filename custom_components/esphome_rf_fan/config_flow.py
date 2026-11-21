@@ -14,7 +14,12 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+)
 from homeassistant.util import slugify
 
 from .actions import (
@@ -78,12 +83,23 @@ from .const import (
     TIMER_HOURS,
     extra_action,
 )
+from .declaration import (
+    REASON_BAD_VALUE,
+    DeclarationError,
+    dump_declaration,
+    parse_declaration,
+)
 from .legacy import async_legacy_installed, async_remove_legacy_installed, legacy_entries
 
 LEARN_TIMEOUT_SEC = 30
 # After the first frame, keep listening briefly so a held button's repeats can be
 # collected and the noise-resistant modal frame chosen.
 LEARN_COLLECT_SEC = 1.2
+
+# The pasted document's field, on the add and replace steps (#58).
+CONF_DECLARATION = "declaration"
+REASON_UNKNOWN_ACTION = "declaration_unknown_action"
+REASON_DUPLICATE_CODE = "declaration_duplicate_code"
 
 
 class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -132,6 +148,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         self._existing_codes: dict[str, str] = {}
         self._pending_actions: list[str] | None = None
         self._repeat_count: int = DEFAULT_REPEAT_COUNT
+        # The last pasted declaration, so a refused one comes back as it was.
+        self._declaration_text: str = ""
 
     _SERVICE_SUFFIX = "_transmit_rf_fan"
 
@@ -352,11 +370,19 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step 1: general fan information."""
-        if user_input is None and legacy_entries(self.hass):
+        """Step 1: declare the fan by hand, or paste a declaration (#58)."""
+        if legacy_entries(self.hass):
             if await async_legacy_installed(self.hass):
                 return await self.async_step_legacy_installed()
             return await self.async_step_import_legacy()
+        return self.async_show_menu(
+            step_id="user", menu_options=["declare", "paste_declaration"]
+        )
+
+    async def async_step_declare(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """General fan information, by hand."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
 
@@ -394,13 +420,173 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_method()
 
         return self.async_show_form(
-            step_id="user",
+            step_id="declare",
             data_schema=self._base_schema(include_device=True),
             description_placeholders={
                 "detected": ", ".join(available_devices) if available_devices else "none",
             },
             errors=errors,
         )
+
+    async def async_step_paste_declaration(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """A new fan from a pasted declaration: the gateway and a name, then the file.
+
+        The name typed here wins over the file's, which is only a suggestion: a
+        shared file names the sharer's fan.
+        """
+        errors: dict[str, str] = {}
+        placeholders = {"key": ""}
+        available_devices = self._available_esphome_devices()
+
+        if user_input is not None:
+            selected_device = user_input.get(CONF_ESPHOME_DEVICE, "").strip()
+            if not selected_device and len(available_devices) == 1:
+                selected_device = available_devices[0]
+            self._esphome_device = selected_device
+            self._declaration_text = str(user_input.get(CONF_DECLARATION, ""))
+            typed_name = str(user_input.get(CONF_FAN_NAME, "")).strip()
+
+            if not selected_device:
+                errors[CONF_ESPHOME_DEVICE] = (
+                    "required_esphome_device"
+                    if len(available_devices) > 1
+                    else "unknown_esphome_device"
+                )
+            elif available_devices and selected_device not in available_devices:
+                errors[CONF_ESPHOME_DEVICE] = "unknown_esphome_device"
+            else:
+                try:
+                    codes = self._apply_declaration(
+                        self._declaration_text, name=typed_name or None
+                    )
+                except DeclarationError as err:
+                    errors[CONF_DECLARATION] = err.reason
+                    placeholders["key"] = err.key
+                else:
+                    unique_id = self.unique_id_for(selected_device, self._fan_name)
+                    if not self._fan_name:
+                        errors[CONF_FAN_NAME] = "required"
+                    elif unique_id in self._async_current_ids(include_ignore=False):
+                        errors[CONF_FAN_NAME] = "name_already_used"
+                    else:
+                        self._gateway_service = self._resolve_gateway_service(
+                            selected_device
+                        )
+                        await self.async_set_unique_id(unique_id)
+                        self._abort_if_unique_id_configured()
+                        return await self._async_continue_with_codes(codes)
+            self._fan_name = typed_name
+
+        fields: dict[Any, Any] = {}
+        for key, value in self._base_schema(include_device=True).schema.items():
+            if str(key) == CONF_ESPHOME_DEVICE:
+                fields[key] = value
+        fields[vol.Optional(CONF_FAN_NAME, default=self._fan_name)] = str
+        fields[self._declaration_field()] = TextSelector(TextSelectorConfig(multiline=True))
+        return self.async_show_form(
+            step_id="paste_declaration",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders=placeholders,
+        )
+
+    def _declaration_field(self) -> vol.Required:
+        """The text field, holding the last paste so a refusal does not empty it."""
+        return vol.Required(CONF_DECLARATION, default=self._declaration_text)
+
+    def _reset_declaration(self) -> None:
+        """Back to a new fan's answers, so a file replaces rather than merges.
+
+        The form's defaults are read from these attributes; reconfiguring has
+        loaded the entry's into them, and a key the file leaves out must take the
+        value a new fan gets, not the one being replaced.
+        """
+        self._speed_count = DEFAULT_SPEED_COUNT
+        self._light_control = LIGHT_CONTROL_TOGGLE
+        self._has_fan_on = False
+        self._has_light = True
+        self._caps = {}
+        self._steps = {}
+        self._natural_levels = 0
+        self._extra_count = 0
+        self._extra_names = {}
+
+    def _apply_declaration(self, text: str, *, name: str | None) -> dict[str, str]:
+        """Take a pasted declaration into the flow; return its codes.
+
+        Raises DeclarationError, naming the key at fault, for anything the form
+        itself would refuse: the values go through the declaration form's own
+        schema and reader, so a file cannot declare a fan the form could not.
+        Nothing is stored on the entry here; a refusal leaves it untouched.
+
+        `name` is the name to use; None takes the file's.
+        """
+        declaration = parse_declaration(text)
+        self._reset_declaration()
+        fan_name = declaration.name if name is None else name
+        try:
+            values = self._base_schema(include_device=False)(
+                {**declaration.form, CONF_FAN_NAME: fan_name}
+            )
+        except vol.Invalid as err:
+            path = getattr(err, "path", None) or []
+            raise DeclarationError(REASON_BAD_VALUE, str(path[0]) if path else "") from err
+        error = self._read_declaration(values)
+        if error is not None:
+            raise DeclarationError(error)
+        self._fan_name = fan_name
+
+        if declaration.repeat_count is not None:
+            if not 1 <= declaration.repeat_count <= 8:
+                raise DeclarationError(REASON_BAD_VALUE, CONF_REPEAT_COUNT)
+            self._repeat_count = declaration.repeat_count
+
+        declared_keys = [extra_action(i) for i in range(1, self._extra_count + 1)]
+        for action in declaration.extra_names:
+            if action not in declared_keys:
+                raise DeclarationError(REASON_UNKNOWN_ACTION, f"{CONF_EXTRA_NAMES}.{action}")
+        self._extra_names = {
+            action: declaration.extra_names.get(action, "") for action in declared_keys
+        }
+
+        required, optional = self._split_actions()
+        offered = {*required, *optional}
+        for action in declaration.codes:
+            if action not in offered:
+                raise DeclarationError(REASON_UNKNOWN_ACTION, f"{CONF_CODES}.{action}")
+        for action, problem in validate_codes(declaration.codes, required, optional).items():
+            if problem == "duplicate_code":
+                raise DeclarationError(REASON_DUPLICATE_CODE, f"{CONF_CODES}.{action}")
+        return dict(declaration.codes)
+
+    async def _async_continue_with_codes(self, codes: dict[str, str]) -> ConfigFlowResult:
+        """Finish with a declaration's codes, asking only for the required ones missing.
+
+        The same mechanism reconfiguring uses: the missing actions become the pending
+        subset, and the manual form or the learning loop works on those alone.
+        """
+        required, _optional = self._split_actions()
+        missing = [action for action in required if not codes.get(action)]
+        self._learn_codes = dict(codes)
+        if not missing:
+            return self._finish(dict(codes))
+        self._pending_actions = missing
+        self._learn_action_index = 0
+        return await self.async_step_method()
+
+    def _declaration_form(self) -> dict[str, Any]:
+        """The declaration form's answers, as this flow holds them."""
+        return {
+            CONF_SPEED_COUNT: self._speed_count,
+            CONF_LIGHT_CONTROL: self._light_control,
+            CONF_HAS_FAN_ON: self._has_fan_on,
+            **self._caps,
+            CONF_NATURAL_LEVELS: self._natural_levels,
+            **self._steps,
+            CONF_EXTRA_COUNT: self._extra_count,
+        }
 
     async def async_step_extra_names(
         self, user_input: dict[str, Any] | None = None
@@ -461,7 +647,9 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         """Choose between manual entry and learning."""
         if user_input is not None:
             if user_input["method"] == "learn":
-                if not self._reconfigure:
+                # A subset is pending when reconfiguring, or after a pasted
+                # declaration: the codes already known are kept, not relearned.
+                if self._pending_actions is None:
                     self._learn_codes = {}
                 self._learn_task = None
                 self._learn_error = None
@@ -492,7 +680,7 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         actions = self._actions_to_process()
 
         if user_input is not None:
-            codes = dict(self._learn_codes) if self._reconfigure else {}
+            codes = dict(self._learn_codes) if self._pending_actions is not None else {}
             codes.update(
                 {
                     action: str(user_input.get(action, "")).strip()
@@ -786,11 +974,17 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         if self._reconfigure:
             entry = self._get_reconfigure_entry()
+            # The options' repeat count shadows the data's. It only differs from
+            # this flow's when a pasted declaration set one, which must then win.
+            options = dict(entry.options)
+            if options.get(CONF_REPEAT_COUNT, self._repeat_count) != self._repeat_count:
+                options[CONF_REPEAT_COUNT] = self._repeat_count
             # Carry a rename through to the entry itself: the title is what the
             # Integrations page shows, the unique id is what prevents a duplicate.
             return self.async_update_reload_and_abort(
                 entry,
                 data=data,
+                options=options,
                 title=self._fan_name,
                 unique_id=self.unique_id_for(self._esphome_device, self._fan_name),
             )
@@ -834,7 +1028,12 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_menu(
             step_id="reconfigure",
-            menu_options=["reconfigure_codes", "reconfigure_capabilities"],
+            menu_options=[
+                "reconfigure_codes",
+                "reconfigure_capabilities",
+                "reconfigure_export",
+                "reconfigure_paste",
+            ],
         )
 
     async def async_step_reconfigure_codes(
@@ -918,6 +1117,64 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
                 "kept": ", ".join(kept) or "—",
                 "forgotten": ", ".join(forgotten) or "—",
             },
+        )
+
+
+    async def async_step_reconfigure_export(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show this fan's declaration as a document to copy; change nothing.
+
+        Built from what this flow read, which is the entry normalised by the same
+        readers the fan uses: an entry from before a capability existed exports it
+        with the value it is actually run with. Only codes the declaration still
+        offers are written, so the document always reads back.
+        """
+        if user_input is not None:
+            return self.async_abort(reason="declaration_exported")
+        offered = self._all_actions()
+        text = dump_declaration(
+            name=self._fan_name,
+            form=self._declaration_form(),
+            extra_names=self._extra_names,
+            repeat_count=self._repeat_count,
+            codes={
+                action: self._existing_codes[action]
+                for action in offered
+                if self._existing_codes.get(action)
+            },
+        )
+        return self.async_show_form(
+            step_id="reconfigure_export",
+            description_placeholders={"declaration": f"```yaml\n{text}```"},
+        )
+
+    async def async_step_reconfigure_paste(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Replace this fan's declaration and codes with a pasted document.
+
+        The gateway and the name stay the entry's: the file describes a remote, not
+        where it is installed, and a shared file names somebody else's fan.
+        """
+        errors: dict[str, str] = {}
+        placeholders = {"key": ""}
+        if user_input is not None:
+            self._declaration_text = str(user_input.get(CONF_DECLARATION, ""))
+            try:
+                codes = self._apply_declaration(self._declaration_text, name=self._fan_name)
+            except DeclarationError as err:
+                errors[CONF_DECLARATION] = err.reason
+                placeholders["key"] = err.key
+            else:
+                return await self._async_continue_with_codes(codes)
+        return self.async_show_form(
+            step_id="reconfigure_paste",
+            data_schema=vol.Schema(
+                {self._declaration_field(): TextSelector(TextSelectorConfig(multiline=True))}
+            ),
+            errors=errors,
+            description_placeholders=placeholders,
         )
 
 

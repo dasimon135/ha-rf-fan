@@ -55,6 +55,7 @@ async def _start_learn(hass: HomeAssistant):
 
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {
@@ -121,6 +122,7 @@ async def test_extra_keys_are_named_then_learned(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {
@@ -179,6 +181,7 @@ async def test_no_extra_keys_skips_the_naming_step(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {
@@ -209,6 +212,7 @@ async def test_all_capabilities_manual_flow(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {
@@ -758,6 +762,8 @@ async def test_reconfigure_opens_on_a_menu(hass: HomeAssistant) -> None:
     assert set(result["menu_options"]) == {
         "reconfigure_capabilities",
         "reconfigure_codes",
+        "reconfigure_export",
+        "reconfigure_paste",
     }
 
 
