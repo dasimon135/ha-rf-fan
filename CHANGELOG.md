@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A fan's declaration as one file**
+  ([#58](https://github.com/dasimon135/ha-rf-fan/issues/58)). **Reconfigure → Export
+  the declaration** shows a fan's capabilities, extra-key names, repeat count and
+  learned codes as one YAML document, without the gateway. Paste it under **Add
+  integration → RF Fan → Paste a declaration** to set up another fan with the same
+  remote, or under **Reconfigure → Replace with a pasted declaration** to restore one.
+  A document is checked against the same rules as the declaration form, and the error
+  names the key at fault. Codes it lacks are asked for afterwards, and only those. A
+  shared file for a remote model is enough to set up a fan without capturing a single
+  key.
+
+  Adding a fan now opens on a menu: **Declare it by hand** is the form it opened on
+  until now.
+
 ### Fixed
 
 - **A control whose code was never learned now says so when it is used**

@@ -327,6 +327,7 @@ async def _submit_capabilities(hass: HomeAssistant, **extra):
 
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "declare"})
     result = await flow.async_configure(
         result["flow_id"],
         {
@@ -353,7 +354,7 @@ async def test_levels_without_a_key_that_sets_are_refused(
     )
 
     assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "declare"
     assert result["errors"] == {"natural_levels": "natural_levels_need_dedicated"}
 
 

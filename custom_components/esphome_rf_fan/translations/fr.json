@@ -2,6 +2,13 @@
   "config": {
     "step": {
       "user": {
+        "title": "Ajouter un ventilateur RF",
+        "menu_options": {
+          "declare": "Le déclarer à la main",
+          "paste_declaration": "Coller une déclaration (exportée d'un autre ventilateur, ou partagée)"
+        }
+      },
+      "declare": {
         "title": "Ventilateur RF - Configuration",
         "description": "Choisissez la passerelle RF ESPHome et les capacités du ventilateur. Appareil(s) ESPHome compatible(s) détecté(s): {detected}.",
         "data": {
@@ -24,6 +31,18 @@
         },
         "data_description": {
           "extra_count": "Les touches dont l'intégration n'a aucun concept - un bouton mémoire, un ionisateur, tout ce que le ventilateur fait sans que Home Assistant sache le nommer. Chacune devient un bouton que vous nommez, et les noms sont demandés à l'étape suivante."
+        }
+      },
+      "paste_declaration": {
+        "title": "Coller une déclaration",
+        "description": "Collez la déclaration d'un ventilateur : le document que **Reconfigurer → Exporter la déclaration** affiche sur un autre ventilateur, ou celui qu'une personne a partagé pour la même télécommande. Il décrit la télécommande, jamais la passerelle : choisissez la vôtre ici. Les codes absents sont demandés ensuite.",
+        "data": {
+          "esphome_device": "Nom de l'appareil ESPHome",
+          "fan_name": "Nom affiché du ventilateur",
+          "declaration": "Déclaration"
+        },
+        "data_description": {
+          "fan_name": "Laissez vide pour reprendre le nom de la déclaration."
         }
       },
       "extra_names": {
@@ -210,7 +229,20 @@
         "title": "Reconfigurer le ventilateur",
         "menu_options": {
           "reconfigure_codes": "Réapprendre des codes RF (un bouton mal capté)",
-          "reconfigure_capabilities": "Modifier la déclaration (nom, vitesses, fonctions)"
+          "reconfigure_capabilities": "Modifier la déclaration (nom, vitesses, fonctions)",
+          "reconfigure_export": "Exporter la déclaration (pour la garder ou la partager)",
+          "reconfigure_paste": "Remplacer par une déclaration collée"
+        }
+      },
+      "reconfigure_export": {
+        "title": "Exporter la déclaration",
+        "description": "Copiez ce document pour le conserver, ou pour configurer un autre ventilateur avec la même télécommande (**Ajouter une intégration → RF Fan → Coller une déclaration**). Il contient les codes appris et aucune passerelle. Valider ferme cette fenêtre sans rien modifier.\n\n{declaration}"
+      },
+      "reconfigure_paste": {
+        "title": "Remplacer par une déclaration collée",
+        "description": "Les capacités et les codes de ce ventilateur sont remplacés par ceux du document ; son nom et sa passerelle restent. Les codes absents du document sont demandés ensuite.",
+        "data": {
+          "declaration": "Déclaration"
         }
       },
       "reconfigure_capabilities": {
@@ -253,7 +285,14 @@
       "learn_timeout": "Aucun signal RF n'a été capturé à temps. Vous pouvez réessayer, coller le code manuellement ou ignorer cette action.",
       "duplicate_code": "Ce code est déjà attribué à une autre action. Deux actions partageant un même code ne peuvent pas être distinguées lors de l'utilisation de la télécommande physique. Appuyez sur un autre bouton, ou collez un code distinct.",
       "name_already_used": "Un autre ventilateur de cette passerelle porte déjà ce nom. Choisissez-en un autre.",
-      "natural_levels_need_dedicated": "Les niveaux de flux naturel exigent une touche qui règle un niveau. Choisissez l'option de flux dédiée ci-dessus, ou remettez le nombre de niveaux à 0."
+      "natural_levels_need_dedicated": "Les niveaux de flux naturel exigent une touche qui règle un niveau. Choisissez l'option de flux dédiée ci-dessus, ou remettez le nombre de niveaux à 0.",
+      "declaration_unreadable": "Ce n'est pas un document de déclaration. Collez le texte YAML exporté d'un ventilateur.",
+      "declaration_format": "Le document n'a pas de ligne « format: 1 », ou un format que cette version ne lit pas.",
+      "declaration_unknown_key": "« {key} » n'est pas une clé de déclaration. Vérifiez son orthographe.",
+      "declaration_bad_value": "La valeur de « {key} » n'est pas une valeur que le formulaire de déclaration accepte.",
+      "declaration_code_not_text": "Le code de « {key} » doit être un texte entre guillemets, par exemple '0123' : sans guillemets, YAML peut le lire comme un autre nombre.",
+      "declaration_unknown_action": "« {key} » est une touche que cette déclaration n'a pas. Déclarez la capacité, ou retirez la ligne.",
+      "declaration_duplicate_code": "« {key} » utilise un code qu'une autre touche utilise déjà."
     },
     "abort": {
       "already_configured": "Un ventilateur portant ce nom est déjà configuré sur cette passerelle.",
@@ -262,7 +301,8 @@
       "restart_to_finish": "L'ancienne version est supprimée. Redémarrez Home Assistant, puis ajoutez de nouveau RF Fan pour reprendre vos ventilateurs.",
       "legacy_not_removed": "Le dossier `custom_components/rf_fan` n'est pas l'ancienne version de cette intégration : il n'a pas été touché. Supprimez-le vous-même si c'est bien elle, puis redémarrez Home Assistant.",
       "legacy_gone": "Ce ventilateur de l'ancienne version n'existe plus.",
-      "legacy_too_new": "Ce ventilateur a été configuré par une version plus récente que celle-ci et ne peut pas être repris."
+      "legacy_too_new": "Ce ventilateur a été configuré par une version plus récente que celle-ci et ne peut pas être repris.",
+      "declaration_exported": "Rien n'a été modifié."
     }
   },
   "options": {

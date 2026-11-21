@@ -441,7 +441,7 @@ route works as a fallback.
 To add a capability (or fix a captured code) later, open the integration entry and use
 **⋮ → Reconfigure** (on the *RF Fan* integration card, not the device page):
 
-You land on a menu with two paths:
+You land on a menu with four paths:
 
 **Relearn RF codes** — for a button that was mis-captured. Goes straight to the review
 screen: tick the action(s) to re-capture and learn them again. Nothing else is touched.
@@ -453,12 +453,71 @@ screen: tick the action(s) to re-capture and learn them again. Nothing else is t
    **kept** (existing codes — tick a box to re-learn one), and **removed**.
 3. Choose learning or manual entry; only the delta is asked for.
 
+**Export the declaration** and **Replace with a pasted declaration**: see
+[A fan's declaration as one file](#a-fans-declaration-as-one-file) below.
+
 Either way the entry reloads in place — your dashboards and automations keep working.
 Renaming the fan here also renames the entry itself; a name already used by another fan
 on the same gateway is refused.
 
 > A full Home Assistant **restart** is required after updating the integration so the
 > new config-flow steps load.
+
+## A fan's declaration as one file
+
+Everything that describes a fan and its remote (speed count, capabilities, the names of
+its extra keys, the repeat count and every learned code) can be copied out as one YAML
+document, and a fan can be created or replaced from one. It serves three purposes: setting
+up a second fan with the same remote, keeping a backup before you relearn something, and
+sharing a known-good declaration with other owners of the same remote.
+
+- **Export**: **⋮ → Reconfigure → Export the declaration** shows the document. Copy it;
+  submitting closes the window and changes nothing.
+- **New fan**: **Add integration → RF Fan → Paste a declaration**. Choose your gateway,
+  optionally type a name (the document's name is used otherwise), and paste.
+- **Existing fan**: **⋮ → Reconfigure → Replace with a pasted declaration**. Capabilities
+  and codes are replaced by the document's; the fan keeps its name and gateway.
+
+```yaml
+format: 1
+name: Living room fan
+speed_count: 3
+light_control: toggle
+has_fan_on: false
+direction_control: toggle
+natural_control: none
+natural_levels: 0
+color_control: none
+color_temp_steps: 3
+light_level: none
+light_level_steps: 10
+timer_hours:
+- 2
+- 4
+has_timer_off: false
+has_sound: false
+extra_count: 0
+repeat_count: 3
+codes:
+  fan_off: '5592371'
+  fan_speed_1: '5592380'
+  ...
+```
+
+The document never contains the gateway: that belongs to one installation, and leaving it
+out is what makes the file shareable. A document you write by hand needs only
+`format: 1`; any other key left out takes the value the declaration form starts with.
+
+Codes the document lacks are asked for afterwards, through the usual choice between
+learning and manual entry, and only for those keys. A shared file from a remote without a
+timer key still sets up everything else.
+
+A document is checked against the same rules as the form, and nothing is changed unless
+it passes. The error names the offending key: a misspelt key, a value the form does not
+offer, a code for a key the declaration does not have, a code used twice, or a code that
+is not quoted text. That last rule exists because YAML reads an unquoted `0123` as the
+number 83, which would make the remote send the wrong frame. Exported documents always
+quote their codes.
 
 ## ESPHome contract
 

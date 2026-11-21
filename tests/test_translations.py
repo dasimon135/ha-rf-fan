@@ -210,7 +210,7 @@ def test_no_key_is_defined_twice(name: str) -> None:
 def test_the_reconfigure_form_labels_every_field_it_shows() -> None:
     """Reconfiguring shows the same declaration form, extra-key count included."""
     steps = _loaded("strings.json")["config"]["step"]
-    created = set(steps["user"]["data"]) - {"esphome_device"}
+    created = set(steps["declare"]["data"]) - {"esphome_device"}
 
     assert sorted(created - set(steps["reconfigure_capabilities"]["data"])) == []
 

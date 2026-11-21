@@ -2,6 +2,13 @@
   "config": {
     "step": {
       "user": {
+        "title": "Add an RF fan",
+        "menu_options": {
+          "declare": "Declare it by hand",
+          "paste_declaration": "Paste a declaration (a file exported from another fan, or shared)"
+        }
+      },
+      "declare": {
         "title": "RF Fan - Device Setup",
         "description": "Choose the ESPHome RF gateway and basic fan capabilities. Compatible ESPHome devices found: {detected}.",
         "data": {
@@ -24,6 +31,18 @@
         },
         "data_description": {
           "extra_count": "Keys this integration has no concept of - a memory button, an ioniser, anything the fan does that Home Assistant cannot name. Each becomes a button you name yourself, and the names are asked for next."
+        }
+      },
+      "paste_declaration": {
+        "title": "Paste a declaration",
+        "description": "Paste a fan's declaration: the document **Reconfigure → Export the declaration** shows on another fan, or one somebody shared for the same remote. It describes the remote, never the gateway, so choose yours here. Codes it lacks are asked for next.",
+        "data": {
+          "esphome_device": "ESPHome device name",
+          "fan_name": "Fan display name",
+          "declaration": "Declaration"
+        },
+        "data_description": {
+          "fan_name": "Leave empty to use the name in the declaration."
         }
       },
       "extra_names": {
@@ -210,7 +229,20 @@
         "title": "Reconfigure the fan",
         "menu_options": {
           "reconfigure_codes": "Relearn RF codes (a button that was mis-captured)",
-          "reconfigure_capabilities": "Change the fan declaration (name, speeds, features)"
+          "reconfigure_capabilities": "Change the fan declaration (name, speeds, features)",
+          "reconfigure_export": "Export the declaration (to keep or share)",
+          "reconfigure_paste": "Replace with a pasted declaration"
+        }
+      },
+      "reconfigure_export": {
+        "title": "Export the declaration",
+        "description": "Copy this document to keep it, or to set up another fan with the same remote (**Add integration → RF Fan → Paste a declaration**). It holds the learned codes and no gateway. Submitting closes this window and changes nothing.\n\n{declaration}"
+      },
+      "reconfigure_paste": {
+        "title": "Replace with a pasted declaration",
+        "description": "The capabilities and codes of this fan are replaced by the document's; its name and gateway stay. Codes the document lacks are asked for next.",
+        "data": {
+          "declaration": "Declaration"
         }
       },
       "reconfigure_capabilities": {
@@ -253,7 +285,14 @@
       "learn_timeout": "No RF signal was captured in time. You can retry, paste the code manually, or skip this action.",
       "duplicate_code": "This code is already assigned to another action. Two actions sharing one code cannot be told apart when the physical remote is used. Press a different button, or paste a distinct code.",
       "name_already_used": "Another fan on this gateway already uses this name. Pick a different one.",
-      "natural_levels_need_dedicated": "Natural airflow levels need a key that sets a level. Choose the dedicated airflow option above, or set the number of levels back to 0."
+      "natural_levels_need_dedicated": "Natural airflow levels need a key that sets a level. Choose the dedicated airflow option above, or set the number of levels back to 0.",
+      "declaration_unreadable": "This is not a declaration document. Paste the YAML text exported from a fan.",
+      "declaration_format": "The document has no \"format: 1\" line, or a format this version does not read.",
+      "declaration_unknown_key": "\"{key}\" is not a declaration key. Check its spelling.",
+      "declaration_bad_value": "The value of \"{key}\" is not one the declaration form accepts.",
+      "declaration_code_not_text": "The code of \"{key}\" must be quoted text, for example '0123': unquoted, YAML may read it as another number.",
+      "declaration_unknown_action": "\"{key}\" is a key this declaration does not have. Declare the capability, or remove the line.",
+      "declaration_duplicate_code": "\"{key}\" uses a code another key already uses."
     },
     "abort": {
       "already_configured": "A fan with this name is already configured on this gateway.",
@@ -262,7 +301,8 @@
       "restart_to_finish": "The previous version is removed. Restart Home Assistant, then add RF Fan again to bring your fans over.",
       "legacy_not_removed": "The folder `custom_components/rf_fan` is not the previous version of this integration, so it was left alone. Remove it yourself if it is, then restart Home Assistant.",
       "legacy_gone": "That fan from the previous version no longer exists.",
-      "legacy_too_new": "That fan was set up by a newer version than this one and cannot be brought over."
+      "legacy_too_new": "That fan was set up by a newer version than this one and cannot be brought over.",
+      "declaration_exported": "Nothing was changed."
     }
   },
   "options": {
