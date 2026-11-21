@@ -5,7 +5,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] - 2026-11-21
+
+### A fan's declaration in one file, and keys never learned now speak up
+
+Nothing to do when updating beyond a restart: no option, entity ID or learned code
+changes. The add-integration dialog now opens on a menu, and **Declare it by hand**
+is the form it used to open on.
+
+Checked on the maintainer's own instance (a six-speed Cecotec fan on a raw-timings
+gateway): the integration loaded with nothing in the log, the real fan's declaration
+exported, and that document read back in full through **Paste a declaration**, with
+a misspelt key refused by name. Not run there: an actual creation or replacement
+from a document, the follow-up step for missing codes, and a key that was never
+learned (every key of that fan is learned). Those rest on the test suite.
 
 ### Added
 
