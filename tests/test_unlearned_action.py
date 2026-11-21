@@ -21,7 +21,7 @@ from homeassistant.components.fan import ATTR_DIRECTION
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.rf_fan.const import DOMAIN
+from custom_components.esphome_rf_fan.const import DOMAIN
 from tests.ha_helpers import (
     TRANSMIT_SERVICE,
     actions_sent,
