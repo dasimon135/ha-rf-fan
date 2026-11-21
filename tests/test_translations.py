@@ -227,3 +227,28 @@ def test_the_recovery_screen_does_not_claim_there_was_no_signal() -> None:
     description = _loaded("strings.json")["config"]["step"]["learn_resolve"]["description"]
 
     assert "No RF signal" not in description
+
+
+@pytest.mark.parametrize("name", list(FILES))
+def test_an_unlearned_key_points_at_the_relearn_menu(name: str) -> None:
+    """The error for a key never learned names the way back, as the menu words it (#87).
+
+    Pressing a control whose code was skipped during learning raises this message.
+    It is only useful if the user can find the menu it names, so it quotes the
+    reconfigure menu entry of the same file rather than paraphrasing it.
+    """
+    strings = _loaded(name)
+    message = strings["exceptions"]["action_not_learned"]["message"]
+    menu = strings["config"]["step"]["reconfigure"]["menu_options"]["reconfigure_codes"]
+
+    assert "{action}" in message
+    assert "{fan_name}" in message
+    assert menu.split(" (")[0] in message
+
+
+def test_the_unlearned_key_error_is_translated() -> None:
+    """Same rot as the code labels: an English copy in fr.json passes every shape check."""
+    english = _loaded("en.json")["exceptions"]["action_not_learned"]["message"]
+    french = _loaded("fr.json")["exceptions"]["action_not_learned"]["message"]
+
+    assert french != english

@@ -20,6 +20,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
+from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant_custom_component.common import mock_restore_cache
 
 from tests.ha_helpers import last_call as _last_call
@@ -213,7 +214,10 @@ async def test_turn_on_applies_the_requested_preset(hass: HomeAssistant) -> None
 async def test_colour_position_is_not_moved_when_nothing_is_transmitted(
     hass: HomeAssistant,
 ) -> None:
-    """With no `light_kelvin` code, selecting a colour must not fake the new position."""
+    """With no `light_kelvin` code, selecting a colour must not fake the new position.
+
+    The selection is refused with an error rather than ignored (#87).
+    """
     entry, _calls = await _setup_full(hass)
 
     codes = dict(entry.data["codes"])
@@ -232,9 +236,13 @@ async def test_colour_position_is_not_moved_when_nothing_is_transmitted(
     await hass.async_block_till_done()
     assert hass.states.get(select_id).state == "Neutre"
 
-    await hass.services.async_call(
-        "select", "select_option", {"entity_id": select_id, "option": "Froid"}, blocking=True
-    )
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {"entity_id": select_id, "option": "Froid"},
+            blocking=True,
+        )
     await hass.async_block_till_done()
 
     assert hass.states.get(select_id).state == "Neutre", "position moved without any RF"
