@@ -89,7 +89,7 @@ from .declaration import (
     dump_declaration,
     parse_declaration,
 )
-from .legacy import async_legacy_installed, async_remove_legacy_installed, legacy_entries
+from .legacy import async_legacy_installed, legacy_entries, legacy_running
 
 LEARN_TIMEOUT_SEC = 30
 # After the first frame, keep listening briefly so a held button's repeats can be
@@ -304,6 +304,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         old = self.hass.config_entries.async_get_entry(import_data[CONF_LEGACY_ENTRY_ID])
         if old is None or old.domain != LEGACY_DOMAIN:
             return self.async_abort(reason="legacy_gone")
+        if legacy_running(old):
+            return self.async_abort(reason="restart_to_finish")
         # The old entry may be several schema versions behind, and the new one is
         # created at the current version: nothing would ever migrate its data.
         if not await async_migrate_entry(self.hass, old):
@@ -325,13 +327,21 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_legacy_installed(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """The previous version is still installed and running: remove it first."""
+        """The previous version is still installed and running: the user removes it.
+
+        Never deleted from here: custom_components/rf_fan is also clevrdavid/rf_fan's
+        folder, and nothing outside this integration's own is ours to remove. The
+        step holds until the folder is gone; the import waits for the restart.
+        """
+        errors: dict[str, str] = {}
         if user_input is not None:
-            if not await async_remove_legacy_installed(self.hass):
-                return self.async_abort(reason="legacy_not_removed")
-            return self.async_abort(reason="restart_to_finish")
+            if not await async_legacy_installed(self.hass):
+                # Gone from disk, still loaded: only a restart stops the old code.
+                return self.async_abort(reason="restart_to_finish")
+            errors["base"] = "legacy_still_installed"
         return self.async_show_form(
             step_id="legacy_installed",
+            errors=errors,
             description_placeholders={
                 "count": str(len(legacy_entries(self.hass))),
                 "path": f"custom_components/{LEGACY_DOMAIN}",
@@ -374,6 +384,8 @@ class RfFanConfigFlow(ConfigFlow, domain=DOMAIN):
         if legacy_entries(self.hass):
             if await async_legacy_installed(self.hass):
                 return await self.async_step_legacy_installed()
+            if any(legacy_running(old) for old in legacy_entries(self.hass)):
+                return self.async_abort(reason="restart_to_finish")
             return await self.async_step_import_legacy()
         return self.async_show_menu(
             step_id="user", menu_options=["declare", "paste_declaration"]

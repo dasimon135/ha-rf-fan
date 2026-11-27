@@ -320,9 +320,15 @@ working. It takes two restarts:
    on the old version for now: HACS installs the new one beside it, in
    `custom_components/esphome_rf_fan/`, and leaves `custom_components/rf_fan/`
    in place.
-2. Go to **Settings → Devices & services → Add integration → RF Fan**. It offers
-   to remove the old version: accept, then restart Home Assistant.
-3. Add **RF Fan** again. It lists your fans and offers to bring them over: accept.
+2. Delete the `custom_components/rf_fan/` folder yourself (with the File editor
+   add-on, a Samba share or SSH), then restart Home Assistant. Do not use
+   **Remove** in HACS for this: it deletes the new version,
+   `custom_components/esphome_rf_fan/`, not the old one. The
+   integration never deletes that folder for you: `clevrdavid/rf_fan` installs
+   into the same one. Until it is gone, **Add integration → RF Fan** only shows
+   this step again, and nothing is brought over.
+3. Go to **Settings → Devices & services → Add integration → RF Fan**. It lists
+   your fans and offers to bring them over: accept.
 
 If you enabled debug logging, the logger is now `custom_components.esphome_rf_fan`.
 

@@ -15,18 +15,20 @@ Two facts shape how this is triggered:
   From then on `async_setup` brings over whatever is left.
 - HACS installs a renamed integration into the NEW folder and leaves the old one
   in place, still loaded and still driving the fans. Importing then would give
-  every fan two masters, so the flow first removes the old folder and asks for a
-  restart.
+  every fan two masters, so the flow waits until the user has removed the old
+  version (in HACS, or by deleting the folder) and restarted. Nothing here ever
+  deletes it: custom_components/rf_fan is also where clevrdavid/rf_fan lives, and
+  an integration must not remove anything outside its own folder
+  (hacs/default#10711). The manifest check below only tells the two apart.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import shutil
 from pathlib import Path
 
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -67,6 +69,23 @@ def legacy_entries(hass: HomeAssistant) -> list[ConfigEntry]:
     ]
 
 
+# States in which the old code holds the entry: set up, retrying, or getting there.
+_RUNNING = (
+    ConfigEntryState.LOADED,
+    ConfigEntryState.SETUP_RETRY,
+    ConfigEntryState.SETUP_IN_PROGRESS,
+)
+
+
+def legacy_running(entry: ConfigEntry) -> bool:
+    """True while the old code still drives this entry, i.e. until the restart.
+
+    Deleting the folder does not unload what Home Assistant already imported:
+    an import before the restart would give the fan two masters.
+    """
+    return entry.state in _RUNNING
+
+
 def legacy_package_path(hass: HomeAssistant) -> Path:
     """Where the old package was installed."""
     return Path(hass.config.path("custom_components", LEGACY_DOMAIN))
@@ -83,33 +102,11 @@ def is_legacy_package(path: Path) -> bool:
     )
 
 
-def remove_legacy_package(path: Path) -> bool:
-    """Delete the old package. Refuses anything that is not provably ours."""
-    if not is_legacy_package(path):
-        return False
-    shutil.rmtree(path)
-    return True
-
-
 async def async_legacy_installed(hass: HomeAssistant) -> bool:
     """True while the old package is on disk (and so loaded after a restart)."""
     return await hass.async_add_executor_job(
         is_legacy_package, legacy_package_path(hass)
     )
-
-
-async def async_remove_legacy_installed(hass: HomeAssistant) -> bool:
-    """Delete the old package from disk. True when it was ours and is gone."""
-    removed = await hass.async_add_executor_job(
-        remove_legacy_package, legacy_package_path(hass)
-    )
-    if removed:
-        _LOGGER.warning(
-            "Removed the previous version of RF Fan (custom_components/%s); restart "
-            "Home Assistant, then add RF Fan again to bring your fans over",
-            LEGACY_DOMAIN,
-        )
-    return removed
 
 
 async def async_import_legacy_entries(hass: HomeAssistant) -> None:
@@ -121,7 +118,8 @@ async def async_import_legacy_entries(hass: HomeAssistant) -> None:
         _LOGGER.warning(
             "%d RF Fan entries from the previous version are waiting to be brought "
             "over, but that version is still installed in custom_components/%s. "
-            "Add RF Fan from Settings → Devices & services to remove it",
+            "Remove it in HACS (or delete that folder), restart Home Assistant, then "
+            "add RF Fan from Settings → Devices & services",
             len(pending),
             LEGACY_DOMAIN,
         )

@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Upgrading from 1.x: you remove the old version yourself.** The add-integration
+  dialog no longer deletes `custom_components/rf_fan/` when you accept: that folder
+  is also where `clevrdavid/rf_fan` installs, and an integration should never remove
+  anything outside its own folder, as the HACS review pointed out
+  ([hacs/default#10711](https://github.com/hacs/default/pull/10711)). The dialog now
+  asks you to delete that folder yourself (not with Remove in HACS, which would
+  delete the new version) and to restart Home Assistant. Until the folder is gone
+  it shows the same step again, and until the restart it brings nothing over:
+  deleting the folder does not stop the 1.x code already running, and importing
+  then would give every fan two masters. After the restart, the import is
+  unchanged: learned codes, options, devices and entity IDs all come over.
+  Nothing changes if you have already upgraded.
+
 ## [2.2.0] - 2026-11-21
 
 ### A fan's declaration in one file, and keys never learned now speak up

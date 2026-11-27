@@ -29,7 +29,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.esphome_rf_fan import CARD_URL, LEGACY_CARD_URL
 from custom_components.esphome_rf_fan.const import DOMAIN, LEGACY_DOMAIN
-from custom_components.esphome_rf_fan.legacy import is_legacy_package, remove_legacy_package
+from custom_components.esphome_rf_fan.legacy import is_legacy_package
 from tests.ha_helpers import CODES, DEVICE, full_entry, register_stub
 
 
@@ -271,32 +271,111 @@ async def test_adding_the_integration_offers_to_bring_the_fans_over(
     assert hass.states.get("fan.chambre") is not None
 
 
-async def test_adding_the_integration_first_removes_a_running_old_version(
-    hass: HomeAssistant,
-) -> None:
-    _legacy_entry(hass)
+_OURS = {"domain": "rf_fan", "documentation": "https://github.com/dasimon135/ha-rf-fan"}
+_CLEVRDAVIDS = {"domain": "rf_fan", "documentation": "https://github.com/clevrdavid/rf_fan"}
 
-    with (
-        patch(
-            "custom_components.esphome_rf_fan.config_flow.async_legacy_installed",
-            return_value=True,
-        ),
-        patch(
-            "custom_components.esphome_rf_fan.config_flow.async_remove_legacy_installed",
-            return_value=True,
-        ) as remove,
+
+async def test_a_running_old_version_is_left_for_the_user_to_remove(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    """Its folder is also clevrdavid/rf_fan's: the flow asks, it never deletes."""
+    old = _legacy_entry(hass)
+    folder = _package(tmp_path / "custom_components" / "rf_fan", _OURS)
+
+    with patch(
+        "custom_components.esphome_rf_fan.legacy.legacy_package_path", return_value=folder
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
         assert result["type"] is FlowResultType.FORM
         assert result["step_id"] == "legacy_installed"
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["description_placeholders"]["path"] == "custom_components/rf_fan"
 
-    assert remove.called
+        # Submitted with the folder still there: same step, nothing removed or taken.
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "legacy_installed"
+        assert result["errors"] == {"base": "legacy_still_installed"}
+        assert (folder / "manifest.json").exists()
+        assert hass.config_entries.async_get_entry(old.entry_id) is not None
+        assert not hass.config_entries.async_entries(DOMAIN)
+
+        # The user removes it: the old code still runs until the restart.
+        (folder / "manifest.json").unlink()
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "restart_to_finish"
+        assert hass.config_entries.async_get_entry(old.entry_id) is not None
+        assert not hass.config_entries.async_entries(DOMAIN)
+
+        # After the restart: the import goes ahead as it always did.
+        register_stub(hass)
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        assert result["step_id"] == "import_legacy"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result
+    assert not hass.config_entries.async_entries(LEGACY_DOMAIN)
+    assert hass.states.get("fan.salon") is not None
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        config_entries.ConfigEntryState.LOADED,
+        config_entries.ConfigEntryState.SETUP_RETRY,
+        config_entries.ConfigEntryState.SETUP_IN_PROGRESS,
+    ],
+)
+async def test_no_import_while_the_old_code_still_runs(
+    hass: HomeAssistant, state: config_entries.ConfigEntryState
+) -> None:
+    """Folder deleted, no restart yet: the 1.x code still drives the fan.
+
+    Importing then would give it two masters, so both ways in wait for the restart.
+    Seen on a real 2026.11 instance before this guard: Add integration offered the
+    import straight after the folder was deleted.
+    """
+    old = _legacy_entry(hass)
+    old.mock_state(hass, state)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "restart_to_finish"
-    assert len(hass.config_entries.async_entries(LEGACY_DOMAIN)) == 1
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_IMPORT},
+        data={"legacy_entry_id": old.entry_id},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "restart_to_finish"
+    assert not hass.config_entries.async_entries(DOMAIN)
+    assert hass.config_entries.async_get_entry(old.entry_id) is not None
+
+
+async def test_clevrdavids_folder_does_not_hold_the_import(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    """Same folder name, somebody else's integration: not ours to wait for, or touch."""
+    _legacy_entry(hass)
+    folder = _package(tmp_path / "custom_components" / "rf_fan", _CLEVRDAVIDS)
+
+    with patch(
+        "custom_components.esphome_rf_fan.legacy.legacy_package_path", return_value=folder
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+
+    assert result["step_id"] == "import_legacy"
+    assert (folder / "manifest.json").exists()
 
 
 async def test_without_old_fans_adding_the_integration_is_unchanged(
@@ -335,25 +414,13 @@ def _package(path: Path, manifest: dict) -> Path:
     return path
 
 
-def test_the_old_package_is_recognised_and_removed(tmp_path: Path) -> None:
-    path = _package(
-        tmp_path / "rf_fan",
-        {"domain": "rf_fan", "documentation": "https://github.com/dasimon135/ha-rf-fan"},
-    )
-    assert is_legacy_package(path)
-    assert remove_legacy_package(path)
-    assert not path.exists()
+def test_the_old_package_is_recognised(tmp_path: Path) -> None:
+    assert is_legacy_package(_package(tmp_path / "rf_fan", _OURS))
 
 
-def test_clevrdavids_package_is_never_removed(tmp_path: Path) -> None:
+def test_clevrdavids_package_is_not_the_old_one(tmp_path: Path) -> None:
     """Same folder name, somebody else's integration."""
-    path = _package(
-        tmp_path / "rf_fan",
-        {"domain": "rf_fan", "documentation": "https://github.com/clevrdavid/rf_fan"},
-    )
-    assert not is_legacy_package(path)
-    assert not remove_legacy_package(path)
-    assert path.exists()
+    assert not is_legacy_package(_package(tmp_path / "rf_fan", _CLEVRDAVIDS))
 
 
 def test_a_missing_folder_is_not_the_old_package(tmp_path: Path) -> None:
