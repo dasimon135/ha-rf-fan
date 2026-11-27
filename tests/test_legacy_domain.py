@@ -323,6 +323,43 @@ async def test_a_running_old_version_is_left_for_the_user_to_remove(
     assert hass.states.get("fan.salon") is not None
 
 
+@pytest.mark.parametrize(
+    "state",
+    [
+        config_entries.ConfigEntryState.LOADED,
+        config_entries.ConfigEntryState.SETUP_RETRY,
+        config_entries.ConfigEntryState.SETUP_IN_PROGRESS,
+    ],
+)
+async def test_no_import_while_the_old_code_still_runs(
+    hass: HomeAssistant, state: config_entries.ConfigEntryState
+) -> None:
+    """Folder deleted, no restart yet: the 1.x code still drives the fan.
+
+    Importing then would give it two masters, so both ways in wait for the restart.
+    Seen on a real 2026.11 instance before this guard: Add integration offered the
+    import straight after the folder was deleted.
+    """
+    old = _legacy_entry(hass)
+    old.mock_state(hass, state)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "restart_to_finish"
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_IMPORT},
+        data={"legacy_entry_id": old.entry_id},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "restart_to_finish"
+    assert not hass.config_entries.async_entries(DOMAIN)
+    assert hass.config_entries.async_get_entry(old.entry_id) is not None
+
+
 async def test_clevrdavids_folder_does_not_hold_the_import(
     hass: HomeAssistant, tmp_path: Path
 ) -> None:

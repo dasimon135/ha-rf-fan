@@ -28,7 +28,7 @@ import json
 import logging
 from pathlib import Path
 
-from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -67,6 +67,23 @@ def legacy_entries(hass: HomeAssistant) -> list[ConfigEntry]:
         and CONF_CODES in entry.data
         and entry.entry_id not in claimed
     ]
+
+
+# States in which the old code holds the entry: set up, retrying, or getting there.
+_RUNNING = (
+    ConfigEntryState.LOADED,
+    ConfigEntryState.SETUP_RETRY,
+    ConfigEntryState.SETUP_IN_PROGRESS,
+)
+
+
+def legacy_running(entry: ConfigEntry) -> bool:
+    """True while the old code still drives this entry, i.e. until the restart.
+
+    Deleting the folder does not unload what Home Assistant already imported:
+    an import before the restart would give the fan two masters.
+    """
+    return entry.state in _RUNNING
 
 
 def legacy_package_path(hass: HomeAssistant) -> Path:
