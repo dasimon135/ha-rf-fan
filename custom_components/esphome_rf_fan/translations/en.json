@@ -268,7 +268,7 @@
       },
       "legacy_installed": {
         "title": "Remove the previous version first",
-        "description": "The previous version of RF Fan is still installed, in `{path}`, and it is the one driving your {count} fan(s) right now. Bringing them over while it runs would give every fan two masters, so they wait until it is gone.\n\nRemove it yourself: in HACS if the 1.x version is still listed there, otherwise by deleting the `{path}` folder. Then submit, restart Home Assistant and add RF Fan again: your fans come over with their learned codes, options and entity IDs, so nothing has to be relearned."
+        "description": "The previous version of RF Fan is still installed, in `{path}`, and it is the one driving your {count} fan(s) right now. Bringing them over while it runs would give every fan two masters, so they wait until it is gone.\n\nDelete the `{path}` folder yourself (with the File editor add-on, a Samba share or SSH). Do not use Remove in HACS for this: it deletes the new version, `custom_components/esphome_rf_fan`, not the old one. Then submit, restart Home Assistant and add RF Fan again: your fans come over with their learned codes, options and entity IDs, so nothing has to be relearned."
       },
       "import_legacy": {
         "title": "Bring your fans over",
@@ -293,7 +293,7 @@
       "declaration_code_not_text": "The code of \"{key}\" must be quoted text, for example '0123': unquoted, YAML may read it as another number.",
       "declaration_unknown_action": "\"{key}\" is a key this declaration does not have. Declare the capability, or remove the line.",
       "declaration_duplicate_code": "\"{key}\" uses a code another key already uses.",
-      "legacy_still_installed": "`custom_components/rf_fan` is still there. Remove the previous version in HACS, or delete that folder, then submit again."
+      "legacy_still_installed": "`custom_components/rf_fan` is still there. Delete that folder by hand (Remove in HACS would delete the new version), then submit again."
     },
     "abort": {
       "already_configured": "A fan with this name is already configured on this gateway.",

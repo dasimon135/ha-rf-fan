@@ -268,7 +268,7 @@
       },
       "legacy_installed": {
         "title": "Supprimer d'abord l'ancienne version",
-        "description": "L'ancienne version de RF Fan est toujours installée, dans `{path}`, et c'est elle qui pilote vos {count} ventilateur(s) en ce moment. Les reprendre pendant qu'elle tourne donnerait deux maîtres à chaque ventilateur : ils attendent donc qu'elle soit partie.\n\nSupprimez-la vous-même : dans HACS si la version 1.x y figure encore, sinon en supprimant le dossier `{path}`. Validez ensuite, redémarrez Home Assistant et ajoutez de nouveau RF Fan : vos ventilateurs sont repris avec leurs codes appris, leurs options et leurs identifiants d'entité, sans rien réapprendre."
+        "description": "L'ancienne version de RF Fan est toujours installée, dans `{path}`, et c'est elle qui pilote vos {count} ventilateur(s) en ce moment. Les reprendre pendant qu'elle tourne donnerait deux maîtres à chaque ventilateur : ils attendent donc qu'elle soit partie.\n\nSupprimez vous-même le dossier `{path}` (avec le module complémentaire File editor, un partage Samba ou SSH). N'utilisez pas Supprimer dans HACS pour cela : cette action efface la nouvelle version, `custom_components/esphome_rf_fan`, et non l'ancienne. Validez ensuite, redémarrez Home Assistant et ajoutez de nouveau RF Fan : vos ventilateurs sont repris avec leurs codes appris, leurs options et leurs identifiants d'entité, sans rien réapprendre."
       },
       "import_legacy": {
         "title": "Reprendre vos ventilateurs",
@@ -293,7 +293,7 @@
       "declaration_code_not_text": "Le code de « {key} » doit être un texte entre guillemets, par exemple '0123' : sans guillemets, YAML peut le lire comme un autre nombre.",
       "declaration_unknown_action": "« {key} » est une touche que cette déclaration n'a pas. Déclarez la capacité, ou retirez la ligne.",
       "declaration_duplicate_code": "« {key} » utilise un code qu'une autre touche utilise déjà.",
-      "legacy_still_installed": "`custom_components/rf_fan` est toujours là. Supprimez l'ancienne version dans HACS, ou supprimez ce dossier, puis validez de nouveau."
+      "legacy_still_installed": "`custom_components/rf_fan` est toujours là. Supprimez ce dossier à la main (Supprimer dans HACS effacerait la nouvelle version), puis validez de nouveau."
     },
     "abort": {
       "already_configured": "Un ventilateur portant ce nom est déjà configuré sur cette passerelle.",
