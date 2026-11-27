@@ -5,7 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.1] - 2026-11-27
+
+### Upgrading from 1.x no longer deletes anything outside this integration
+
+Nothing to do when updating if you are already on 2.x: no option, entity ID or
+learned code changes. This release only touches the one-time move from 1.x.
+
+Rehearsed on a throwaway Home Assistant 2026.11.3 with 1.11.0 installed and one
+fan: the dialog asked for the folder, refused the import until the restart, then
+brought the fan over with its entity IDs. Running on the maintainer's own
+instance, which had already moved to 2.x, so the 1.x path did not run there.
 
 ### Changed
 
